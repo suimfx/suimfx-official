@@ -821,7 +821,7 @@ const Footer = () => {
 
             <div className="flex flex-col gap-1 text-[#a0a0a0] text-xs sm:text-sm">
               <p className="font-bold text-white mb-1">SetupFX24</p>
-              <p>2nd floor 4084, currency tower, Vishal Nagar, Raipur, Chhattisgarh</p>
+              <p>4th floor 4084, currency tower, Vishal Nagar, Raipur, Chhattisgarh</p>
             </div>
 
             <div className="flex gap-4 sm:gap-5">
