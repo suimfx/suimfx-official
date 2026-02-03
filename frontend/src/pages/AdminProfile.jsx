@@ -9,7 +9,11 @@ import {
   Link,
   Copy,
   Check,
-  Save
+  Save,
+  Lock,
+  Eye,
+  EyeOff,
+  Key
 } from 'lucide-react'
 import { API_URL } from '../config/api'
 
@@ -25,6 +29,16 @@ const AdminProfile = () => {
     phone: '',
     brandName: ''
   })
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordSuccess, setPasswordSuccess] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
 
   useEffect(() => {
     const adminUser = localStorage.getItem('adminUser')
@@ -89,6 +103,50 @@ const AdminProfile = () => {
     navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    setPasswordError('')
+    setPasswordSuccess('')
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('New passwords do not match')
+      return
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters')
+      return
+    }
+
+    setPasswordLoading(true)
+    try {
+      const token = localStorage.getItem('adminToken')
+      const res = await fetch(`${API_URL}/admin-mgmt/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        })
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        setPasswordSuccess('Password changed successfully!')
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+        setTimeout(() => setPasswordSuccess(''), 3000)
+      } else {
+        setPasswordError(data.message || 'Failed to change password')
+      }
+    } catch (err) {
+      setPasswordError('Connection error. Please try again.')
+    }
+    setPasswordLoading(false)
   }
 
   const getInitials = () => {
@@ -293,6 +351,97 @@ const AdminProfile = () => {
               >
                 <Save size={18} />
                 {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </form>
+          </div>
+
+          {/* Change Password Section */}
+          <div className="bg-dark-800 rounded-xl border border-gray-800 p-6 mt-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Key size={20} className="text-gray-400" />
+              <h3 className="text-lg font-semibold text-white">Change Password</h3>
+            </div>
+            <p className="text-gray-500 text-sm mb-6">Update your account password</p>
+
+            <form onSubmit={handleChangePassword} className="space-y-5">
+              {/* Current Password */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Current Password</label>
+                <div className="relative">
+                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    className="w-full bg-dark-700 border border-gray-600 rounded-lg pl-11 pr-12 py-3 text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Enter current password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  >
+                    {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* New Password Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">New Password</label>
+                  <div className="relative">
+                    <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                      className="w-full bg-dark-700 border border-gray-600 rounded-lg pl-11 pr-12 py-3 text-white focus:outline-none focus:border-blue-500"
+                      placeholder="Enter new password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                    >
+                      {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Confirm New Password</label>
+                  <div className="relative">
+                    <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type="password"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      className="w-full bg-dark-700 border border-gray-600 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                      placeholder="Confirm new password"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Error/Success Messages */}
+              {passwordError && (
+                <p className="text-red-500 text-sm">{passwordError}</p>
+              )}
+              {passwordSuccess && (
+                <p className="text-green-500 text-sm">{passwordSuccess}</p>
+              )}
+
+              {/* Change Password Button */}
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                <Key size={18} />
+                {passwordLoading ? 'Changing...' : 'Change Password'}
               </button>
             </form>
           </div>
