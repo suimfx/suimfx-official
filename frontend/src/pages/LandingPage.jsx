@@ -69,13 +69,13 @@ const Navbar = () => {
 
           <div className="hidden md:flex items-center gap-3 lg:gap-4">
             <a
-              href="https://trade.setupfx24.com/login"
+              href="/user/login"
               className="rounded-lg border border-white/20 bg-white/5 px-4 lg:px-5 py-2 lg:py-2.5 text-[14px] lg:text-[15px] font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/10 active:scale-95"
             >
               Sign In
             </a>
             <a
-              href="https://trade.setupfx24.com/user/signup"
+              href="/user/signup"
               className="rounded-lg bg-white px-4 lg:px-5 py-2 lg:py-2.5 text-[14px] lg:text-[15px] font-semibold text-[#111111] transition-all hover:bg-opacity-90 active:scale-95"
             >
               Get Started
@@ -109,13 +109,13 @@ const Navbar = () => {
             </div>
             <div className="mt-8 flex flex-col gap-4">
               <a
-                href="https://trade.setupfx24.com/login"
+                href="/user/login"
                 className="w-full rounded-lg border border-white/20 bg-white/5 px-5 py-3 text-[16px] font-semibold text-white transition-all hover:bg-white/10 text-center"
               >
                 Sign In
               </a>
               <a
-                href="https://trade.setupfx24.com/user/signup"
+                href="/user/signup"
                 className="w-full rounded-lg bg-white px-5 py-3 text-[16px] font-semibold text-[#111111] transition-all hover:bg-opacity-90 text-center"
               >
                 Get Started
@@ -193,7 +193,7 @@ const Hero = () => {
 
           <div className="mt-8 sm:mt-12 flex flex-col items-center gap-3 sm:gap-4 w-full sm:w-auto sm:flex-row">
             <a
-              href="https://trade.setupfx24.com/user/signup"
+              href="/user/signup"
               className="w-full sm:w-auto rounded-lg bg-white px-6 sm:px-8 py-3 sm:py-4 text-[14px] sm:text-[16px] font-bold text-black transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] text-center"
             >
               Get Started
@@ -500,7 +500,7 @@ const Pricing = () => {
             </ul>
 
             <a 
-              href="https://trade.setupfx24.com/user/signup"
+              href="/user/signup"
               className="w-full bg-[#ff4d4d] hover:bg-[#e63946] text-white py-4 rounded-xl text-[16px] font-semibold transition-all duration-200 block text-center"
             >
               Get Started
@@ -546,7 +546,7 @@ const Pricing = () => {
               </ul>
 
               <a 
-                href="https://trade.setupfx24.com/user/signup"
+                href="/user/signup"
                 className="w-full bg-[#ff4d4d] hover:bg-[#e63946] text-white py-4 rounded-xl text-[16px] font-semibold shadow-[0_10px_30px_rgba(255,77,77,0.2)] transition-all duration-200 block text-center"
               >
                 Get Started

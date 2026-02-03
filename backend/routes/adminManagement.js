@@ -12,23 +12,28 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 
 // ==================== ADMIN AUTH ====================
 
-// POST /api/admin-mgmt/login - Admin login
+// POST /api/admin-mgmt/login - Super Admin login only (for /admin route)
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
 
     const admin = await Admin.findOne({ email: email.toLowerCase() })
     if (!admin) {
-      return res.status(401).json({ message: 'Invalid credentials' })
+      return res.status(401).json({ success: false, message: 'Invalid credentials' })
+    }
+
+    // Only SUPER_ADMIN can login via this route
+    if (admin.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Access denied. Use admin-employee login.' })
     }
 
     if (admin.status !== 'ACTIVE') {
-      return res.status(403).json({ message: 'Account is suspended or pending' })
+      return res.status(403).json({ success: false, message: 'Account is suspended or pending' })
     }
 
     const isMatch = await bcrypt.compare(password, admin.password)
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' })
+      return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
     // Update last login
@@ -53,14 +58,67 @@ router.post('/login', async (req, res) => {
         firstName: admin.firstName,
         lastName: admin.lastName,
         role: admin.role,
-        urlSlug: admin.urlSlug,
-        brandName: admin.brandName,
-        permissions: admin.permissions,
+        sidebarPermissions: admin.sidebarPermissions,
         walletBalance: wallet?.balance || 0
       }
     })
   } catch (error) {
-    res.status(500).json({ message: 'Login failed', error: error.message })
+    res.status(500).json({ success: false, message: 'Login failed', error: error.message })
+  }
+})
+
+// POST /api/admin-mgmt/admin-login - Admin/Employee login only (for /admin-employee route)
+router.post('/admin-login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+
+    const admin = await Admin.findOne({ email: email.toLowerCase() })
+    if (!admin) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' })
+    }
+
+    // Only ADMIN (not SUPER_ADMIN) can login via this route
+    if (admin.role !== 'ADMIN') {
+      return res.status(403).json({ success: false, message: 'Access denied. Use super admin login.' })
+    }
+
+    if (admin.status !== 'ACTIVE') {
+      return res.status(403).json({ success: false, message: 'Account is suspended or pending' })
+    }
+
+    const isMatch = await bcrypt.compare(password, admin.password)
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' })
+    }
+
+    // Update last login
+    admin.lastLogin = new Date()
+    await admin.save()
+
+    // Get wallet info
+    const wallet = await AdminWallet.findOne({ adminId: admin._id })
+
+    const token = jwt.sign(
+      { adminId: admin._id, role: admin.role, email: admin.email },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    )
+
+    res.json({
+      success: true,
+      token,
+      admin: {
+        _id: admin._id,
+        email: admin.email,
+        firstName: admin.firstName,
+        lastName: admin.lastName,
+        role: admin.role,
+        sidebarPermissions: admin.sidebarPermissions,
+        walletBalance: wallet?.balance || 0
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Login failed', error: error.message })
   }
 })
 
@@ -126,14 +184,11 @@ router.post('/admins', async (req, res) => {
       password,
       firstName,
       lastName,
-      phone,
-      urlSlug,
-      brandName,
-      permissions
+      phone
     } = req.body
 
     // Validate required fields
-    if (!email || !password || !firstName || !lastName || !urlSlug) {
+    if (!email || !password || !firstName || !lastName) {
       return res.status(400).json({ message: 'Missing required fields' })
     }
 
@@ -143,14 +198,36 @@ router.post('/admins', async (req, res) => {
       return res.status(400).json({ message: 'Email already exists' })
     }
 
-    // Check if URL slug already exists
-    const existingSlug = await Admin.findOne({ urlSlug: urlSlug.toLowerCase() })
-    if (existingSlug) {
-      return res.status(400).json({ message: 'URL slug already exists' })
-    }
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Default sidebar permissions for new ADMIN
+    const defaultSidebarPermissions = {
+      overviewDashboard: true,
+      userManagement: false,
+      tradeManagement: false,
+      fundManagement: false,
+      bankSettings: false,
+      ibManagement: false,
+      forexCharges: false,
+      earningsReport: false,
+      copyTrade: false,
+      propFirmChallenges: false,
+      accountTypes: false,
+      themeSettings: false,
+      emailTemplates: false,
+      bonusManagement: false,
+      adminManagement: false,
+      employeeManagement: false,
+      kycVerification: false,
+      supportTickets: false
+    }
+
+    // Merge with provided sidebarPermissions
+    const finalSidebarPermissions = { ...defaultSidebarPermissions, ...(req.body.sidebarPermissions || {}) }
+
+    // Generate unique urlSlug from email
+    const generatedSlug = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Date.now().toString(36)
 
     // Create admin
     const admin = new Admin({
@@ -159,10 +236,9 @@ router.post('/admins', async (req, res) => {
       firstName,
       lastName,
       phone: phone || '',
-      urlSlug: urlSlug.toLowerCase(),
-      brandName: brandName || firstName + "'s Trading",
+      urlSlug: generatedSlug,
       role: 'ADMIN',
-      permissions: permissions || {}
+      sidebarPermissions: finalSidebarPermissions
     })
 
     await admin.save()
@@ -176,15 +252,13 @@ router.post('/admins', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Admin created successfully',
+      message: 'Employee created successfully',
       admin: {
         _id: admin._id,
         email: admin.email,
         firstName: admin.firstName,
         lastName: admin.lastName,
-        urlSlug: admin.urlSlug,
-        brandName: admin.brandName,
-        permissions: admin.permissions
+        sidebarPermissions: admin.sidebarPermissions
       }
     })
   } catch (error) {
@@ -199,62 +273,56 @@ router.put('/admins/:id', async (req, res) => {
       firstName,
       lastName,
       phone,
-      brandName,
-      permissions,
       status
     } = req.body
 
     const admin = await Admin.findById(req.params.id)
     if (!admin) {
-      return res.status(404).json({ message: 'Admin not found' })
+      return res.status(404).json({ message: 'Employee not found' })
     }
 
     // Update fields
     if (firstName) admin.firstName = firstName
     if (lastName) admin.lastName = lastName
     if (phone !== undefined) admin.phone = phone
-    if (brandName) admin.brandName = brandName
-    if (permissions) admin.permissions = { ...admin.permissions, ...permissions }
     if (status) admin.status = status
 
     await admin.save()
 
     res.json({
       success: true,
-      message: 'Admin updated successfully',
+      message: 'Employee updated successfully',
       admin: {
         _id: admin._id,
         email: admin.email,
         firstName: admin.firstName,
         lastName: admin.lastName,
-        urlSlug: admin.urlSlug,
-        brandName: admin.brandName,
-        permissions: admin.permissions,
+        sidebarPermissions: admin.sidebarPermissions,
         status: admin.status
       }
     })
   } catch (error) {
-    res.status(500).json({ message: 'Error updating admin', error: error.message })
+    res.status(500).json({ message: 'Error updating employee', error: error.message })
   }
 })
 
-// PUT /api/admin-mgmt/admins/:id/permissions - Update admin permissions
+// PUT /api/admin-mgmt/admins/:id/permissions - Update admin sidebar permissions
 router.put('/admins/:id/permissions', async (req, res) => {
   try {
-    const { permissions } = req.body
+    const { sidebarPermissions } = req.body
 
     const admin = await Admin.findById(req.params.id)
     if (!admin) {
-      return res.status(404).json({ message: 'Admin not found' })
+      return res.status(404).json({ message: 'Employee not found' })
     }
 
-    admin.permissions = { ...admin.permissions, ...permissions }
+    admin.sidebarPermissions = { ...admin.sidebarPermissions, ...sidebarPermissions }
     await admin.save()
 
     res.json({
       success: true,
       message: 'Permissions updated successfully',
-      permissions: admin.permissions
+      sidebarPermissions: admin.sidebarPermissions
     })
   } catch (error) {
     res.status(500).json({ message: 'Error updating permissions', error: error.message })

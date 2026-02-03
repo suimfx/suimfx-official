@@ -33,27 +33,54 @@ const AdminLayout = ({ children, title, subtitle }) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState({})
+  const [admin, setAdmin] = useState(null)
 
-  const menuItems = [
-    { name: 'Overview Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
-    { name: 'User Management', icon: Users, path: '/admin/users' },
-    { name: 'Trade Management', icon: TrendingUp, path: '/admin/trades' },
-    { name: 'Fund Management', icon: Wallet, path: '/admin/funds' },
-    { name: 'Bank Settings', icon: Building2, path: '/admin/bank-settings' },
-    { name: 'IB Management', icon: UserCog, path: '/admin/ib-management' },
-    { name: 'Forex Charges', icon: DollarSign, path: '/admin/forex-charges' },
-    { name: 'Earnings Report', icon: TrendingUp, path: '/admin/earnings' },
-    { name: 'Copy Trade Management', icon: Copy, path: '/admin/copy-trade' },
-    { name: 'Prop Firm Challenges', icon: Trophy, path: '/admin/prop-firm' },
-    { name: 'Account Types', icon: CreditCard, path: '/admin/account-types' },
-    { name: 'Theme Settings', icon: Palette, path: '/admin/theme' },
-    { name: 'Email Templates', icon: Mail, path: '/admin/email-templates' },
-    { name: 'Bonus Management', icon: Gift, path: '/admin/bonus-management' },
-    { name: 'Banner Management', icon: Image, path: '/admin/banners' },
-    { name: 'Admin Management', icon: Shield, path: '/admin/admin-management' },
-    { name: 'KYC Verification', icon: FileCheck, path: '/admin/kyc' },
-    { name: 'Support Tickets', icon: HeadphonesIcon, path: '/admin/support' },
+  // Get admin data from localStorage
+  useEffect(() => {
+    const adminUser = localStorage.getItem('adminUser')
+    if (adminUser) {
+      setAdmin(JSON.parse(adminUser))
+    }
+  }, [])
+
+  // All menu items with sidebarPermission key
+  const allMenuItems = [
+    { name: 'Overview Dashboard', icon: LayoutDashboard, path: '/admin/dashboard', sidebarKey: 'overviewDashboard' },
+    { name: 'User Management', icon: Users, path: '/admin/users', sidebarKey: 'userManagement' },
+    { name: 'Trade Management', icon: TrendingUp, path: '/admin/trades', sidebarKey: 'tradeManagement' },
+    { name: 'Fund Management', icon: Wallet, path: '/admin/funds', sidebarKey: 'fundManagement' },
+    { name: 'Bank Settings', icon: Building2, path: '/admin/bank-settings', sidebarKey: 'bankSettings' },
+    { name: 'IB Management', icon: UserCog, path: '/admin/ib-management', sidebarKey: 'ibManagement' },
+    { name: 'Forex Charges', icon: DollarSign, path: '/admin/forex-charges', sidebarKey: 'forexCharges' },
+    { name: 'Earnings Report', icon: TrendingUp, path: '/admin/earnings', sidebarKey: 'earningsReport' },
+    { name: 'Copy Trade Management', icon: Copy, path: '/admin/copy-trade', sidebarKey: 'copyTrade' },
+    { name: 'Prop Firm Challenges', icon: Trophy, path: '/admin/prop-firm', sidebarKey: 'propFirmChallenges' },
+    { name: 'Account Types', icon: CreditCard, path: '/admin/account-types', sidebarKey: 'accountTypes' },
+    { name: 'Theme Settings', icon: Palette, path: '/admin/theme', sidebarKey: 'themeSettings' },
+    { name: 'Email Templates', icon: Mail, path: '/admin/email-templates', sidebarKey: 'emailTemplates' },
+    { name: 'Bonus Management', icon: Gift, path: '/admin/bonus-management', sidebarKey: 'bonusManagement' },
+    { name: 'Banner Management', icon: Image, path: '/admin/banners', sidebarKey: 'bonusManagement' },
+    { name: 'Employee Management', icon: Shield, path: '/admin/admin-management', sidebarKey: 'employeeManagement' },
+    { name: 'KYC Verification', icon: FileCheck, path: '/admin/kyc', sidebarKey: 'kycVerification' },
+    { name: 'Support Tickets', icon: HeadphonesIcon, path: '/admin/support', sidebarKey: 'supportTickets' },
   ]
+
+  // Check if user has sidebar permission (SUPER_ADMIN has all permissions)
+  const hasSidebarPermission = (sidebarKey) => {
+    if (!admin) return false
+    if (admin.role === 'SUPER_ADMIN') return true
+    if (sidebarKey === 'overviewDashboard') return true // Dashboard always visible
+    
+    // Check sidebarPermissions (new format)
+    if (admin.sidebarPermissions && admin.sidebarPermissions[sidebarKey] === true) {
+      return true
+    }
+    
+    return false
+  }
+
+  // Filter menu items based on sidebar permissions
+  const menuItems = allMenuItems.filter(item => hasSidebarPermission(item.sidebarKey))
 
   useEffect(() => {
     const adminToken = localStorage.getItem('adminToken')
@@ -63,9 +90,15 @@ const AdminLayout = ({ children, title, subtitle }) => {
   }, [navigate])
 
   const handleLogout = () => {
+    const currentAdmin = admin
     localStorage.removeItem('adminToken')
     localStorage.removeItem('adminUser')
-    navigate('/admin')
+    // Redirect based on role - ADMIN goes to /admin-employee, SUPER_ADMIN goes to /admin
+    if (currentAdmin?.role === 'ADMIN') {
+      navigate('/admin-employee')
+    } else {
+      navigate('/admin')
+    }
   }
 
   const isActive = (path) => location.pathname === path
@@ -101,7 +134,6 @@ const AdminLayout = ({ children, title, subtitle }) => {
         <div className="p-4 flex items-center justify-between border-b border-gray-800">
           <div className="flex items-center gap-2">
             <img src={logoImage} alt="SetupFX" className="h-8 w-auto object-contain flex-shrink-0" />
-            {sidebarExpanded && <span className="text-white font-semibold">SetupFX Admin</span>}
           </div>
           <button 
             onClick={() => setSidebarExpanded(!sidebarExpanded)}

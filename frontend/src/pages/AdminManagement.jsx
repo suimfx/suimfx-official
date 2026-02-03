@@ -33,7 +33,6 @@ const AdminManagement = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [selectedAdmin, setSelectedAdmin] = useState(null)
   const [newPassword, setNewPassword] = useState('')
-  const [copiedSlug, setCopiedSlug] = useState(null)
   
   const [newAdmin, setNewAdmin] = useState({
     email: '',
@@ -41,42 +40,34 @@ const AdminManagement = () => {
     firstName: '',
     lastName: '',
     phone: '',
-    urlSlug: '',
-    brandName: '',
-    permissions: {}
+    sidebarPermissions: {
+      overviewDashboard: true
+    }
   })
   
   const [fundAmount, setFundAmount] = useState('')
   const [fundDescription, setFundDescription] = useState('')
 
-  const allPermissions = [
-    { key: 'canManageUsers', label: 'Manage Users', category: 'Users' },
-    { key: 'canCreateUsers', label: 'Create Users', category: 'Users' },
-    { key: 'canDeleteUsers', label: 'Delete Users', category: 'Users' },
-    { key: 'canViewUsers', label: 'View Users', category: 'Users' },
-    { key: 'canManageTrades', label: 'Manage Trades', category: 'Trading' },
-    { key: 'canCloseTrades', label: 'Close Trades', category: 'Trading' },
-    { key: 'canModifyTrades', label: 'Modify Trades', category: 'Trading' },
-    { key: 'canManageAccounts', label: 'Manage Accounts', category: 'Accounts' },
-    { key: 'canCreateAccounts', label: 'Create Accounts', category: 'Accounts' },
-    { key: 'canDeleteAccounts', label: 'Delete Accounts', category: 'Accounts' },
-    { key: 'canModifyLeverage', label: 'Modify Leverage', category: 'Accounts' },
-    { key: 'canManageDeposits', label: 'Manage Deposits', category: 'Finance' },
-    { key: 'canApproveDeposits', label: 'Approve Deposits', category: 'Finance' },
-    { key: 'canManageWithdrawals', label: 'Manage Withdrawals', category: 'Finance' },
-    { key: 'canApproveWithdrawals', label: 'Approve Withdrawals', category: 'Finance' },
-    { key: 'canManageKYC', label: 'Manage KYC', category: 'KYC' },
-    { key: 'canApproveKYC', label: 'Approve KYC', category: 'KYC' },
-    { key: 'canManageIB', label: 'Manage IB', category: 'IB' },
-    { key: 'canApproveIB', label: 'Approve IB', category: 'IB' },
-    { key: 'canManageCopyTrading', label: 'Manage Copy Trading', category: 'Copy Trade' },
-    { key: 'canApproveMasters', label: 'Approve Masters', category: 'Copy Trade' },
-    { key: 'canManageSymbols', label: 'Manage Symbols', category: 'Settings' },
-    { key: 'canManageGroups', label: 'Manage Groups', category: 'Settings' },
-    { key: 'canManageSettings', label: 'Manage Settings', category: 'Settings' },
-    { key: 'canManageTheme', label: 'Manage Theme', category: 'Settings' },
-    { key: 'canViewReports', label: 'View Reports', category: 'Reports' },
-    { key: 'canExportReports', label: 'Export Reports', category: 'Reports' },
+  // Sidebar permissions matching the image layout
+  const sidebarPermissions = [
+    { key: 'overviewDashboard', label: 'Overview Dashboard' },
+    { key: 'userManagement', label: 'User Management' },
+    { key: 'tradeManagement', label: 'Trade Management' },
+    { key: 'fundManagement', label: 'Fund Management' },
+    { key: 'bankSettings', label: 'Bank Settings' },
+    { key: 'ibManagement', label: 'IB Management' },
+    { key: 'forexCharges', label: 'Forex Charges' },
+    { key: 'earningsReport', label: 'Earnings Report' },
+    { key: 'copyTrade', label: 'Copy Trade' },
+    { key: 'propFirmChallenges', label: 'Prop Firm Challenges' },
+    { key: 'accountTypes', label: 'Account Types' },
+    { key: 'themeSettings', label: 'Theme Settings' },
+    { key: 'emailTemplates', label: 'Email Templates' },
+    { key: 'bonusManagement', label: 'Bonus Management' },
+    { key: 'adminManagement', label: 'Admin Management' },
+    { key: 'employeeManagement', label: 'Employee Management' },
+    { key: 'kycVerification', label: 'KYC Verification' },
+    { key: 'supportTickets', label: 'Support Tickets' },
   ]
 
   useEffect(() => {
@@ -105,15 +96,15 @@ const AdminManagement = () => {
       })
       const data = await res.json()
       if (data.success) {
-        alert('Admin created successfully!')
+        alert('Employee created successfully!')
         setShowAddModal(false)
-        setNewAdmin({ email: '', password: '', firstName: '', lastName: '', phone: '', urlSlug: '', brandName: '', permissions: {} })
+        setNewAdmin({ email: '', password: '', firstName: '', lastName: '', phone: '', sidebarPermissions: { overviewDashboard: true } })
         fetchAdmins()
       } else {
-        alert(data.message || 'Failed to create admin')
+        alert(data.message || 'Failed to create employee')
       }
     } catch (error) {
-      alert('Error creating admin')
+      alert('Error creating employee')
     }
   }
 
@@ -126,20 +117,19 @@ const AdminManagement = () => {
           firstName: selectedAdmin.firstName,
           lastName: selectedAdmin.lastName,
           phone: selectedAdmin.phone,
-          brandName: selectedAdmin.brandName,
           status: selectedAdmin.status
         })
       })
       const data = await res.json()
       if (data.success) {
-        alert('Admin updated successfully!')
+        alert('Employee updated successfully!')
         setShowEditModal(false)
         fetchAdmins()
       } else {
-        alert(data.message || 'Failed to update admin')
+        alert(data.message || 'Failed to update employee')
       }
     } catch (error) {
-      alert('Error updating admin')
+      alert('Error updating employee')
     }
   }
 
@@ -148,7 +138,7 @@ const AdminManagement = () => {
       const res = await fetch(`${API_URL}/admin-mgmt/admins/${selectedAdmin._id}/permissions`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissions: selectedAdmin.permissions })
+        body: JSON.stringify({ sidebarPermissions: selectedAdmin.sidebarPermissions })
       })
       const data = await res.json()
       if (data.success) {
@@ -214,13 +204,13 @@ const AdminManagement = () => {
       })
       const data = await res.json()
       if (data.success) {
-        alert('Admin deleted successfully!')
+        alert('Employee deleted successfully!')
         fetchAdmins()
       } else {
-        alert(data.message || 'Failed to delete admin')
+        alert(data.message || 'Failed to delete employee')
       }
     } catch (error) {
-      alert('Error deleting admin')
+      alert('Error deleting employee')
     }
   }
 
@@ -248,27 +238,38 @@ const AdminManagement = () => {
     }
   }
 
-  const copyToClipboard = (slug) => {
-    const url = `${window.location.origin}/${slug}/login`
-    navigator.clipboard.writeText(url)
-    setCopiedSlug(slug)
-    setTimeout(() => setCopiedSlug(null), 2000)
+  const selectAllPermissions = () => {
+    const allSelected = {}
+    sidebarPermissions.forEach(p => allSelected[p.key] = true)
+    if (showAddModal) {
+      setNewAdmin({ ...newAdmin, sidebarPermissions: allSelected })
+    } else if (selectedAdmin) {
+      setSelectedAdmin({ ...selectedAdmin, sidebarPermissions: allSelected })
+    }
+  }
+
+  const deselectAllPermissions = () => {
+    const noneSelected = { overviewDashboard: true } // Dashboard always enabled
+    if (showAddModal) {
+      setNewAdmin({ ...newAdmin, sidebarPermissions: noneSelected })
+    } else if (selectedAdmin) {
+      setSelectedAdmin({ ...selectedAdmin, sidebarPermissions: noneSelected })
+    }
   }
 
   const filteredAdmins = admins.filter(admin => 
     admin.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     admin.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    admin.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    admin.urlSlug?.toLowerCase().includes(searchTerm.toLowerCase())
+    admin.email?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const getPermissionCount = (permissions) => {
-    if (!permissions) return 0
-    return Object.values(permissions).filter(v => v === true).length
+  const getPermissionCount = (sidebarPerms) => {
+    if (!sidebarPerms) return 0
+    return Object.values(sidebarPerms).filter(v => v === true).length
   }
 
   return (
-    <AdminLayout title="Admin Management" subtitle="Manage sub-admins, permissions, and wallets">
+    <AdminLayout title="Employee Management" subtitle="Manage employees and their sidebar permissions">
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
@@ -277,7 +278,7 @@ const AdminManagement = () => {
               <Shield size={20} className="text-blue-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Total Admins</p>
+              <p className="text-gray-500 text-sm">Total Employees</p>
               <p className="text-white text-xl font-bold">{admins.length}</p>
             </div>
           </div>
@@ -288,45 +289,45 @@ const AdminManagement = () => {
               <Check size={20} className="text-green-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Active Admins</p>
+              <p className="text-gray-500 text-sm">Active Employees</p>
               <p className="text-white text-xl font-bold">{admins.filter(a => a.status === 'ACTIVE').length}</p>
             </div>
           </div>
         </div>
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-              <Users size={20} className="text-purple-500" />
+            <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+              <Users size={20} className="text-red-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Total Users</p>
-              <p className="text-white text-xl font-bold">{admins.reduce((sum, a) => sum + (a.userCount || 0), 0)}</p>
+              <p className="text-gray-500 text-sm">Suspended</p>
+              <p className="text-white text-xl font-bold">{admins.filter(a => a.status === 'SUSPENDED').length}</p>
             </div>
           </div>
         </div>
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-              <Wallet size={20} className="text-yellow-500" />
+            <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+              <Key size={20} className="text-purple-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Total Wallet Balance</p>
-              <p className="text-white text-xl font-bold">${admins.reduce((sum, a) => sum + (a.walletBalance || 0), 0).toLocaleString()}</p>
+              <p className="text-gray-500 text-sm">Avg Permissions</p>
+              <p className="text-white text-xl font-bold">{admins.length ? Math.round(admins.reduce((sum, a) => sum + getPermissionCount(a.sidebarPermissions), 0) / admins.length) : 0}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Admin List */}
+      {/* Employee List */}
       <div className="bg-dark-800 rounded-xl border border-gray-800 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 border-b border-gray-800">
-          <h2 className="text-white font-semibold text-lg">Sub-Admins</h2>
+          <h2 className="text-white font-semibold text-lg">Employees</h2>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 type="text"
-                placeholder="Search admins..."
+                placeholder="Search employees..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full sm:w-64 bg-dark-700 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
@@ -334,21 +335,21 @@ const AdminManagement = () => {
             </div>
             <button 
               onClick={() => setShowAddModal(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-accent-green text-black rounded-lg hover:bg-accent-green/90 transition-colors font-medium"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
             >
               <Plus size={16} />
-              <span>Add Admin</span>
+              <span>Add Employee</span>
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading admins...</div>
+          <div className="p-8 text-center text-gray-500">Loading employees...</div>
         ) : filteredAdmins.length === 0 ? (
           <div className="p-8 text-center">
             <Shield size={48} className="mx-auto text-gray-600 mb-4" />
-            <p className="text-gray-500">No admins found</p>
-            <p className="text-gray-600 text-sm mt-1">Create your first sub-admin to get started</p>
+            <p className="text-gray-500">No employees found</p>
+            <p className="text-gray-600 text-sm mt-1">Create your first employee to get started</p>
           </div>
         ) : (
           <>
@@ -363,7 +364,7 @@ const AdminManagement = () => {
                       </div>
                       <div>
                         <p className="text-white font-medium">{admin.firstName} {admin.lastName}</p>
-                        <p className="text-gray-500 text-sm">{admin.brandName}</p>
+                        <p className="text-gray-500 text-sm">{admin.email}</p>
                       </div>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs ${
@@ -374,32 +375,15 @@ const AdminManagement = () => {
                   </div>
                   <div className="space-y-2 text-sm mb-3">
                     <div className="flex items-center gap-2 text-gray-400">
-                      <Mail size={14} />
-                      <span>{admin.email}</span>
+                      <Key size={14} />
+                      <span>{getPermissionCount(admin.sidebarPermissions)} permissions</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-400">
-                      <Link size={14} />
-                      <span>/{admin.urlSlug}/login</span>
-                      <button onClick={() => copyToClipboard(admin.urlSlug)} className="text-blue-500">
-                        {copiedSlug === admin.urlSlug ? <Check size={14} /> : <Copy size={14} />}
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-400">
-                      <Wallet size={14} />
-                      <span>Balance: ${admin.walletBalance?.toLocaleString() || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-400">
-                      <Users size={14} />
-                      <span>{admin.userCount || 0} users</span>
+                      <Calendar size={14} />
+                      <span>Joined: {new Date(admin.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-5 gap-2 pt-3 border-t border-gray-600">
-                    <button 
-                      onClick={() => { setSelectedAdmin(admin); setShowFundModal(true) }}
-                      className="flex items-center justify-center gap-1 py-2 bg-green-500/20 text-green-500 rounded-lg text-xs"
-                    >
-                      <DollarSign size={14} />
-                    </button>
+                  <div className="grid grid-cols-4 gap-2 pt-3 border-t border-gray-600">
                     <button 
                       onClick={() => { setSelectedAdmin({...admin}); setShowPermissionsModal(true) }}
                       className="flex items-center justify-center gap-1 py-2 bg-purple-500/20 text-purple-500 rounded-lg text-xs"
@@ -434,11 +418,9 @@ const AdminManagement = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-700">
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Admin</th>
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">URL Slug</th>
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Wallet</th>
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Users</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Employee</th>
                     <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Permissions</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Joined</th>
                     <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Status</th>
                     <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Actions</th>
                   </tr>
@@ -458,25 +440,10 @@ const AdminManagement = () => {
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400">/{admin.urlSlug}</span>
-                          <button 
-                            onClick={() => copyToClipboard(admin.urlSlug)}
-                            className="text-blue-500 hover:text-blue-400"
-                          >
-                            {copiedSlug === admin.urlSlug ? <Check size={14} /> : <Copy size={14} />}
-                          </button>
-                        </div>
+                        <span className="text-gray-400">{getPermissionCount(admin.sidebarPermissions)} / {sidebarPermissions.length}</span>
                       </td>
                       <td className="py-4 px-4">
-                        <p className="text-white font-medium">${admin.walletBalance?.toLocaleString() || 0}</p>
-                        <p className="text-gray-500 text-xs">Given: ${admin.totalGivenToUsers?.toLocaleString() || 0}</p>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-white">{admin.userCount || 0}</span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-gray-400">{getPermissionCount(admin.permissions)} permissions</span>
+                        <span className="text-gray-400">{new Date(admin.createdAt).toLocaleDateString()}</span>
                       </td>
                       <td className="py-4 px-4">
                         <button
@@ -490,13 +457,6 @@ const AdminManagement = () => {
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-1">
-                          <button 
-                            onClick={() => { setSelectedAdmin(admin); setShowFundModal(true) }}
-                            className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-green-500"
-                            title="Fund Wallet"
-                          >
-                            <DollarSign size={16} />
-                          </button>
                           <button 
                             onClick={() => { setSelectedAdmin({...admin}); setShowPermissionsModal(true) }}
                             className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-purple-500"
@@ -536,12 +496,12 @@ const AdminManagement = () => {
         )}
       </div>
 
-      {/* Add Admin Modal */}
+      {/* Add Employee Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-dark-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">Create New Admin</h3>
+              <h3 className="text-white font-semibold text-lg">Create New Employee</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
@@ -576,7 +536,7 @@ const AdminManagement = () => {
                   value={newAdmin.email}
                   onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
                   className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
-                  placeholder="admin@example.com"
+                  placeholder="employee@example.com"
                 />
               </div>
               <div>
@@ -590,30 +550,6 @@ const AdminManagement = () => {
                 />
               </div>
               <div>
-                <label className="text-gray-400 text-sm mb-1 block">URL Slug * (unique identifier)</label>
-                <div className="flex items-center">
-                  <span className="text-gray-500 bg-dark-600 px-3 py-2 rounded-l-lg border border-r-0 border-gray-700">/</span>
-                  <input
-                    type="text"
-                    value={newAdmin.urlSlug}
-                    onChange={(e) => setNewAdmin({...newAdmin, urlSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')})}
-                    className="flex-1 bg-dark-700 border border-gray-700 rounded-r-lg px-3 py-2 text-white"
-                    placeholder="my-trading"
-                  />
-                </div>
-                <p className="text-gray-500 text-xs mt-1">Users will access: {window.location.origin}/{newAdmin.urlSlug || 'slug'}/login</p>
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Brand Name</label>
-                <input
-                  type="text"
-                  value={newAdmin.brandName}
-                  onChange={(e) => setNewAdmin({...newAdmin, brandName: e.target.value})}
-                  className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
-                  placeholder="My Trading Platform"
-                />
-              </div>
-              <div>
                 <label className="text-gray-400 text-sm mb-1 block">Phone</label>
                 <input
                   type="text"
@@ -624,21 +560,44 @@ const AdminManagement = () => {
                 />
               </div>
               
+              {/* Sidebar Permissions */}
               <div>
-                <label className="text-gray-400 text-sm mb-2 block">Default Permissions</label>
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto bg-dark-700 rounded-lg p-3">
-                  {allPermissions.slice(0, 10).map(perm => (
-                    <label key={perm.key} className="flex items-center gap-2 text-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-gray-400 text-sm">Sidebar Permissions</label>
+                  <div className="flex gap-2 text-sm">
+                    <button 
+                      type="button"
+                      onClick={selectAllPermissions}
+                      className="text-blue-500 hover:text-blue-400"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-gray-600">|</span>
+                    <button 
+                      type="button"
+                      onClick={deselectAllPermissions}
+                      className="text-gray-400 hover:text-gray-300"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 bg-dark-700 rounded-lg p-4">
+                  {sidebarPermissions.map(perm => (
+                    <label key={perm.key} className="flex items-center gap-2 text-sm cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={newAdmin.permissions[perm.key] || false}
+                        checked={newAdmin.sidebarPermissions?.[perm.key] || false}
                         onChange={(e) => setNewAdmin({
                           ...newAdmin,
-                          permissions: {...newAdmin.permissions, [perm.key]: e.target.checked}
+                          sidebarPermissions: {...newAdmin.sidebarPermissions, [perm.key]: e.target.checked}
                         })}
-                        className="rounded"
+                        disabled={perm.key === 'overviewDashboard'}
+                        className="rounded bg-dark-600 border-gray-600 text-blue-500 focus:ring-blue-500"
                       />
-                      <span className="text-gray-300">{perm.label}</span>
+                      <span className={`${perm.key === 'overviewDashboard' ? 'text-gray-500' : 'text-gray-300'}`}>
+                        {perm.label}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -653,21 +612,21 @@ const AdminManagement = () => {
               </button>
               <button
                 onClick={handleCreateAdmin}
-                className="flex-1 py-2 bg-accent-green text-black rounded-lg font-medium hover:bg-accent-green/90"
+                className="flex-1 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
               >
-                Create Admin
+                Create Employee
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Admin Modal */}
+      {/* Edit Employee Modal */}
       {showEditModal && selectedAdmin && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-800 rounded-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">Edit Admin</h3>
+              <h3 className="text-white font-semibold text-lg">Edit Employee</h3>
               <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
@@ -692,15 +651,6 @@ const AdminManagement = () => {
                     className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Brand Name</label>
-                <input
-                  type="text"
-                  value={selectedAdmin.brandName}
-                  onChange={(e) => setSelectedAdmin({...selectedAdmin, brandName: e.target.value})}
-                  className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
-                />
               </div>
               <div>
                 <label className="text-gray-400 text-sm mb-1 block">Phone</label>
@@ -808,35 +758,47 @@ const AdminManagement = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">
-                Permissions - {selectedAdmin.firstName} {selectedAdmin.lastName}
-              </h3>
-              <button onClick={() => setShowPermissionsModal(false)} className="text-gray-400 hover:text-white">
-                <X size={20} />
-              </button>
+              <h3 className="text-white font-semibold text-lg">Sidebar Permissions</h3>
+              <div className="flex items-center gap-4">
+                <div className="flex gap-2 text-sm">
+                  <button 
+                    type="button"
+                    onClick={selectAllPermissions}
+                    className="text-blue-500 hover:text-blue-400"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-gray-600">|</span>
+                  <button 
+                    type="button"
+                    onClick={deselectAllPermissions}
+                    className="text-gray-400 hover:text-gray-300"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="p-5">
-              {['Users', 'Trading', 'Accounts', 'Finance', 'KYC', 'IB', 'Copy Trade', 'Settings', 'Reports'].map(category => (
-                <div key={category} className="mb-4">
-                  <h4 className="text-white font-medium mb-2">{category}</h4>
-                  <div className="grid grid-cols-2 gap-2 bg-dark-700 rounded-lg p-3">
-                    {allPermissions.filter(p => p.category === category).map(perm => (
-                      <label key={perm.key} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedAdmin.permissions?.[perm.key] || false}
-                          onChange={(e) => setSelectedAdmin({
-                            ...selectedAdmin,
-                            permissions: {...selectedAdmin.permissions, [perm.key]: e.target.checked}
-                          })}
-                          className="rounded"
-                        />
-                        <span className="text-gray-300">{perm.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <div className="grid grid-cols-2 gap-3 bg-dark-700 rounded-lg p-4">
+                {sidebarPermissions.map(perm => (
+                  <label key={perm.key} className="flex items-center gap-3 text-sm cursor-pointer py-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedAdmin.sidebarPermissions?.[perm.key] || false}
+                      onChange={(e) => setSelectedAdmin({
+                        ...selectedAdmin,
+                        sidebarPermissions: {...selectedAdmin.sidebarPermissions, [perm.key]: e.target.checked}
+                      })}
+                      disabled={perm.key === 'overviewDashboard'}
+                      className="w-4 h-4 rounded bg-dark-600 border-gray-600 text-blue-500 focus:ring-blue-500"
+                    />
+                    <span className={`${perm.key === 'overviewDashboard' ? 'text-gray-500' : 'text-gray-300'}`}>
+                      {perm.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="flex gap-3 p-5 border-t border-gray-700">
               <button
@@ -847,7 +809,7 @@ const AdminManagement = () => {
               </button>
               <button
                 onClick={handleUpdatePermissions}
-                className="flex-1 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600"
+                className="flex-1 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
               >
                 Save Permissions
               </button>

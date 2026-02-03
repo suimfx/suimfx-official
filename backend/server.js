@@ -30,6 +30,8 @@ import uploadRoutes from './routes/upload.js'
 import emailTemplatesRoutes from './routes/emailTemplates.js'
 import bonusRoutes from './routes/bonus.js'
 import bannerRoutes from './routes/banner.js'
+import employeeRoutes from './routes/employee.js'
+import employeeManagementRoutes from './routes/employeeManagement.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
@@ -263,6 +265,8 @@ app.use('/api/upload', uploadRoutes)
 app.use('/api/email-templates', emailTemplatesRoutes)
 app.use('/api/bonus', bonusRoutes)
 app.use('/api/banners', bannerRoutes)
+app.use('/api/employee', employeeRoutes)
+app.use('/api/employee-mgmt', employeeManagementRoutes)
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))

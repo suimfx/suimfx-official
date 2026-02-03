@@ -57,56 +57,28 @@ const adminSchema = new mongoose.Schema({
     default: null
   },
   
-  // Permissions - what features this admin can access/manage
-  permissions: {
-    // User Management
-    canManageUsers: { type: Boolean, default: true },
-    canCreateUsers: { type: Boolean, default: true },
-    canDeleteUsers: { type: Boolean, default: false },
-    canViewUsers: { type: Boolean, default: true },
-    
-    // Trading Management
-    canManageTrades: { type: Boolean, default: true },
-    canCloseTrades: { type: Boolean, default: true },
-    canModifyTrades: { type: Boolean, default: false },
-    
-    // Account Management
-    canManageAccounts: { type: Boolean, default: true },
-    canCreateAccounts: { type: Boolean, default: true },
-    canDeleteAccounts: { type: Boolean, default: false },
-    canModifyLeverage: { type: Boolean, default: true },
-    
-    // Wallet/Finance
-    canManageDeposits: { type: Boolean, default: true },
-    canApproveDeposits: { type: Boolean, default: true },
-    canManageWithdrawals: { type: Boolean, default: true },
-    canApproveWithdrawals: { type: Boolean, default: true },
-    
-    // KYC
-    canManageKYC: { type: Boolean, default: true },
-    canApproveKYC: { type: Boolean, default: true },
-    
-    // IB Management
-    canManageIB: { type: Boolean, default: true },
-    canApproveIB: { type: Boolean, default: true },
-    
-    // Copy Trading
-    canManageCopyTrading: { type: Boolean, default: true },
-    canApproveMasters: { type: Boolean, default: true },
-    
-    // Settings
-    canManageSymbols: { type: Boolean, default: false },
-    canManageGroups: { type: Boolean, default: false },
-    canManageSettings: { type: Boolean, default: false },
-    canManageTheme: { type: Boolean, default: true },
-    
-    // Reports
-    canViewReports: { type: Boolean, default: true },
-    canExportReports: { type: Boolean, default: true },
-    
-    // Admin Management (only for super admin)
-    canManageAdmins: { type: Boolean, default: false },
-    canFundAdmins: { type: Boolean, default: false }
+  // Sidebar Permissions - which menu items this admin can see
+  // For ADMIN role, all defaults are FALSE - SuperAdmin must explicitly grant permissions
+  // For SUPER_ADMIN, all sidebar items are visible
+  sidebarPermissions: {
+    overviewDashboard: { type: Boolean, default: true }, // Always visible
+    userManagement: { type: Boolean, default: false },
+    tradeManagement: { type: Boolean, default: false },
+    fundManagement: { type: Boolean, default: false },
+    bankSettings: { type: Boolean, default: false },
+    ibManagement: { type: Boolean, default: false },
+    forexCharges: { type: Boolean, default: false },
+    earningsReport: { type: Boolean, default: false },
+    copyTrade: { type: Boolean, default: false },
+    propFirmChallenges: { type: Boolean, default: false },
+    accountTypes: { type: Boolean, default: false },
+    themeSettings: { type: Boolean, default: false },
+    emailTemplates: { type: Boolean, default: false },
+    bonusManagement: { type: Boolean, default: false },
+    adminManagement: { type: Boolean, default: false },
+    employeeManagement: { type: Boolean, default: false },
+    kycVerification: { type: Boolean, default: false },
+    supportTickets: { type: Boolean, default: false }
   },
   
   // Status
