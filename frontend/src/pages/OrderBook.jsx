@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { API_URL } from '../config/api'
+import priceStreamService from '../services/priceStream'
 import logoImage from '../assets/SetupFX.png'
 
 const OrderBook = () => {
@@ -80,31 +81,14 @@ const OrderBook = () => {
     }
   }, [accounts, selectedAccount])
 
-  // Fetch live prices periodically
+  // Subscribe to real-time WebSocket prices
   useEffect(() => {
-    const fetchPrices = async () => {
-      const symbols = [...new Set(openTrades.map(t => t.symbol))]
-      if (symbols.length === 0) return
-      
-      try {
-        const res = await fetch(`${API_URL}/prices/batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbols })
-        })
-        const data = await res.json()
-        if (data.success && data.prices) {
-          setLivePrices(data.prices)
-        }
-      } catch (e) {
-        console.error('Error fetching prices:', e)
-      }
-    }
-
-    fetchPrices()
-    const interval = setInterval(fetchPrices, 3000)
-    return () => clearInterval(interval)
-  }, [openTrades])
+    const unsubscribe = priceStreamService.subscribe('orderbook', (prices) => {
+      setLivePrices(prices)
+    })
+    
+    return () => unsubscribe()
+  }, [])
 
   const fetchAccounts = async () => {
     try {

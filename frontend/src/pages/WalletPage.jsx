@@ -613,6 +613,9 @@ const WalletPage = () => {
                             {tx.type === 'Account_Transfer_Out' && <ArrowUpCircle size={18} className="text-orange-500" />}
                             {tx.type === 'Account_Transfer_In' && <ArrowDownCircle size={18} className="text-teal-500" />}
                             {tx.type === 'Challenge_Purchase' && <ArrowUpCircle size={18} className="text-yellow-500" />}
+                            {tx.type === 'Admin_Fund_Add' && <Gift size={18} className="text-emerald-500" />}
+                            {tx.type === 'Admin_Credit_Add' && <Gift size={18} className="text-cyan-500" />}
+                            {tx.type === 'Admin_Credit_Remove' && <ArrowUpCircle size={18} className="text-pink-500" />}
                             <div>
                               <span className={isDarkMode ? 'text-white' : 'text-gray-900'}>
                                 {tx.type === 'Transfer_To_Account' ? 'To Trading Account' : 
@@ -620,6 +623,9 @@ const WalletPage = () => {
                                  tx.type === 'Account_Transfer_Out' ? 'Account Transfer (Out)' :
                                  tx.type === 'Account_Transfer_In' ? 'Account Transfer (In)' :
                                  tx.type === 'Challenge_Purchase' ? 'Challenge Purchase' :
+                                 tx.type === 'Admin_Fund_Add' ? 'Admin Fund Addition' :
+                                 tx.type === 'Admin_Credit_Add' ? 'Admin Credit Addition' :
+                                 tx.type === 'Admin_Credit_Remove' ? 'Admin Credit Removal' :
                                  tx.type}
                               </span>
                               {tx.tradingAccountName && (
@@ -634,13 +640,16 @@ const WalletPage = () => {
                               {tx.type === 'Challenge_Purchase' && tx.description && (
                                 <p className="text-gray-500 text-xs">{tx.description}</p>
                               )}
+                              {(tx.type === 'Admin_Fund_Add' || tx.type === 'Admin_Credit_Add' || tx.type === 'Admin_Credit_Remove') && tx.description && (
+                                <p className="text-gray-500 text-xs">{tx.description}</p>
+                              )}
                             </div>
                           </div>
                         </td>
                         <td className={`py-4 px-4 font-medium ${
-                          tx.type === 'Deposit' || tx.type === 'Transfer_From_Account' || tx.type === 'Account_Transfer_In' ? 'text-green-500' : 'text-red-500'
+                          tx.type === 'Deposit' || tx.type === 'Transfer_From_Account' || tx.type === 'Account_Transfer_In' || tx.type === 'Admin_Fund_Add' || tx.type === 'Admin_Credit_Add' ? 'text-green-500' : 'text-red-500'
                         }`}>
-                          {tx.type === 'Deposit' || tx.type === 'Transfer_From_Account' || tx.type === 'Account_Transfer_In' ? '+' : '-'}${tx.amount.toLocaleString()}
+                          {tx.type === 'Deposit' || tx.type === 'Transfer_From_Account' || tx.type === 'Account_Transfer_In' || tx.type === 'Admin_Fund_Add' || tx.type === 'Admin_Credit_Add' ? '+' : '-'}${tx.amount.toLocaleString()}
                         </td>
                         <td className="py-4 px-4">
                           {tx.type === 'Deposit' ? (

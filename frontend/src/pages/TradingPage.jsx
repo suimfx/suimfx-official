@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Search, Star, X, Plus, Minus, Settings, Home, Wallet, LayoutGrid, BarChart3, Pencil, Trophy, AlertTriangle, Sun, Moon, Grid2X2 } from 'lucide-react'
+import { Search, Star, X, Plus, Minus, Settings, Home, Wallet, LayoutGrid, BarChart3, Pencil, Trophy, AlertTriangle, Sun, Moon, Grid2X2, Download, RefreshCw } from 'lucide-react'
 import priceService from '../services/priceService'
 import binanceApiService from '../services/binanceApi'
 import priceStreamService from '../services/priceStream'
@@ -86,6 +86,11 @@ const TradingPage = () => {
   })
   const [livePrices, setLivePrices] = useState({}) // Store live prices separately
   const [adminSpreads, setAdminSpreads] = useState({}) // Store admin-set spreads
+  
+  // History filter states
+  const [historyFilter, setHistoryFilter] = useState('all') // all, today, week, month, year
+  const [historyStartDate, setHistoryStartDate] = useState('')
+  const [historyEndDate, setHistoryEndDate] = useState('')
   
   // Modal states for iOS-style popups
   const [showModifyModal, setShowModifyModal] = useState(false)
@@ -529,6 +534,71 @@ const TradingPage = () => {
     } catch (error) {
       console.error('Error fetching trade history:', error)
     }
+  }
+
+  // Filter trade history based on selected filter
+  const getFilteredHistory = () => {
+    const now = new Date()
+    return tradeHistory.filter(trade => {
+      const tradeDate = new Date(trade.closedAt)
+      
+      // Date range filter (takes priority if both dates are set)
+      if (historyStartDate && historyEndDate) {
+        const start = new Date(historyStartDate)
+        const end = new Date(historyEndDate)
+        end.setHours(23, 59, 59, 999)
+        return tradeDate >= start && tradeDate <= end
+      }
+      
+      if (historyFilter === 'all') return true
+      if (historyFilter === 'today') {
+        return tradeDate.toDateString() === now.toDateString()
+      }
+      if (historyFilter === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        return tradeDate >= weekAgo
+      }
+      if (historyFilter === 'month') {
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        return tradeDate >= monthAgo
+      }
+      if (historyFilter === 'year') {
+        const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+        return tradeDate >= yearAgo
+      }
+      return true
+    })
+  }
+
+  // Calculate total P&L for filtered history
+  const getHistoryTotalPnl = () => {
+    return getFilteredHistory().reduce((sum, trade) => sum + (trade.realizedPnl || 0), 0)
+  }
+
+  // Download trade history as CSV
+  const downloadHistoryCSV = () => {
+    const filtered = getFilteredHistory()
+    const headers = ['Date', 'Symbol', 'Side', 'Quantity', 'Open Price', 'Close Price', 'Commission', 'Swap', 'P&L', 'Closed By']
+    const rows = filtered.map(trade => [
+      new Date(trade.closedAt).toLocaleString(),
+      trade.symbol,
+      trade.side,
+      trade.quantity,
+      trade.openPrice?.toFixed(5),
+      trade.closePrice?.toFixed(5),
+      trade.commission?.toFixed(2) || '0.00',
+      trade.swap?.toFixed(2) || '0.00',
+      trade.realizedPnl?.toFixed(2) || '0.00',
+      trade.closedBy || 'USER'
+    ])
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `trade_history_${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
   }
 
   // Fetch account summary with current prices
@@ -1623,56 +1693,121 @@ const TradingPage = () => {
               )}
 
               {activePositionTab === 'History' && (
-              <table className="w-full text-sm">
-                <thead className={`text-gray-500 border-b sticky top-0 ${isDarkMode ? 'border-gray-800 bg-[#0d0d0d]' : 'border-gray-200 bg-white'}`}>
-                  <tr>
-                    <th className="text-left py-2 px-3 font-normal">Closed</th>
-                    <th className="text-left py-2 px-3 font-normal">Symbol</th>
-                    <th className="text-left py-2 px-3 font-normal">Side</th>
-                    <th className="text-left py-2 px-3 font-normal">Lots</th>
-                    <th className="text-left py-2 px-3 font-normal">Entry</th>
-                    <th className="text-left py-2 px-3 font-normal">Close</th>
-                    <th className="text-left py-2 px-3 font-normal">Charges</th>
-                    <th className="text-left py-2 px-3 font-normal">Swap</th>
-                    <th className="text-left py-2 px-3 font-normal">P/L</th>
-                    <th className="text-left py-2 px-3 font-normal">Closed By</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tradeHistory.length === 0 ? (
+              <div className="flex flex-col h-full">
+                {/* History Filters Row */}
+                <div className={`flex flex-wrap items-center gap-2 px-3 py-2 border-b ${isDarkMode ? 'border-gray-800 bg-[#0d0d0d]' : 'border-gray-200 bg-gray-50'}`}>
+                  {/* Refresh Button */}
+                  <button
+                    onClick={fetchTradeHistory}
+                    className={`flex items-center gap-1 text-xs ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                  >
+                    <RefreshCw size={12} /> Refresh
+                  </button>
+                  
+                  {/* Filter Buttons */}
+                  {[
+                    { key: 'all', label: 'All' },
+                    { key: 'today', label: 'Today' },
+                    { key: 'week', label: 'This Week' },
+                    { key: 'month', label: 'This Month' },
+                    { key: 'year', label: 'This Year' }
+                  ].map(filter => (
+                    <button
+                      key={filter.key}
+                      onClick={() => { setHistoryFilter(filter.key); setHistoryStartDate(''); setHistoryEndDate('') }}
+                      className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                        historyFilter === filter.key && !historyStartDate
+                          ? 'bg-green-500 text-black' 
+                          : isDarkMode ? 'bg-[#1a1a1a] text-gray-400 hover:text-white' : 'bg-gray-200 text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                  
+                  {/* Date Range Picker */}
+                  <div className="flex items-center gap-1 ml-2">
+                    <input
+                      type="date"
+                      value={historyStartDate}
+                      onChange={(e) => setHistoryStartDate(e.target.value)}
+                      className={`px-2 py-1 rounded text-xs border ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                    />
+                    <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>to</span>
+                    <input
+                      type="date"
+                      value={historyEndDate}
+                      onChange={(e) => setHistoryEndDate(e.target.value)}
+                      className={`px-2 py-1 rounded text-xs border ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                    />
+                  </div>
+                  
+                  {/* Trade Count & P&L Summary */}
+                  <span className={`ml-auto text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {getFilteredHistory().length} trades | P&L: <span className={getHistoryTotalPnl() >= 0 ? 'text-green-500' : 'text-red-500'}>${getHistoryTotalPnl().toFixed(2)}</span>
+                  </span>
+                  
+                  {/* Download CSV Button */}
+                  <button
+                    onClick={downloadHistoryCSV}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${isDarkMode ? 'bg-[#1a1a1a] text-gray-300 hover:bg-[#252525]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  >
+                    <Download size={12} /> Download CSV
+                  </button>
+                </div>
+                
+                {/* History Table */}
+                <table className="w-full text-sm">
+                  <thead className={`text-gray-500 border-b sticky top-0 ${isDarkMode ? 'border-gray-800 bg-[#0d0d0d]' : 'border-gray-200 bg-white'}`}>
                     <tr>
-                      <td colSpan="10" className="text-center py-8 text-gray-500">No trade history</td>
+                      <th className="text-left py-2 px-3 font-normal">Closed</th>
+                      <th className="text-left py-2 px-3 font-normal">Symbol</th>
+                      <th className="text-left py-2 px-3 font-normal">Side</th>
+                      <th className="text-left py-2 px-3 font-normal">Lots</th>
+                      <th className="text-left py-2 px-3 font-normal">Entry</th>
+                      <th className="text-left py-2 px-3 font-normal">Close</th>
+                      <th className="text-left py-2 px-3 font-normal">Charges</th>
+                      <th className="text-left py-2 px-3 font-normal">Swap</th>
+                      <th className="text-left py-2 px-3 font-normal">P/L</th>
+                      <th className="text-left py-2 px-3 font-normal">Closed By</th>
                     </tr>
-                  ) : (
-                    tradeHistory.map(trade => {
-                      const formatPrice = (price) => {
-                        if (!price) return '-'
-                        if (trade.symbol.includes('JPY')) return price.toFixed(3)
-                        if (['BTCUSD', 'ETHUSD', 'XAUUSD'].includes(trade.symbol)) return price.toFixed(2)
-                        if (['XAGUSD'].includes(trade.symbol)) return price.toFixed(4)
-                        return price.toFixed(5)
-                      }
-                      
-                      return (
-                        <tr key={trade._id} className={`border-t ${isDarkMode ? 'border-gray-800 hover:bg-[#1a1a1a]' : 'border-gray-200 hover:bg-gray-50'}`}>
-                          <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{new Date(trade.closedAt).toLocaleString()}</td>
-                          <td className={`py-2 px-3 text-xs font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{trade.symbol}</td>
-                          <td className={`py-2 px-3 text-xs font-medium ${trade.side === 'BUY' ? 'text-blue-400' : 'text-red-400'}`}>{trade.side}</td>
-                          <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{trade.quantity}</td>
-                          <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(trade.openPrice)}</td>
-                          <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(trade.closePrice)}</td>
-                          <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${trade.commission?.toFixed(2) || '0.00'}</td>
-                          <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${trade.swap?.toFixed(2) || '0.00'}</td>
-                          <td className={`py-2 px-3 text-xs font-medium ${trade.realizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            ${trade.realizedPnl?.toFixed(2) || '0.00'}
-                          </td>
-                          <td className="py-2 px-3 text-xs text-gray-400">{trade.closedBy || 'USER'}</td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {getFilteredHistory().length === 0 ? (
+                      <tr>
+                        <td colSpan="10" className="text-center py-8 text-gray-500">No trade history</td>
+                      </tr>
+                    ) : (
+                      getFilteredHistory().map(trade => {
+                        const formatPrice = (price) => {
+                          if (!price) return '-'
+                          if (trade.symbol.includes('JPY')) return price.toFixed(3)
+                          if (['BTCUSD', 'ETHUSD', 'XAUUSD'].includes(trade.symbol)) return price.toFixed(2)
+                          if (['XAGUSD'].includes(trade.symbol)) return price.toFixed(4)
+                          return price.toFixed(5)
+                        }
+                        
+                        return (
+                          <tr key={trade._id} className={`border-t ${isDarkMode ? 'border-gray-800 hover:bg-[#1a1a1a]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                            <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{new Date(trade.closedAt).toLocaleString()}</td>
+                            <td className={`py-2 px-3 text-xs font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{trade.symbol}</td>
+                            <td className={`py-2 px-3 text-xs font-medium ${trade.side === 'BUY' ? 'text-blue-400' : 'text-red-400'}`}>{trade.side}</td>
+                            <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{trade.quantity}</td>
+                            <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(trade.openPrice)}</td>
+                            <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatPrice(trade.closePrice)}</td>
+                            <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${trade.commission?.toFixed(2) || '0.00'}</td>
+                            <td className={`py-2 px-3 text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>${trade.swap?.toFixed(2) || '0.00'}</td>
+                            <td className={`py-2 px-3 text-xs font-medium ${trade.realizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              ${trade.realizedPnl?.toFixed(2) || '0.00'}
+                            </td>
+                            <td className="py-2 px-3 text-xs text-gray-400">{trade.closedBy || 'USER'}</td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
               )}
 
               {activePositionTab === 'Pending' && (

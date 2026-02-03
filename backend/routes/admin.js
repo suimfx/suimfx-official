@@ -183,23 +183,41 @@ router.post('/users/:id/add-fund', async (req, res) => {
 // POST /api/admin/trading-account/:id/add-fund - Add funds to trading account (Admin only)
 router.post('/trading-account/:id/add-fund', async (req, res) => {
   try {
-    const { amount, reason } = req.body
+    const { amount, reason, adminId } = req.body
     if (!amount || amount <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid amount' })
     }
     
     const TradingAccount = (await import('../models/TradingAccount.js')).default
+    const Transaction = (await import('../models/Transaction.js')).default
     const account = await TradingAccount.findById(req.params.id)
     if (!account) {
       return res.status(404).json({ success: false, message: 'Trading account not found' })
     }
     
-    account.balance = (account.balance || 0) + parseFloat(amount)
+    const previousBalance = account.balance || 0
+    account.balance = previousBalance + parseFloat(amount)
     await account.save()
+    
+    // Create transaction record for admin fund addition
+    await Transaction.create({
+      userId: account.userId,
+      type: 'Admin_Fund_Add',
+      amount: parseFloat(amount),
+      paymentMethod: 'System',
+      tradingAccountId: account._id,
+      tradingAccountName: account.accountId,
+      description: reason || 'Admin fund addition',
+      status: 'Completed',
+      transactionRef: `ADMIN${Date.now()}`,
+      processedBy: adminId || null,
+      processedAt: new Date()
+    })
     
     res.json({ 
       success: true,
       message: 'Funds added to trading account successfully',
+      previousBalance,
       newBalance: account.balance
     })
   } catch (error) {
