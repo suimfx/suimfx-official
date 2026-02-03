@@ -1,7 +1,7 @@
-// Price Service - uses backend API (AllTick powered)
+// Price Service - uses backend API (TradeWatch powered)
 import { API_URL } from '../config/api'
 
-console.log('Price service initialized - using backend API')
+console.log('Price service initialized - using TradeWatch backend API')
 
 class PriceService {
   constructor() {
@@ -16,7 +16,7 @@ class PriceService {
 
   async getSymbols() {
     try {
-      // Fetch instruments from backend API (AllTick powered)
+      // Fetch instruments from backend API (TradeWatch powered)
       const response = await fetch(`${API_URL}/prices/instruments`)
       if (!response.ok) throw new Error('Failed to fetch instruments')
       const data = await response.json()
@@ -129,7 +129,7 @@ class PriceService {
   }
 }
 
-// Singleton instance - named metaApiService for backward compatibility
-const metaApiService = new PriceService()
+// Singleton instance
+const priceService = new PriceService()
 
-export default metaApiService
+export default priceService

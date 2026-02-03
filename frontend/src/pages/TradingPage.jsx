@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Search, Star, X, Plus, Minus, Settings, Home, Wallet, LayoutGrid, BarChart3, Pencil, Trophy, AlertTriangle, Sun, Moon, Grid2X2 } from 'lucide-react'
-import metaApiService from '../services/metaApi'
+import priceService from '../services/priceService'
 import binanceApiService from '../services/binanceApi'
 import priceStreamService from '../services/priceStream'
 import { useTheme } from '../context/ThemeContext'
@@ -135,7 +135,7 @@ const TradingPage = () => {
     
     return () => {
       clearInterval(priceInterval)
-      metaApiService.disconnect()
+      priceService.disconnect()
     }
   }, [accountId])
 
@@ -367,7 +367,7 @@ const TradingPage = () => {
       if (allSymbols.length === 0) return
       
       // Single batch call to backend (handles both MetaAPI and Binance)
-      const allPrices = await metaApiService.getAllPrices(allSymbols)
+      const allPrices = await priceService.getAllPrices(allSymbols)
       
       // Always update livePrices state for open trades display
       if (Object.keys(allPrices).length > 0) {

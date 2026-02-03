@@ -15,7 +15,7 @@ import {
   X,
   Trash2
 } from 'lucide-react'
-import metaApiService from '../services/metaApi'
+import priceService from '../services/priceService'
 import binanceApiService from '../services/binanceApi'
 import priceStreamService from '../services/priceStream'
 import { API_URL } from '../config/api'
@@ -345,7 +345,7 @@ const AdminTradeManagement = () => {
         const prices = await binanceApiService.getAllPrices([trade.symbol])
         priceData = prices[trade.symbol]
       } else {
-        priceData = await metaApiService.getSymbolPrice(trade.symbol)
+        priceData = await priceService.getSymbolPrice(trade.symbol)
       }
       if (priceData) {
         const closePrice = trade.side === 'BUY' ? priceData.bid : priceData.ask

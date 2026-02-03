@@ -7,7 +7,7 @@ import {
   Plus, Minus, Settings, RefreshCw, ChevronDown, Bell, User,
   ArrowDownCircle, ArrowUpCircle, Check, Pencil, Trash2
 } from 'lucide-react'
-import metaApiService from '../services/metaApi'
+import priceService from '../services/priceService'
 import priceStreamService from '../services/priceStream'
 import { API_URL } from '../config/api'
 
@@ -110,7 +110,7 @@ const MobileTradingApp = () => {
     fetchLivePrices()
 
     return () => {
-      metaApiService.disconnect()
+      priceService.disconnect()
     }
   }, [])
 
@@ -174,10 +174,10 @@ const MobileTradingApp = () => {
     return () => unsubscribe()
   }, [])
 
-  // Fetch live prices using metaApiService (same as TradingPage)
+  // Fetch live prices using priceService (same as TradingPage)
   const fetchLivePrices = async () => {
     try {
-      const allPrices = await metaApiService.getAllPrices(allSymbols)
+      const allPrices = await priceService.getAllPrices(allSymbols)
       
       if (Object.keys(allPrices).length > 0) {
         setLoading(false)

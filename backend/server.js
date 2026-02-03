@@ -37,7 +37,7 @@ import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
-import metaApiService from './services/metaApiService.js'
+import infowayService from './services/infowayService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -59,79 +59,32 @@ const io = new Server(httpServer, {
 const connectedClients = new Map()
 const priceSubscribers = new Set()
 
-// Price cache for real-time streaming (shared with MetaAPI service)
-const priceCache = metaApiService.getPriceCache()
+// Price cache for real-time streaming (shared with Infoway service)
+const priceCache = infowayService.getPriceCache()
 
-// Use Binance for crypto (faster updates)
-const BINANCE_CRYPTO_SYMBOLS = {
-  'BTCUSD': 'BTCUSDT', 'ETHUSD': 'ETHUSDT', 'BNBUSD': 'BNBUSDT', 'SOLUSD': 'SOLUSDT',
-  'XRPUSD': 'XRPUSDT', 'ADAUSD': 'ADAUSDT', 'DOGEUSD': 'DOGEUSDT', 'TRXUSD': 'TRXUSDT',
-  'LINKUSD': 'LINKUSDT', 'MATICUSD': 'MATICUSDT', 'DOTUSD': 'DOTUSDT',
-  'SHIBUSD': 'SHIBUSDT', 'LTCUSD': 'LTCUSDT', 'BCHUSD': 'BCHUSDT', 'AVAXUSD': 'AVAXUSDT',
-  'XLMUSD': 'XLMUSDT', 'UNIUSD': 'UNIUSDT', 'ATOMUSD': 'ATOMUSDT', 'ETCUSD': 'ETCUSDT',
-  'FILUSD': 'FILUSDT', 'ICPUSD': 'ICPUSDT', 'VETUSD': 'VETUSDT',
-  'NEARUSD': 'NEARUSDT', 'GRTUSD': 'GRTUSDT', 'AAVEUSD': 'AAVEUSDT', 'MKRUSD': 'MKRUSDT',
-  'ALGOUSD': 'ALGOUSDT', 'FTMUSD': 'FTMUSDT', 'SANDUSD': 'SANDUSDT', 'MANAUSD': 'MANAUSDT',
-  'AXSUSD': 'AXSUSDT', 'THETAUSD': 'THETAUSDT', 'FLOWUSD': 'FLOWUSDT',
-  'SNXUSD': 'SNXUSDT', 'EOSUSD': 'EOSUSDT', 'CHZUSD': 'CHZUSDT', 'ENJUSD': 'ENJUSDT',
-  'ZILUSD': 'ZILUSDT', 'BATUSD': 'BATUSDT', 'CRVUSD': 'CRVUSDT', 'COMPUSD': 'COMPUSDT',
-  'PEPEUSD': 'PEPEUSDT', 'ARBUSD': 'ARBUSDT', 'OPUSD': 'OPUSDT', 'SUIUSD': 'SUIUSDT',
-  'APTUSD': 'APTUSDT', 'INJUSD': 'INJUSDT', 'TONUSD': 'TONUSDT', 'HBARUSD': 'HBARUSDT'
-}
+// Infoway handles all asset classes: Forex, Crypto, Commodities
 
-// MetaAPI WebSocket price update handler
-metaApiService.setOnPriceUpdate((symbol, price) => {
+// Infoway WebSocket price update handler - emit tick-to-tick updates
+infowayService.setOnPriceUpdate((symbol, price) => {
   if (priceSubscribers.size > 0) {
+    // Emit individual price update for tick-to-tick
     io.to('prices').emit('priceUpdate', { symbol, price })
-  }
-})
-
-// MetaAPI connection status handler
-metaApiService.setOnConnectionChange((connected) => {
-  console.log(`[MetaAPI] ${connected ? 'Connected' : 'Disconnected'}`)
-})
-
-// Background price streaming - Binance polling + MetaAPI WebSocket
-async function streamPrices() {
-  const now = Date.now()
-  const updatedPrices = {}
-  
-  // Binance - always fetch crypto prices to keep cache fresh
-  try {
-    const response = await fetch('https://api.binance.com/api/v3/ticker/bookTicker')
-    if (response.ok) {
-      const tickers = await response.json()
-      const tickerMap = {}
-      tickers.forEach(t => { tickerMap[t.symbol] = t })
-      
-      Object.keys(BINANCE_CRYPTO_SYMBOLS).forEach(symbol => {
-        const ticker = tickerMap[BINANCE_CRYPTO_SYMBOLS[symbol]]
-        if (ticker) {
-          const price = { bid: parseFloat(ticker.bidPrice), ask: parseFloat(ticker.askPrice), time: now }
-          priceCache.set(symbol, price)
-          updatedPrices[symbol] = price
-        }
-      })
-    }
-  } catch (e) {
-    console.error('[Binance] Error fetching prices:', e.message)
-  }
-  
-  // Only emit to subscribers if any exist
-  if (priceSubscribers.size > 0) {
+    // Also emit as priceStream for compatibility (single symbol update)
     io.to('prices').emit('priceStream', {
-      prices: Object.fromEntries(priceCache),
-      updated: updatedPrices,
-      timestamp: now
+      prices: { [symbol]: price },
+      updated: { [symbol]: true },
+      timestamp: Date.now()
     })
   }
-}
+})
 
-// Start MetaAPI connection (handles its own polling internally)
-metaApiService.connect()
+// Infoway connection status handler
+infowayService.setOnConnectionChange((connected) => {
+  console.log(`[Infoway] ${connected ? 'Connected' : 'Disconnected'}`)
+})
 
-// Start price streaming interval (500ms for Binance crypto)
-setInterval(streamPrices, 500)
+// Start Infoway WebSocket connections
+infowayService.connect()
 
 // Background stop-out check every 5 seconds
 setInterval(async () => {

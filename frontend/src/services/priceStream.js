@@ -51,6 +51,22 @@ class PriceStreamService {
       })
     })
 
+    // Handle individual tick-to-tick price updates
+    this.socket.on('priceUpdate', (data) => {
+      const { symbol, price } = data
+      if (symbol && price) {
+        this.prices[symbol] = price
+        // Notify subscribers immediately for tick-to-tick
+        this.subscribers.forEach((callback, id) => {
+          try {
+            callback(this.prices, { [symbol]: true }, Date.now())
+          } catch (e) {
+            console.error('[PriceStream] Subscriber error:', e)
+          }
+        })
+      }
+    })
+
     this.socket.on('disconnect', () => {
       console.log('[PriceStream] Disconnected')
       this.isConnected = false

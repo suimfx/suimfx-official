@@ -8,19 +8,19 @@ import propTradingEngine from '../services/propTradingEngine.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
 import ibEngine from '../services/ibEngineNew.js'
 import MasterTrader from '../models/MasterTrader.js'
-import metaApiService from '../services/metaApiService.js'
+import infowayService from '../services/infowayService.js'
 
-// Fetch fresh price from MetaAPI
+// Fetch fresh price from Infoway
 async function getFreshPrice(symbol) {
   try {
     // Try cache first
-    let price = metaApiService.getPrice(symbol)
+    let price = infowayService.getPrice(symbol)
     if (price) {
       return { bid: price.bid, ask: price.ask }
     }
     
     // Fetch via REST API
-    price = await metaApiService.fetchPriceREST(symbol)
+    price = await infowayService.fetchPriceREST(symbol)
     if (price) {
       return { bid: price.bid, ask: price.ask }
     }
