@@ -1464,8 +1464,7 @@ const TradingPage = () => {
               </div>
               
               {/* Footer */}
-              <div className={`px-3 py-2 border-t flex items-center justify-between shrink-0 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-                <span className="text-gray-500 text-xs">{filteredInstruments.length} instruments</span>
+              <div className={`px-3 py-2 border-t flex items-center justify-end shrink-0 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="text-green-500 text-xs">Live</span>

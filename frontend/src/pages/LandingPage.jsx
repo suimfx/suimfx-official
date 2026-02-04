@@ -53,8 +53,8 @@ const Navbar = () => {
               <a href="/suimfx.apk" download className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/10 transition-all">
                 <Download className="w-4 h-4" /> APK
               </a>
-              <a href="/user/login" className="px-4 py-2 text-sm font-medium text-white hover:text-slate-300 transition-colors">Sign In</a>
-              <a href="/user/signup" className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25">
+              <a href="https://trade.suimfx.com/user/login" className="px-4 py-2 text-sm font-medium text-white hover:text-slate-300 transition-colors">Sign In</a>
+              <a href="https://trade.suimfx.com/user/signup" className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25">
                 Get Started
               </a>
             </div>
@@ -79,8 +79,8 @@ const Navbar = () => {
               <a href="/suimfx.apk" download className="flex items-center justify-center gap-2 py-3 text-emerald-400 border border-emerald-500/30 rounded-xl">
                 <Download className="w-5 h-5" /> Download APK
               </a>
-              <a href="/user/login" className="py-3 text-center text-white border border-slate-700 rounded-xl">Sign In</a>
-              <a href="/user/signup" className="py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl">Get Started</a>
+              <a href="https://trade.suimfx.com/user/login" className="py-3 text-center text-white border border-slate-700 rounded-xl">Sign In</a>
+              <a href="https://trade.suimfx.com/user/signup" className="py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl">Get Started</a>
             </div>
           </div>
         </div>
@@ -130,7 +130,7 @@ const Hero = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <a href="/user/signup" className="w-full sm:w-auto px-8 py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2">
+            <a href="https://trade.suimfx.com/user/signup" className="w-full sm:w-auto px-8 py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2">
               Open Account <ArrowRight className="w-5 h-5" />
             </a>
             <a href="#markets" className="w-full sm:w-auto px-8 py-4 text-lg font-semibold text-white border border-slate-700 rounded-xl hover:bg-slate-800/50 transition-all flex items-center justify-center gap-2">
@@ -315,7 +315,7 @@ const AccountTypes = () => {
                 </li>
               ))}
             </ul>
-            <a href="/user/signup" className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
+            <a href="https://trade.suimfx.com/user/signup" className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
               Open Account
             </a>
           </div>
@@ -336,7 +336,7 @@ const AccountTypes = () => {
                 </li>
               ))}
             </ul>
-            <a href="/user/signup" className="block w-full py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all">
+            <a href="https://trade.suimfx.com/user/signup" className="block w-full py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all">
               Open Account
             </a>
           </div>
@@ -354,7 +354,7 @@ const AccountTypes = () => {
                 </li>
               ))}
             </ul>
-            <a href="/user/signup" className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
+            <a href="https://trade.suimfx.com/user/signup" className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
               Open Account
             </a>
           </div>
