@@ -109,8 +109,24 @@ const TradingPage = () => {
   const [killSwitchDuration, setKillSwitchDuration] = useState({ value: 30, unit: 'minutes' })
   const [killSwitchTimeLeft, setKillSwitchTimeLeft] = useState('')
   const [globalNotification, setGlobalNotification] = useState('')
+  const [tradeNotifications, setTradeNotifications] = useState([]) // Array of {id, type, message, timestamp}
 
   const categories = ['All', 'Starred', 'Forex', 'Metals', 'Commodities', 'Crypto']
+
+  // Add trade notification (shows at top of screen)
+  const addTradeNotification = (type, message) => {
+    const id = Date.now()
+    setTradeNotifications(prev => [...prev, { id, type, message, timestamp: Date.now() }])
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      setTradeNotifications(prev => prev.filter(n => n.id !== id))
+    }, 5000)
+  }
+
+  // Remove notification manually
+  const removeTradeNotification = (id) => {
+    setTradeNotifications(prev => prev.filter(n => n.id !== id))
+  }
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
@@ -463,9 +479,11 @@ const TradingPage = () => {
               // Refresh trades if any were closed by SL/TP
               fetchOpenTrades()
               fetchTradeHistory()
-              // Show notification
+              // Show prominent notification for each closed trade
               slTpData.closedTrades.forEach(ct => {
-                setTradeSuccess(`Trade ${ct.symbol} closed by ${ct.reason}: ${ct.pnl >= 0 ? '+' : ''}$${ct.pnl.toFixed(2)}`)
+                const pnlStr = ct.pnl >= 0 ? `+$${ct.pnl.toFixed(2)}` : `-$${Math.abs(ct.pnl).toFixed(2)}`
+                const type = ct.reason === 'TP' ? 'tp' : 'sl'
+                addTradeNotification(type, `${ct.symbol} ${ct.reason} triggered: ${pnlStr}`)
               })
             }
           } catch (e) {
@@ -738,6 +756,7 @@ const TradingPage = () => {
 
       if (data.success) {
         setTradeSuccess(`${side} order executed successfully!`)
+        addTradeNotification('order', `${side} ${selectedInstrument.symbol} @ ${side === 'BUY' ? ask.toFixed(5) : bid.toFixed(5)}`)
         fetchOpenTrades()
         fetchAccountSummary()
         // Clear SL/TP after successful trade
@@ -868,12 +887,15 @@ const TradingPage = () => {
       const data = await res.json()
 
       if (data.success) {
-        setTradeSuccess(`Trade closed. P/L: $${data.realizedPnl?.toFixed(2)}`)
+        const pnlStr = data.realizedPnl >= 0 ? `+$${data.realizedPnl?.toFixed(2)}` : `-$${Math.abs(data.realizedPnl)?.toFixed(2)}`
+        setTradeSuccess(`Trade closed. P/L: ${pnlStr}`)
+        addTradeNotification(data.realizedPnl >= 0 ? 'success' : 'sl', `Trade closed: ${pnlStr}`)
         fetchOpenTrades()
         fetchTradeHistory()
         fetchAccountSummary()
       } else {
         setTradeError(data.message || 'Failed to close trade')
+        addTradeNotification('error', data.message || 'Failed to close trade')
       }
     } catch (error) {
       console.error('Error closing trade:', error)
@@ -1275,6 +1297,43 @@ const TradingPage = () => {
             }`}>
               {globalNotification}
             </div>
+          </div>
+        )}
+
+        {/* Trade Notifications - SL/TP, Orders, etc. */}
+        {tradeNotifications.length > 0 && (
+          <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+            {tradeNotifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl backdrop-blur-sm animate-slide-left ${
+                  notification.type === 'tp' 
+                    ? 'bg-green-600/95 text-white border border-green-500' 
+                    : notification.type === 'sl'
+                    ? 'bg-red-600/95 text-white border border-red-500'
+                    : notification.type === 'order'
+                    ? 'bg-blue-600/95 text-white border border-blue-500'
+                    : notification.type === 'error'
+                    ? 'bg-red-600/95 text-white border border-red-500'
+                    : 'bg-green-600/95 text-white border border-green-500'
+                }`}
+              >
+                <div className="flex-shrink-0">
+                  {notification.type === 'tp' && <span className="text-xl">🎯</span>}
+                  {notification.type === 'sl' && <span className="text-xl">🛑</span>}
+                  {notification.type === 'order' && <span className="text-xl">📊</span>}
+                  {notification.type === 'success' && <span className="text-xl">✅</span>}
+                  {notification.type === 'error' && <span className="text-xl">❌</span>}
+                </div>
+                <div className="flex-1 font-medium text-sm">{notification.message}</div>
+                <button
+                  onClick={() => removeTradeNotification(notification.id)}
+                  className="flex-shrink-0 hover:bg-white/20 rounded p-1 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -2632,6 +2691,19 @@ const TradingPage = () => {
         }
         .animate-slide-up {
           animation: slide-up 0.3s ease-out;
+        }
+        @keyframes slide-left {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-left {
+          animation: slide-left 0.3s ease-out;
         }
       `}</style>
     </div>

@@ -466,35 +466,37 @@ class TradeEngine {
     if (!trade) throw new Error('Trade not found')
     if (trade.status !== 'OPEN') throw new Error('Trade is not open')
 
-    // Use provided prices or fall back to open price for validation
-    const bid = currentBid || trade.openPrice
-    const ask = currentAsk || trade.openPrice
+    // Only validate if we have valid current prices
+    // Skip validation if prices not provided (allow modification without price check)
+    const hasPrices = currentBid && currentAsk && currentBid > 0 && currentAsk > 0
 
-    // Validate SL/TP values based on trade side
-    if (sl !== null && !isNaN(sl)) {
-      if (trade.side === 'BUY') {
-        // For BUY: SL must be below current bid
-        if (sl >= bid) {
-          throw new Error(`Stop Loss must be below current price (${bid}). You entered ${sl}.`)
-        }
-      } else {
-        // For SELL: SL must be above current ask
-        if (sl <= ask) {
-          throw new Error(`Stop Loss must be above current price (${ask}). You entered ${sl}.`)
+    if (hasPrices) {
+      // Validate SL/TP values based on trade side
+      if (sl !== null && !isNaN(sl)) {
+        if (trade.side === 'BUY') {
+          // For BUY: SL must be below current bid
+          if (sl >= currentBid) {
+            throw new Error(`Stop Loss must be below current price (${currentBid}). You entered ${sl}.`)
+          }
+        } else {
+          // For SELL: SL must be above current ask
+          if (sl <= currentAsk) {
+            throw new Error(`Stop Loss must be above current price (${currentAsk}). You entered ${sl}.`)
+          }
         }
       }
-    }
 
-    if (tp !== null && !isNaN(tp)) {
-      if (trade.side === 'BUY') {
-        // For BUY: TP must be above current ask
-        if (tp <= ask) {
-          throw new Error(`Take Profit must be above current price (${ask}). You entered ${tp}.`)
-        }
-      } else {
-        // For SELL: TP must be below current bid
-        if (tp >= bid) {
-          throw new Error(`Take Profit must be below current price (${bid}). You entered ${tp}.`)
+      if (tp !== null && !isNaN(tp)) {
+        if (trade.side === 'BUY') {
+          // For BUY: TP must be above current ask
+          if (tp <= currentAsk) {
+            throw new Error(`Take Profit must be above current price (${currentAsk}). You entered ${tp}.`)
+          }
+        } else {
+          // For SELL: TP must be below current bid
+          if (tp >= currentBid) {
+            throw new Error(`Take Profit must be below current price (${currentBid}). You entered ${tp}.`)
+          }
         }
       }
     }
