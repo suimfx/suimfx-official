@@ -9,6 +9,7 @@ class PriceStreamService {
     this.socket = null
     this.prices = {}
     this.subscribers = new Map()
+    this.slTpSubscribers = new Map() // Subscribers for SL/TP notifications
     this.isConnected = false
     this.reconnectAttempts = 0
     this.maxReconnectAttempts = 10
@@ -76,6 +77,19 @@ class PriceStreamService {
       console.error('[PriceStream] Connection error:', error.message)
       this.reconnectAttempts++
     })
+
+    // Listen for SL/TP triggered events from server
+    this.socket.on('slTpTriggered', (data) => {
+      console.log('[PriceStream] SL/TP triggered:', data)
+      // Notify all SL/TP subscribers
+      this.slTpSubscribers.forEach((callback, id) => {
+        try {
+          callback(data)
+        } catch (e) {
+          console.error('[PriceStream] SL/TP subscriber error:', e)
+        }
+      })
+    })
   }
 
   disconnect() {
@@ -104,7 +118,25 @@ class PriceStreamService {
   unsubscribe(id) {
     this.subscribers.delete(id)
     // Disconnect if no subscribers
-    if (this.subscribers.size === 0) {
+    if (this.subscribers.size === 0 && this.slTpSubscribers.size === 0) {
+      this.disconnect()
+    }
+  }
+
+  // Subscribe to SL/TP notifications
+  subscribeSlTp(id, callback) {
+    this.slTpSubscribers.set(id, callback)
+    // Connect if not already connected
+    if (!this.socket?.connected) {
+      this.connect()
+    }
+    return () => this.unsubscribeSlTp(id)
+  }
+
+  // Unsubscribe from SL/TP notifications
+  unsubscribeSlTp(id) {
+    this.slTpSubscribers.delete(id)
+    if (this.subscribers.size === 0 && this.slTpSubscribers.size === 0) {
       this.disconnect()
     }
   }

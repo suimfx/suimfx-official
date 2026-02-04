@@ -121,6 +121,18 @@ setInterval(async () => {
       console.log(`[SL/TP AUTO] ${allClosed.length} trades closed by SL/TP`)
       allClosed.forEach(ct => {
         console.log(`[SL/TP AUTO] ${ct.trade?.symbol || 'Unknown'} closed by ${ct.trigger || ct.reason} - PnL: ${ct.pnl?.toFixed(2) || 0}`)
+        
+        // Emit SL/TP notification to all connected clients
+        io.emit('slTpTriggered', {
+          symbol: ct.trade?.symbol || ct.symbol || 'Unknown',
+          reason: ct.trigger || ct.reason || 'SL/TP',
+          pnl: ct.pnl || 0,
+          tradeId: ct.trade?._id || ct.tradeId,
+          tradingAccountId: ct.trade?.tradingAccountId || ct.tradingAccountId,
+          side: ct.trade?.side || ct.side,
+          quantity: ct.trade?.quantity || ct.quantity,
+          closePrice: ct.closePrice || ct.trade?.closePrice
+        })
       })
     }
   } catch (error) {}

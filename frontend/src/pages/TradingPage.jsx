@@ -153,10 +153,25 @@ const TradingPage = () => {
     const priceInterval = setInterval(() => {
       fetchLivePrices()
     }, 2000)
+
+    // Subscribe to SL/TP notifications via Socket.IO
+    const unsubscribeSlTp = priceStreamService.subscribeSlTp('tradingPage', (data) => {
+      // Only show notification if it's for the current account
+      if (data.tradingAccountId === accountId || !data.tradingAccountId) {
+        const pnlStr = data.pnl >= 0 ? `+$${data.pnl.toFixed(2)}` : `-$${Math.abs(data.pnl).toFixed(2)}`
+        const type = data.reason === 'TP' ? 'tp' : 'sl'
+        addTradeNotification(type, `${data.symbol} ${data.reason} triggered: ${pnlStr}`)
+        // Refresh trades and account
+        fetchOpenTrades()
+        fetchTradeHistory()
+        fetchAccountSummary()
+      }
+    })
     
     return () => {
       clearInterval(priceInterval)
       priceService.disconnect()
+      unsubscribeSlTp()
     }
   }, [accountId])
 
@@ -1300,37 +1315,37 @@ const TradingPage = () => {
           </div>
         )}
 
-        {/* Trade Notifications - SL/TP, Orders, etc. */}
+        {/* Trade Notifications - SL/TP, Orders, etc. - TOP CENTER */}
         {tradeNotifications.length > 0 && (
-          <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-md px-4">
             {tradeNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl backdrop-blur-sm animate-slide-left ${
+                className={`flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl backdrop-blur-md animate-slide-down ${
                   notification.type === 'tp' 
-                    ? 'bg-green-600/95 text-white border border-green-500' 
+                    ? 'bg-green-600 text-white border-2 border-green-400' 
                     : notification.type === 'sl'
-                    ? 'bg-red-600/95 text-white border border-red-500'
+                    ? 'bg-red-600 text-white border-2 border-red-400'
                     : notification.type === 'order'
-                    ? 'bg-blue-600/95 text-white border border-blue-500'
+                    ? 'bg-blue-600 text-white border-2 border-blue-400'
                     : notification.type === 'error'
-                    ? 'bg-red-600/95 text-white border border-red-500'
-                    : 'bg-green-600/95 text-white border border-green-500'
+                    ? 'bg-red-600 text-white border-2 border-red-400'
+                    : 'bg-green-600 text-white border-2 border-green-400'
                 }`}
               >
-                <div className="flex-shrink-0">
-                  {notification.type === 'tp' && <span className="text-xl">🎯</span>}
-                  {notification.type === 'sl' && <span className="text-xl">🛑</span>}
-                  {notification.type === 'order' && <span className="text-xl">📊</span>}
-                  {notification.type === 'success' && <span className="text-xl">✅</span>}
-                  {notification.type === 'error' && <span className="text-xl">❌</span>}
+                <div className="flex-shrink-0 text-2xl">
+                  {notification.type === 'tp' && '🎯'}
+                  {notification.type === 'sl' && '🛑'}
+                  {notification.type === 'order' && '📊'}
+                  {notification.type === 'success' && '✅'}
+                  {notification.type === 'error' && '❌'}
                 </div>
-                <div className="flex-1 font-medium text-sm">{notification.message}</div>
+                <div className="flex-1 font-semibold text-base">{notification.message}</div>
                 <button
                   onClick={() => removeTradeNotification(notification.id)}
-                  className="flex-shrink-0 hover:bg-white/20 rounded p-1 transition-colors"
+                  className="flex-shrink-0 hover:bg-white/20 rounded-full p-1.5 transition-colors"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
             ))}
@@ -2704,6 +2719,19 @@ const TradingPage = () => {
         }
         .animate-slide-left {
           animation: slide-left 0.3s ease-out;
+        }
+        @keyframes slide-down {
+          from {
+            transform: translateY(-100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-down {
+          animation: slide-down 0.4s ease-out;
         }
       `}</style>
     </div>
