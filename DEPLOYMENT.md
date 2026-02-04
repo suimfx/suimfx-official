@@ -1,4 +1,4 @@
-# SetupFX VPS Deployment Guide (Fresh OS Installation)
+# Suimfx VPS Deployment Guide (Fresh OS Installation)
 
 ## Step 1: First Login to VPS
 
@@ -11,13 +11,13 @@ ssh root@YOUR_VPS_IP
 
 ```bash
 # Create new user
-adduser SetupFX
+adduser suimfx
 
 # Add user to sudo group
-usermod -aG sudo SetupFX
+usermod -aG sudo suimfx
 
 # Switch to new user
-su - SetupFX
+su - suimfx
 ```
 
 ## Step 3: Update System
@@ -91,24 +91,24 @@ sudo apt install git -y
 
 ### Option A: Using Git (Recommended)
 ```bash
-cd /home/SetupFX
+cd /home/suimfx
 git clone YOUR_REPO_URL setup
 ```
 
 ### Option B: Using SCP (from your local machine)
 ```bash
 # Run this on your LOCAL machine, not VPS
-scp -r ./setup SetupFX@YOUR_VPS_IP:/home/SetupFX/
+scp -r ./setup suimfx@YOUR_VPS_IP:/home/suimfx/
 ```
 
 ### Option C: Using SFTP/FileZilla
 - Connect to VPS using FileZilla
-- Upload the `setup` folder to `/home/SetupFX/`
+- Upload the `setup` folder to `/home/suimfx/`
 
 ## Step 9: Configure Backend
 
 ```bash
-cd /home/SetupFX/setup/backend
+cd /home/suimfx/setup/backend
 
 # Install dependencies
 npm install
@@ -122,7 +122,7 @@ Edit `.env` with your production values:
 ```env
 PORT=5001
 NODE_ENV=production
-MONGODB_URI=mongodb://localhost:27017/SetupFX
+MONGODB_URI=mongodb://localhost:27017/suimfx
 JWT_SECRET=your_secure_random_string_here
 CORS_ORIGIN=http://YOUR_VPS_IP:5173
 ```
@@ -130,7 +130,7 @@ CORS_ORIGIN=http://YOUR_VPS_IP:5173
 ## Step 10: Configure Frontend
 
 ```bash
-cd /home/SetupFX/setup/frontend
+cd /home/suimfx/setup/frontend
 
 # Install dependencies
 npm install
@@ -148,17 +148,17 @@ VITE_API_URL=http://YOUR_VPS_IP:5001
 ## Step 11: Build Frontend
 
 ```bash
-cd /home/SetupFX/setup/frontend
+cd /home/suimfx/setup/frontend
 npm run build
 ```
 
 ## Step 12: Start Backend with PM2
 
 ```bash
-cd /home/SetupFX/setup/backend
+cd /home/suimfx/setup/backend
 
 # Start with PM2
-pm2 start server.js --name SetupFX-backend
+pm2 start server.js --name suimfx-backend
 
 # Save PM2 configuration
 pm2 save
@@ -172,8 +172,8 @@ pm2 startup
 ### Option A: Using serve (Simple)
 ```bash
 npm install -g serve
-cd /home/SetupFX/setup/frontend
-pm2 start "serve -s dist -l 5173" --name SetupFX-frontend
+cd /home/suimfx/setup/frontend
+pm2 start "serve -s dist -l 5173" --name suimfx-frontend
 ```
 
 ### Option B: Using Nginx (Recommended for Production)
@@ -181,7 +181,7 @@ pm2 start "serve -s dist -l 5173" --name SetupFX-frontend
 sudo apt install nginx
 
 # Configure nginx
-sudo nano /etc/nginx/sites-available/SetupFX
+sudo nano /etc/nginx/sites-available/suimfx
 ```
 
 Nginx configuration:
@@ -192,7 +192,7 @@ server {
     
     # Frontend
     location / {
-        root /home/SetupFX/setup/frontend/dist;
+        root /home/suimfx/setup/frontend/dist;
         try_files $uri $uri/ /index.html;
     }
     
@@ -220,7 +220,7 @@ server {
 
 Enable the site:
 ```bash
-sudo ln -s /etc/nginx/sites-available/SetupFX /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/suimfx /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -248,8 +248,8 @@ sudo ufw enable
 pm2 status              # Check status
 pm2 logs                # View logs
 pm2 restart all         # Restart all apps
-pm2 stop SetupFX-backend   # Stop backend
-pm2 delete SetupFX-backend # Remove from PM2
+pm2 stop suimfx-backend   # Stop backend
+pm2 delete suimfx-backend # Remove from PM2
 ```
 
 ## Troubleshooting
@@ -270,7 +270,7 @@ sudo systemctl start mongod
 
 ### View logs
 ```bash
-pm2 logs SetupFX-backend --lines 100
+pm2 logs suimfx-backend --lines 100
 ```
 
 ## Adding Domain Later

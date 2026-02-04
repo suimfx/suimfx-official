@@ -38,7 +38,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { API_URL } from '../config/api'
-import logoImage from '../assets/SetupFX.png'
+import logoImage from '../assets/suimfxLogo.jpeg'
 
 const ProfilePage = () => {
   const navigate = useNavigate()
@@ -465,7 +465,7 @@ const ProfilePage = () => {
           onMouseLeave={() => setSidebarExpanded(false)}
         >
           <div className="p-4 flex items-center justify-center">
-            <img src={logoImage} alt="SetupFX" className="h-8 w-auto object-contain" />
+            <img src={logoImage} alt="Suimfx" className="h-8 w-auto object-contain" />
           </div>
           <nav className="flex-1 px-2">
             {menuItems.map((item) => (
@@ -628,14 +628,14 @@ const ProfilePage = () => {
                 </div>
 
                 <div>
-                  <label className={`text-sm mb-2 block flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <label className={`text-sm mb-2 flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                     <Mail size={14} /> Email
                   </label>
                   <p className={isDarkMode ? 'text-white' : 'text-gray-900'}>{profile.email}</p>
                 </div>
 
                 <div>
-                  <label className={`text-sm mb-2 block flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <label className={`text-sm mb-2 flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                     <Phone size={14} /> Phone
                   </label>
                   {editing ? (
@@ -651,7 +651,7 @@ const ProfilePage = () => {
                 </div>
 
                 <div>
-                  <label className={`text-sm mb-2 block flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <label className={`text-sm mb-2 flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                     <Calendar size={14} /> Date of Birth
                   </label>
                   {editing ? (
@@ -667,7 +667,7 @@ const ProfilePage = () => {
                 </div>
 
                 <div>
-                  <label className="text-gray-400 text-sm mb-2 block flex items-center gap-2">
+                  <label className="text-gray-400 text-sm mb-2 flex items-center gap-2">
                     <MapPin size={14} /> Country
                   </label>
                   {editing ? (
@@ -683,7 +683,7 @@ const ProfilePage = () => {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="text-gray-400 text-sm mb-2 block flex items-center gap-2">
+                  <label className="text-gray-400 text-sm mb-2 flex items-center gap-2">
                     <MapPin size={14} /> Address
                   </label>
                   {editing ? (

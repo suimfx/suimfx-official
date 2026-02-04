@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { API_URL } from '../config/api'
-import logoImage from '../assets/SetupFX.png'
+import logoImage from '../assets/suimfxLogo.jpeg'
 
 const InstructionsPage = () => {
   const navigate = useNavigate()
@@ -151,7 +151,7 @@ const InstructionsPage = () => {
           onMouseLeave={() => setSidebarExpanded(false)}
         >
           <div className="p-4 flex items-center justify-center">
-            <img src={logoImage} alt="SetupFX" className="h-8 w-auto object-contain" />
+            <img src={logoImage} alt="Suimfx" className="h-8 w-auto object-contain" />
           </div>
           <nav className="flex-1 px-2">
             {menuItems.map((item) => (
@@ -197,7 +197,7 @@ const InstructionsPage = () => {
                   <BookOpen size={isMobile ? 20 : 28} className="text-accent-green" />
                 </div>
                 <div>
-                  <h2 className={`font-bold text-white ${isMobile ? 'text-base' : 'text-xl'}`}>Welcome to SetupFX</h2>
+                  <h2 className={`font-bold text-white ${isMobile ? 'text-base' : 'text-xl'}`}>Welcome to Suimfx</h2>
                   <p className={`text-gray-400 ${isMobile ? 'text-xs' : ''}`}>Learn how to use our platform</p>
                 </div>
               </div>

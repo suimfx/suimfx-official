@@ -26,7 +26,7 @@ import {
   Image,
   User
 } from 'lucide-react'
-import logoImage from '../assets/SetupFX.png'
+import logoImage from '../assets/suimfxLogo.jpeg'
 
 const AdminLayout = ({ children, title, subtitle }) => {
   const navigate = useNavigate()
@@ -136,7 +136,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
         {/* Logo */}
         <div className="p-4 flex items-center justify-between border-b border-gray-800">
           <div className="flex items-center gap-2">
-            <img src={logoImage} alt="SetupFX" className="h-8 w-auto object-contain flex-shrink-0" />
+            <img src={logoImage} alt="Suimfx" className="h-8 w-auto object-contain flex-shrink-0" />
           </div>
           <button 
             onClick={() => setSidebarExpanded(!sidebarExpanded)}

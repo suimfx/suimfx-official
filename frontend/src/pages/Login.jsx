@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { X, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { login } from '../api/auth'
+import suimfxLogo from '../assets/suimfxLogo.jpeg'
 
 const Login = () => {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('signin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -14,7 +14,6 @@ const Login = () => {
     password: ''
   })
   
-  // Detect mobile view
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   
   useEffect(() => {
@@ -37,7 +36,6 @@ const Login = () => {
       const response = await login(formData)
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
-      // Redirect to mobile view on mobile devices
       if (isMobile) {
         navigate('/mobile')
       } else {
@@ -51,101 +49,114 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background gradient effects */}
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-r from-cyan-500/20 to-transparent rounded-full blur-3xl" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-l from-orange-500/20 via-purple-500/20 to-transparent rounded-full blur-3xl" />
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#1e3a5f_0%,_transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#312e81_0%,_transparent_50%)]" />
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px]" />
+      </div>
       
-      {/* Modal */}
-      <div className="relative bg-dark-700 rounded-2xl p-8 w-full max-w-md border border-gray-800">
-        {/* Close button */}
-        <button className="absolute top-4 right-4 w-8 h-8 bg-dark-600 rounded-full flex items-center justify-center hover:bg-dark-500 transition-colors">
-          <X size={16} className="text-gray-400" />
-        </button>
-
-        {/* Tabs */}
-        <div className="flex bg-dark-600 rounded-full p-1 w-fit mb-8">
-          <Link
-            to="/user/signup"
-            className="px-6 py-2 rounded-full text-sm font-medium text-gray-400 hover:text-white transition-colors"
-          >
-            Sign up
-          </Link>
-          <button
-            onClick={() => setActiveTab('signin')}
-            className={`px-6 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeTab === 'signin' ? 'bg-dark-500 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Sign in
-          </button>
-        </div>
-
-        {/* Title */}
-        <h1 className="text-2xl font-semibold text-white mb-6">Welcome back</h1>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email field */}
-          <div className="relative">
-            <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter your email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
-            />
-          </div>
-
-          {/* Password field */}
-          <div className="relative">
-            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              placeholder="Enter your password"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-12 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          {/* Forgot password */}
-          <div className="text-right">
-            <Link to="/user/forgot-password" className="text-sm text-gray-400 hover:text-white transition-colors">
-              Forgot password?
+      {/* Login Card */}
+      <div className="relative w-full max-w-md">
+        <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-8 shadow-2xl">
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <Link to="/">
+              <img src={suimfxLogo} alt="Suimfx" className="h-12 w-auto" />
             </Link>
           </div>
 
-          {/* Error message */}
-          {error && (
-            <p className="text-red-500 text-sm">{error}</p>
-          )}
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
+            <p className="text-slate-400">Sign in to continue trading</p>
+          </div>
 
-          {/* Submit button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-white text-black font-medium py-3 rounded-lg hover:bg-gray-100 transition-colors mt-2 disabled:opacity-50"
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Email Address</label>
+              <div className="relative">
+                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="you@example.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+              <div className="relative">
+                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-12 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Forgot Password */}
+            <div className="flex justify-end">
+              <Link to="/user/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
+                Forgot password?
+              </Link>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3.5 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? 'Signing in...' : <>Sign In <ArrowRight size={18} /></>}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-700"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-slate-900/80 text-slate-500">New to Suimfx?</span>
+            </div>
+          </div>
+
+          {/* Sign Up Link */}
+          <Link
+            to="/user/signup"
+            className="block w-full text-center py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-
-        {/* Terms */}
-        <p className="text-center text-gray-500 text-sm mt-6">
-          Don't have an account?{' '}
-          <Link to="/user/signup" className="text-white hover:underline">Sign up</Link>
-        </p>
+            Create an Account
+          </Link>
+        </div>
       </div>
     </div>
   )

@@ -325,9 +325,9 @@ router.put('/users/:id/ban', async (req, res) => {
           email: user.email,
           reason: reason || 'Policy violation',
           date: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'SetupFX',
-          loginUrl: settings?.loginUrl || 'https://SetupFX.com/login',
-          supportEmail: settings?.supportEmail || 'support@SetupFX.com',
+          platformName: settings?.platformName || 'Suimfx',
+          loginUrl: settings?.loginUrl || 'https://suimfx.com/login',
+          supportEmail: settings?.supportEmail || 'support@suimfx.com',
           year: new Date().getFullYear().toString()
         })
       }

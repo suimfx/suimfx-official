@@ -35,7 +35,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { API_URL } from '../config/api'
-import logoImage from '../assets/SetupFX.png'
+import logoImage from '../assets/suimfxLogo.jpeg'
 
 const WalletPage = () => {
   const navigate = useNavigate()
@@ -455,7 +455,7 @@ const WalletPage = () => {
           onMouseLeave={() => setSidebarExpanded(false)}
         >
           <div className="p-4 flex items-center justify-center shrink-0">
-            <img src={logoImage} alt="SetupFX" className="h-8 w-auto object-contain" />
+            <img src={logoImage} alt="Suimfx" className="h-8 w-auto object-contain" />
           </div>
 
           <nav className="flex-1 px-2 overflow-y-auto">

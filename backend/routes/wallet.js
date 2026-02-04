@@ -124,8 +124,8 @@ router.post('/deposit', async (req, res) => {
           transactionId: transaction._id.toString(),
           paymentMethod: paymentMethod || 'Bank Transfer',
           date: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'SetupFX',
-          supportEmail: settings?.supportEmail || 'support@SetupFX.com',
+          platformName: settings?.platformName || 'Suimfx',
+          supportEmail: settings?.supportEmail || 'support@suimfx.com',
           year: new Date().getFullYear().toString()
         })
       }
@@ -196,8 +196,8 @@ router.post('/withdraw', async (req, res) => {
           transactionId: transaction._id.toString(),
           paymentMethod: paymentMethod || 'Bank Transfer',
           date: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'SetupFX',
-          supportEmail: settings?.supportEmail || 'support@SetupFX.com',
+          platformName: settings?.platformName || 'Suimfx',
+          supportEmail: settings?.supportEmail || 'support@suimfx.com',
           year: new Date().getFullYear().toString()
         })
       }
@@ -406,8 +406,8 @@ router.put('/admin/approve/:id', async (req, res) => {
           paymentMethod: transaction.paymentMethod || 'Wallet',
           date: new Date().toLocaleString(),
           newBalance: wallet.balance.toFixed(2),
-          platformName: settings?.platformName || 'SetupFX',
-          supportEmail: settings?.supportEmail || 'support@SetupFX.com',
+          platformName: settings?.platformName || 'Suimfx',
+          supportEmail: settings?.supportEmail || 'support@suimfx.com',
           year: new Date().getFullYear().toString()
         })
       }
@@ -530,8 +530,8 @@ router.put('/transaction/:id/approve', async (req, res) => {
           paymentMethod: transaction.paymentMethod || 'Wallet',
           date: new Date().toLocaleString(),
           newBalance: wallet.balance.toFixed(2),
-          platformName: settings?.platformName || 'SetupFX',
-          supportEmail: settings?.supportEmail || 'support@SetupFX.com',
+          platformName: settings?.platformName || 'Suimfx',
+          supportEmail: settings?.supportEmail || 'support@suimfx.com',
           year: new Date().getFullYear().toString()
         })
       }

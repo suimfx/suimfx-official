@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { X, Mail, Lock, Eye, EyeOff, Shield, UserCog } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Mail, Lock, Eye, EyeOff, Shield, UserCog, ArrowRight } from 'lucide-react'
 import { API_URL } from '../config/api'
+import suimfxLogo from '../assets/suimfxLogo.jpeg'
 
 const AdminLogin = () => {
   const navigate = useNavigate()
@@ -45,97 +46,134 @@ const AdminLogin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden">
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-r from-red-500/20 to-transparent rounded-full blur-3xl" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-l from-purple-500/20 via-red-500/20 to-transparent rounded-full blur-3xl" />
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#4c1d1d_0%,_transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#312e81_0%,_transparent_50%)]" />
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-red-500/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px]" />
+      </div>
       
-      <div className="relative bg-dark-700 rounded-2xl p-6 sm:p-8 w-full max-w-md border border-gray-800 mx-4 sm:mx-0">
-        <button 
-          onClick={() => navigate('/')}
-          className="absolute top-4 right-4 w-8 h-8 bg-dark-600 rounded-full flex items-center justify-center hover:bg-dark-500 transition-colors"
-        >
-          <X size={16} className="text-gray-400" />
-        </button>
-
-        <div className="flex items-center gap-2 mb-6">
-          <div className="px-3 py-1 rounded-full text-sm font-medium bg-red-500/20 text-red-500">
-            Super Admin Portal
-          </div>
-        </div>
-
-        {/* Login Type Toggle - Navigate to different pages */}
-        <div className="flex gap-2 mb-6 p-1 bg-dark-600 rounded-lg">
-          <button
-            type="button"
-            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors bg-red-500 text-white"
-          >
-            <Shield size={16} />
-            Super Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/admin-employee')}
-            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors text-gray-400 hover:text-white"
-          >
-            <UserCog size={16} />
-            Employee
-          </button>
-        </div>
-
-        <h1 className="text-2xl font-semibold text-white mb-2">Super Admin Login</h1>
-        <p className="text-gray-500 text-sm mb-6">Full access to all features</p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              type="email"
-              name="email"
-              placeholder="Email address"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none transition-colors focus:border-red-500/50"
-            />
+      {/* Admin Login Card */}
+      <div className="relative w-full max-w-md">
+        <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-8 shadow-2xl">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <Link to="/">
+              <img src={suimfxLogo} alt="Suimfx" className="h-12 w-auto" />
+            </Link>
           </div>
 
-          <div className="relative">
-            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-12 py-3 text-white placeholder-gray-500 focus:outline-none transition-colors focus:border-red-500/50"
-            />
+          {/* Admin Badge */}
+          <div className="flex justify-center mb-6">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+              <Shield size={14} />
+              Admin Portal
+            </span>
+          </div>
+
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-white mb-2">Admin Login</h1>
+            <p className="text-slate-400">Access the admin dashboard</p>
+          </div>
+
+          {/* Login Type Toggle */}
+          <div className="flex gap-2 mb-6 p-1 bg-slate-800/50 rounded-xl">
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg"
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              <Shield size={16} />
+              Super Admin
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/admin-employee')}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-700/50"
+            >
+              <UserCog size={16} />
+              Employee
             </button>
           </div>
 
-          {error && (
-            <p className="text-red-500 text-sm">{error}</p>
-          )}
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Email Address</label>
+              <div className="relative">
+                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="admin@suimfx.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                />
+              </div>
+            </div>
 
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+              <div className="relative">
+                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-12 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3.5 rounded-xl hover:from-red-700 hover:to-red-800 transition-all shadow-lg shadow-red-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? 'Signing in...' : <>Sign In <ArrowRight size={18} /></>}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-700"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-slate-900/80 text-slate-500">Not an admin?</span>
+            </div>
+          </div>
+
+          {/* User Login Link */}
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full text-white font-medium py-3 rounded-lg transition-colors mt-2 disabled:opacity-50 bg-red-500 hover:bg-red-600"
+            onClick={() => navigate('/user/login')}
+            className="block w-full text-center py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all"
           >
-            {loading ? 'Signing in...' : 'Sign in as Super Admin'}
+            Go to User Login
           </button>
-        </form>
-
-        <p className="text-center text-gray-500 text-sm mt-6">
-          Not an admin?{' '}
-          <button onClick={() => navigate('/user/login')} className="text-white hover:underline">
-            User Login
-          </button>
-        </p>
+        </div>
       </div>
     </div>
   )

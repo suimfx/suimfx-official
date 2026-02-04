@@ -225,9 +225,9 @@ app.use('/api/employee-mgmt', employeeManagementRoutes)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 // Serve APK download
-app.get('/downloads/SetupFX.apk', (req, res) => {
-  const apkPath = path.join(__dirname, 'apk', 'SetupFX.apk')
-  res.download(apkPath, 'SetupFX.apk', (err) => {
+app.get('/downloads/Suimfx.apk', (req, res) => {
+  const apkPath = path.join(__dirname, 'apk', 'Suimfx.apk')
+  res.download(apkPath, 'Suimfx.apk', (err) => {
     if (err) {
       console.error('APK download error:', err)
       res.status(404).json({ error: 'APK not found' })
@@ -237,7 +237,7 @@ app.get('/downloads/SetupFX.apk', (req, res) => {
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({ message: 'SetupFX API is running' })
+  res.json({ message: 'Suimfx API is running' })
 })
 
 const PORT = process.env.PORT || 5000

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { X, Mail, ChevronDown, Search, Eye, EyeOff, RefreshCw, ArrowLeft } from 'lucide-react'
+import { Mail, ChevronDown, Search, Eye, EyeOff, RefreshCw, ArrowLeft, User, Phone, ArrowRight } from 'lucide-react'
 import { signup } from '../api/auth'
 import { API_URL } from '../config/api'
+import suimfxLogo from '../assets/suimfxLogo.jpeg'
 
 const countries = [
   { code: '+1', name: 'United States', flag: '🇺🇸' },
@@ -296,207 +297,241 @@ const Signup = () => {
   }, [otpVerified])
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 sm:p-6 md:p-8 relative overflow-hidden">
-      {/* Background gradient effects */}
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-r from-cyan-500/20 to-transparent rounded-full blur-3xl" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-l from-orange-500/20 via-purple-500/20 to-transparent rounded-full blur-3xl" />
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#1e3a5f_0%,_transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#312e81_0%,_transparent_50%)]" />
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px]" />
+      </div>
       
-      {/* Modal */}
-      <div className="relative bg-dark-700 rounded-2xl p-6 sm:p-8 w-full max-w-md border border-gray-800 mx-4 sm:mx-0">
-        {/* Close button */}
-        <button className="absolute top-4 right-4 w-8 h-8 bg-dark-600 rounded-full flex items-center justify-center hover:bg-dark-500 transition-colors">
-          <X size={16} className="text-gray-400" />
-        </button>
-
-        {/* Tabs */}
-        <div className="flex bg-dark-600 rounded-full p-1 w-fit mb-8">
-          <button
-            onClick={() => setActiveTab('signup')}
-            className={`px-6 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeTab === 'signup' ? 'bg-dark-500 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Sign up
-          </button>
-          <Link
-            to="/user/login"
-            className="px-6 py-2 rounded-full text-sm font-medium text-gray-400 hover:text-white transition-colors"
-          >
-            Sign in
-          </Link>
-        </div>
-
-        {/* Title */}
-        <h1 className="text-2xl font-semibold text-white mb-6">
-          {otpStep ? 'Verify Your Email' : 'Create an account'}
-        </h1>
-
-        {/* OTP Verification Step */}
-        {otpStep ? (
-          <div className="space-y-4">
-            <button
-              onClick={() => { setOtpStep(false); setOtp(''); setError('') }}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-4"
-            >
-              <ArrowLeft size={18} /> Back
-            </button>
-
-            <p className="text-gray-400 text-sm mb-4">
-              We've sent a 6-digit OTP to <span className="text-white">{formData.email}</span>
-            </p>
-
-            <input
-              type="text"
-              placeholder="Enter 6-digit OTP"
-              value={otp}
-              onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError('') }}
-              maxLength={6}
-              className="w-full bg-dark-600 border border-gray-700 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-widest placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
-            />
-
-            {error && <p className="text-red-500 text-sm">{error}</p>}
-
-            <button
-              onClick={handleVerifyOtp}
-              disabled={verifyingOtp || otp.length !== 6}
-              className="w-full bg-white text-black font-medium py-3 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {verifyingOtp ? <><RefreshCw size={16} className="animate-spin" /> Verifying...</> : 'Verify OTP'}
-            </button>
-
-            <button
-              onClick={handleResendOtp}
-              disabled={sendingOtp}
-              className="w-full text-gray-400 hover:text-white text-sm transition-colors flex items-center justify-center gap-2"
-            >
-              {sendingOtp ? <><RefreshCw size={14} className="animate-spin" /> Sending...</> : "Didn't receive? Resend OTP"}
-            </button>
+      {/* Signup Card */}
+      <div className="relative w-full max-w-md">
+        <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-8 shadow-2xl">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <Link to="/">
+              <img src={suimfxLogo} alt="Suimfx" className="h-12 w-auto" />
+            </Link>
           </div>
-        ) : (
-          /* Form */
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name field */}
-            <input
-              type="text"
-              name="firstName"
-              placeholder="Enter your name"
-              value={formData.firstName}
-              onChange={handleChange}
-              className="w-full bg-dark-600 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
-            />
 
-            {/* Email field */}
-            <div className="relative">
-              <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input
-                type="email"
-                name="email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
-              />
-              </div>
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-white mb-2">
+              {otpStep ? 'Verify Your Email' : 'Create Account'}
+            </h1>
+            <p className="text-slate-400">
+              {otpStep ? 'Enter the code sent to your email' : 'Start your trading journey today'}
+            </p>
+          </div>
 
-            {/* Phone field with country selector */}
-            <div className="flex relative" ref={dropdownRef}>
+          {/* OTP Verification Step */}
+          {otpStep ? (
+            <div className="space-y-5">
               <button
-                type="button"
-                onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                className="flex items-center gap-1 sm:gap-2 bg-dark-600 border border-gray-700 rounded-l-lg px-2 sm:px-3 py-3 border-r-0 hover:bg-dark-500 transition-colors min-w-[70px] sm:min-w-[90px]"
+                onClick={() => { setOtpStep(false); setOtp(''); setError('') }}
+                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
               >
-                <span className="text-base sm:text-lg">{selectedCountry.flag}</span>
-                <span className="text-gray-400 text-xs sm:text-sm hidden sm:inline">{selectedCountry.code}</span>
-                <ChevronDown size={14} className="text-gray-500" />
+                <ArrowLeft size={18} /> Back
               </button>
-              
-              {/* Country Dropdown */}
-              {showCountryDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-64 sm:w-72 bg-dark-600 border border-gray-700 rounded-lg shadow-xl z-50 max-h-64 overflow-hidden">
-                  {/* Search */}
-                  <div className="p-2 border-b border-gray-700">
-                    <div className="relative">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                      <input
-                        type="text"
-                        placeholder="Search country..."
-                        value={countrySearch}
-                        onChange={(e) => setCountrySearch(e.target.value)}
-                        className="w-full bg-dark-700 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gray-600"
-                      />
-                    </div>
-                  </div>
-                  {/* Country List */}
-                  <div className="max-h-48 overflow-y-auto">
-                    {filteredCountries.map((country, index) => (
-                      <button
-                        key={`${country.code}-${index}`}
-                        type="button"
-                        onClick={() => handleCountrySelect(country)}
-                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-dark-500 transition-colors text-left"
-                      >
-                        <span className="text-lg">{country.flag}</span>
-                        <span className="text-white text-sm flex-1">{country.name}</span>
-                        <span className="text-gray-500 text-sm">{country.code}</span>
-                      </button>
-                    ))}
-                    {filteredCountries.length === 0 && (
-                      <p className="text-gray-500 text-sm text-center py-3">No countries found</p>
-                    )}
-                  </div>
+
+              <p className="text-slate-400 text-sm">
+                We've sent a 6-digit OTP to <span className="text-white font-medium">{formData.email}</span>
+              </p>
+
+              <input
+                type="text"
+                placeholder="000000"
+                value={otp}
+                onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError('') }}
+                maxLength={6}
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-4 text-white text-center text-2xl tracking-[0.5em] placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              />
+
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <p className="text-red-400 text-sm">{error}</p>
                 </div>
               )}
-              
-              <input
-                type="tel"
-                name="phone"
-                placeholder="Enter phone number"
-                value={formData.phone}
-                onChange={handleChange}
-                className="flex-1 bg-dark-600 border border-gray-700 rounded-r-lg px-3 sm:px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors min-w-0"
-              />
-            </div>
 
-            {/* Password field */}
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                placeholder="Create password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full bg-dark-600 border border-gray-700 rounded-lg px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
-              />
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                onClick={handleVerifyOtp}
+                disabled={verifyingOtp || otp.length !== 6}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3.5 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {verifyingOtp ? <><RefreshCw size={16} className="animate-spin" /> Verifying...</> : 'Verify OTP'}
+              </button>
+
+              <button
+                onClick={handleResendOtp}
+                disabled={sendingOtp}
+                className="w-full text-slate-400 hover:text-white text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {sendingOtp ? <><RefreshCw size={14} className="animate-spin" /> Sending...</> : "Didn't receive? Resend OTP"}
               </button>
             </div>
+          ) : (
+            /* Form */
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Name field */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Full Name</label>
+                <div className="relative">
+                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    name="firstName"
+                    placeholder="John Doe"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+              </div>
 
-            {/* Error message */}
-            {error && (
-              <p className="text-red-500 text-sm">{error}</p>
-            )}
+              {/* Email field */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Email Address</label>
+                <div className="relative">
+                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+              </div>
 
-            {/* Submit button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-white text-black font-medium py-3 rounded-lg hover:bg-gray-100 transition-colors mt-2 disabled:opacity-50"
-            >
-              {loading ? 'Creating account...' : 'Create an account'}
-            </button>
-          </form>
-        )}
+              {/* Phone field with country selector */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Phone Number</label>
+                <div className="flex relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                    className="flex items-center gap-1 sm:gap-2 bg-slate-800/50 border border-slate-700 rounded-l-xl px-3 py-3.5 border-r-0 hover:bg-slate-700/50 transition-colors min-w-[80px]"
+                  >
+                    <span className="text-lg">{selectedCountry.flag}</span>
+                    <span className="text-slate-400 text-sm">{selectedCountry.code}</span>
+                    <ChevronDown size={14} className="text-slate-500" />
+                  </button>
+                  
+                  {/* Country Dropdown */}
+                  {showCountryDropdown && (
+                    <div className="absolute top-full left-0 mt-1 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 max-h-64 overflow-hidden">
+                      <div className="p-2 border-b border-slate-700">
+                        <div className="relative">
+                          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                          <input
+                            type="text"
+                            placeholder="Search country..."
+                            value={countrySearch}
+                            onChange={(e) => setCountrySearch(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {filteredCountries.map((country, index) => (
+                          <button
+                            key={`${country.code}-${index}`}
+                            type="button"
+                            onClick={() => handleCountrySelect(country)}
+                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-700 transition-colors text-left"
+                          >
+                            <span className="text-lg">{country.flag}</span>
+                            <span className="text-white text-sm flex-1">{country.name}</span>
+                            <span className="text-slate-500 text-sm">{country.code}</span>
+                          </button>
+                        ))}
+                        {filteredCountries.length === 0 && (
+                          <p className="text-slate-500 text-sm text-center py-3">No countries found</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <input
+                    type="tel"
+                    name="phone"
+                    placeholder="Phone number"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="flex-1 bg-slate-800/50 border border-slate-700 rounded-r-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all min-w-0"
+                  />
+                </div>
+              </div>
 
-        {/* Terms */}
-        <p className="text-center text-gray-500 text-sm mt-6">
-          By creating an account, you agree to our{' '}
-          <a href="#" className="text-white hover:underline">Terms & Service</a>
-        </p>
+              {/* Password field */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    placeholder="Create a strong password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3.5 pr-12 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error message */}
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3.5 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+              >
+                {loading ? 'Creating account...' : <>Create Account <ArrowRight size={18} /></>}
+              </button>
+            </form>
+          )}
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-700"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-slate-900/80 text-slate-500">Already have an account?</span>
+            </div>
+          </div>
+
+          {/* Sign In Link */}
+          <Link
+            to="/user/login"
+            className="block w-full text-center py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all"
+          >
+            Sign In
+          </Link>
+
+          {/* Terms */}
+          <p className="text-center text-slate-500 text-xs mt-6">
+            By creating an account, you agree to our{' '}
+            <a href="#" className="text-blue-400 hover:underline">Terms of Service</a>
+            {' '}and{' '}
+            <a href="#" className="text-blue-400 hover:underline">Privacy Policy</a>
+          </p>
+        </div>
       </div>
     </div>
   )
