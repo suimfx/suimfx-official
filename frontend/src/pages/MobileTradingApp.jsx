@@ -518,8 +518,12 @@ const MobileTradingApp = () => {
       return true
     }
     
+    // Map frontend category names to backend category names
+    const categoryMap = { 'Commodities': 'Energy' }
+    const backendCategory = categoryMap[activeCategory] || activeCategory
+    
     // For specific categories, show only popular by default
-    return inst.category === activeCategory && inst.popular
+    return inst.category === backendCategory && inst.popular
   })
 
   const moreMenuItems = [

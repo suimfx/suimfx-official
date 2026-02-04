@@ -46,7 +46,7 @@ const AdminLogin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 py-8 sm:p-4 relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#4c1d1d_0%,_transparent_50%)]" />
@@ -57,11 +57,11 @@ const AdminLogin = () => {
       
       {/* Admin Login Card */}
       <div className="relative w-full max-w-md">
-        <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-8 shadow-2xl">
+        <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-5 sm:p-8 shadow-2xl">
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <Link to="/">
-              <img src={suimfxLogo} alt="Suimfx" className="h-12 w-auto" />
+              <img src={suimfxLogo} alt="Suimfx" className="h-10 sm:h-12 w-auto" />
             </Link>
           </div>
 
@@ -75,7 +75,7 @@ const AdminLogin = () => {
 
           {/* Header */}
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Admin Login</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Admin Login</h1>
             <p className="text-slate-400">Access the admin dashboard</p>
           </div>
 
@@ -108,10 +108,10 @@ const AdminLogin = () => {
                 <input
                   type="email"
                   name="email"
-                  placeholder="admin@suimfx.com"
+                  placeholder="Enter your email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3 sm:py-3.5 text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 />
               </div>
             </div>
@@ -127,7 +127,7 @@ const AdminLogin = () => {
                   placeholder="Enter your password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-12 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-12 py-3 sm:py-3.5 text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 />
                 <button
                   type="button"
@@ -150,7 +150,7 @@ const AdminLogin = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3.5 rounded-xl hover:from-red-700 hover:to-red-800 transition-all shadow-lg shadow-red-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 sm:py-3.5 rounded-xl hover:from-red-700 hover:to-red-800 transition-all shadow-lg shadow-red-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
             >
               {loading ? 'Signing in...' : <>Sign In <ArrowRight size={18} /></>}
             </button>
@@ -169,7 +169,7 @@ const AdminLogin = () => {
           {/* User Login Link */}
           <button
             onClick={() => navigate('/user/login')}
-            className="block w-full text-center py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all"
+            className="block w-full text-center py-3 sm:py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all text-sm sm:text-base"
           >
             Go to User Login
           </button>
