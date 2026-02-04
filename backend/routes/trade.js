@@ -361,10 +361,18 @@ router.put('/modify', async (req, res) => {
     const parsedSl = sl !== undefined && sl !== null && sl !== '' ? parseFloat(sl) : null
     const parsedTp = tp !== undefined && tp !== null && tp !== '' ? parseFloat(tp) : null
     
+    // Get current price for validation
+    const { bid, ask } = req.body
+    const currentBid = bid ? parseFloat(bid) : null
+    const currentAsk = ask ? parseFloat(ask) : null
+    
     const trade = await tradeEngine.modifyTrade(
       tradeId,
       parsedSl !== null && !isNaN(parsedSl) ? parsedSl : null,
-      parsedTp !== null && !isNaN(parsedTp) ? parsedTp : null
+      parsedTp !== null && !isNaN(parsedTp) ? parsedTp : null,
+      null, // adminId
+      currentBid,
+      currentAsk
     )
 
     // Mirror SL/TP modification to follower trades

@@ -937,10 +937,16 @@ const TradingPage = () => {
     setTradeError('') // Clear any previous error
 
     try {
+      // Get current price for the trade's symbol
+      const tradeSymbol = selectedTradeForModify.symbol
+      const currentPrice = instruments.find(i => i.symbol === tradeSymbol)
+      
       const requestBody = {
         tradeId: selectedTradeForModify._id,
         sl: modifySL ? parseFloat(modifySL) : null,
-        tp: modifyTP ? parseFloat(modifyTP) : null
+        tp: modifyTP ? parseFloat(modifyTP) : null,
+        bid: currentPrice?.bid || selectedTradeForModify.openPrice,
+        ask: currentPrice?.ask || selectedTradeForModify.openPrice
       }
       console.log('Request body:', JSON.stringify(requestBody))
 
