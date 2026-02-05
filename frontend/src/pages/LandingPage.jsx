@@ -38,7 +38,7 @@ const Navbar = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 md:h-20">
             <a href="/" className="flex items-center gap-2">
-              <img src={suimfxLogo} alt="Suimfx" className="h-8 md:h-10 w-auto" />
+              <img src={suimfxLogo} alt="Suimfx" className="h-12 md:h-14 w-auto" />
             </a>
 
             <div className="hidden md:flex items-center gap-8">
@@ -445,7 +445,7 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <a href="/" className="inline-block mb-4">
-              <img src={suimfxLogo} alt="Suimfx" className="h-10 w-auto" />
+              <img src={suimfxLogo} alt="Suimfx" className="h-14 w-auto" />
             </a>
             <p className="text-slate-400 text-sm mb-4">
               Your trusted partner for forex, stocks, and crypto trading.
