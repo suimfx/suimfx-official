@@ -26,7 +26,7 @@ import {
   Image,
   User
 } from 'lucide-react'
-import logoImage from '../assets/suimfxLogo.jpeg'
+import logoImage from '../assets/suimfxLogo.png'
 
 const AdminLayout = ({ children, title, subtitle }) => {
   const navigate = useNavigate()
@@ -74,9 +74,35 @@ const AdminLayout = ({ children, title, subtitle }) => {
     if (sidebarKey === 'overviewDashboard') return true // Dashboard always visible
     if (sidebarKey === 'myProfile') return true // My Profile always visible
     
-    // Check sidebarPermissions (new format)
+    // Check sidebarPermissions for Admin role
     if (admin.sidebarPermissions && admin.sidebarPermissions[sidebarKey] === true) {
       return true
+    }
+    
+    // Check employee permissions (map sidebar keys to employee permissions)
+    if (admin.permissions) {
+      const p = admin.permissions
+      const permissionMap = {
+        'userManagement': p.canViewUsers || p.canManageUsers,
+        'tradeManagement': p.canViewTrades || p.canManageTrades,
+        'fundManagement': p.canViewDeposits || p.canViewWithdrawals || p.canApproveDeposits || p.canApproveWithdrawals,
+        'bankSettings': p.canManagePaymentMethods,
+        'ibManagement': p.canViewIB || p.canManageIB,
+        'forexCharges': p.canManageCharges,
+        'earningsReport': p.canViewReports,
+        'copyTrade': p.canViewCopyTrading || p.canManageCopyTrading,
+        'propFirmChallenges': p.canViewPropTrading || p.canManagePropTrading,
+        'accountTypes': p.canManageSettings,
+        'themeSettings': p.canManageTheme,
+        'emailTemplates': p.canManageEmailTemplates,
+        'bonusManagement': p.canManageBonus,
+        'bannerManagement': p.canManageBanners,
+        'kycVerification': p.canViewKYC || p.canApproveKYC,
+        'supportTickets': p.canViewSupport || p.canManageSupport
+      }
+      if (permissionMap[sidebarKey] === true) {
+        return true
+      }
     }
     
     return false

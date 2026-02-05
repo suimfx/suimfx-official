@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, ChevronDown, Search, Eye, EyeOff, RefreshCw, ArrowLeft, User, Phone, ArrowRight } from 'lucide-react'
 import { signup } from '../api/auth'
 import { API_URL } from '../config/api'
-import suimfxLogo from '../assets/suimfxLogo.jpeg'
+import suimfxLogo from '../assets/suimfxLogo.png'
 
 const countries = [
   { code: '+1', name: 'United States', flag: '🇺🇸' },

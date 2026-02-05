@@ -44,6 +44,7 @@ import AdminBannerManagement from './pages/AdminBannerManagement'
 import LandingPage from './pages/LandingPage'
 import EmployeeLogin from './pages/EmployeeLogin'
 import AdminProfile from './pages/AdminProfile'
+import ProtectedAdminRoute from './components/ProtectedAdminRoute'
 
 function App() {
   return (
@@ -67,30 +68,30 @@ function App() {
         <Route path="/support" element={<SupportPage />} />
         <Route path="/instructions" element={<InstructionsPage />} />
         <Route path="/admin" element={<AdminLogin />} />
-        <Route path="/admin/dashboard" element={<AdminOverview />} />
-        <Route path="/admin/users" element={<AdminUserManagement />} />
-        <Route path="/admin/accounts" element={<AdminAccounts />} />
-        <Route path="/admin/account-types" element={<AdminAccountTypes />} />
-        <Route path="/admin/transactions" element={<AdminTransactions />} />
-        <Route path="/admin/payment-methods" element={<AdminPaymentMethods />} />
-        <Route path="/admin/trades" element={<AdminTradeManagement />} />
-        <Route path="/admin/funds" element={<AdminFundManagement />} />
-        <Route path="/admin/bank-settings" element={<AdminBankSettings />} />
-        <Route path="/admin/ib-management" element={<AdminIBManagement />} />
-        <Route path="/admin/forex-charges" element={<AdminForexCharges />} />
-        <Route path="/admin/indian-charges" element={<AdminIndianCharges />} />
-        <Route path="/admin/copy-trade" element={<AdminCopyTrade />} />
-        <Route path="/admin/prop-firm" element={<AdminPropFirm />} />
-        <Route path="/admin/admin-management" element={<AdminManagement />} />
-        <Route path="/admin/kyc" element={<AdminKYC />} />
-        <Route path="/admin/support" element={<AdminSupport />} />
-        <Route path="/admin/prop-trading" element={<AdminPropTrading />} />
-        <Route path="/admin/earnings" element={<AdminEarnings />} />
-        <Route path="/admin/theme" element={<AdminThemeSettings />} />
-        <Route path="/admin/email-templates" element={<AdminEmailTemplates />} />
-        <Route path="/admin/bonus-management" element={<AdminBonusManagement />} />
-        <Route path="/admin/banners" element={<AdminBannerManagement />} />
-        <Route path="/admin/profile" element={<AdminProfile />} />
+        <Route path="/admin/dashboard" element={<ProtectedAdminRoute requiredPermission="overviewDashboard"><AdminOverview /></ProtectedAdminRoute>} />
+        <Route path="/admin/users" element={<ProtectedAdminRoute requiredPermission="userManagement"><AdminUserManagement /></ProtectedAdminRoute>} />
+        <Route path="/admin/accounts" element={<ProtectedAdminRoute requiredPermission="userManagement"><AdminAccounts /></ProtectedAdminRoute>} />
+        <Route path="/admin/account-types" element={<ProtectedAdminRoute requiredPermission="accountTypes"><AdminAccountTypes /></ProtectedAdminRoute>} />
+        <Route path="/admin/transactions" element={<ProtectedAdminRoute requiredPermission="fundManagement"><AdminTransactions /></ProtectedAdminRoute>} />
+        <Route path="/admin/payment-methods" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminPaymentMethods /></ProtectedAdminRoute>} />
+        <Route path="/admin/trades" element={<ProtectedAdminRoute requiredPermission="tradeManagement"><AdminTradeManagement /></ProtectedAdminRoute>} />
+        <Route path="/admin/funds" element={<ProtectedAdminRoute requiredPermission="fundManagement"><AdminFundManagement /></ProtectedAdminRoute>} />
+        <Route path="/admin/bank-settings" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminBankSettings /></ProtectedAdminRoute>} />
+        <Route path="/admin/ib-management" element={<ProtectedAdminRoute requiredPermission="ibManagement"><AdminIBManagement /></ProtectedAdminRoute>} />
+        <Route path="/admin/forex-charges" element={<ProtectedAdminRoute requiredPermission="forexCharges"><AdminForexCharges /></ProtectedAdminRoute>} />
+        <Route path="/admin/indian-charges" element={<ProtectedAdminRoute requiredPermission="forexCharges"><AdminIndianCharges /></ProtectedAdminRoute>} />
+        <Route path="/admin/copy-trade" element={<ProtectedAdminRoute requiredPermission="copyTrade"><AdminCopyTrade /></ProtectedAdminRoute>} />
+        <Route path="/admin/prop-firm" element={<ProtectedAdminRoute requiredPermission="propFirmChallenges"><AdminPropFirm /></ProtectedAdminRoute>} />
+        <Route path="/admin/admin-management" element={<ProtectedAdminRoute requiredPermission="employeeManagement"><AdminManagement /></ProtectedAdminRoute>} />
+        <Route path="/admin/kyc" element={<ProtectedAdminRoute requiredPermission="kycVerification"><AdminKYC /></ProtectedAdminRoute>} />
+        <Route path="/admin/support" element={<ProtectedAdminRoute requiredPermission="supportTickets"><AdminSupport /></ProtectedAdminRoute>} />
+        <Route path="/admin/prop-trading" element={<ProtectedAdminRoute requiredPermission="propFirmChallenges"><AdminPropTrading /></ProtectedAdminRoute>} />
+        <Route path="/admin/earnings" element={<ProtectedAdminRoute requiredPermission="earningsReport"><AdminEarnings /></ProtectedAdminRoute>} />
+        <Route path="/admin/theme" element={<ProtectedAdminRoute requiredPermission="themeSettings"><AdminThemeSettings /></ProtectedAdminRoute>} />
+        <Route path="/admin/email-templates" element={<ProtectedAdminRoute requiredPermission="emailTemplates"><AdminEmailTemplates /></ProtectedAdminRoute>} />
+        <Route path="/admin/bonus-management" element={<ProtectedAdminRoute requiredPermission="bonusManagement"><AdminBonusManagement /></ProtectedAdminRoute>} />
+        <Route path="/admin/banners" element={<ProtectedAdminRoute requiredPermission="bonusManagement"><AdminBannerManagement /></ProtectedAdminRoute>} />
+        <Route path="/admin/profile" element={<ProtectedAdminRoute><AdminProfile /></ProtectedAdminRoute>} />
         <Route path="/admin-employee" element={<EmployeeLogin />} />
         <Route path="/buy-challenge" element={<BuyChallengePage />} />
         <Route path="/challenge-dashboard" element={<ChallengeDashboardPage />} />

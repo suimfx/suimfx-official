@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import suimfxLogo from '../assets/suimfxLogo.jpeg'
+import suimfxLogo from '../assets/suimfxLogo.png'
 import { 
   CheckCircle2, Users, TrendingUp, Shield, Zap, Globe, BarChart3,
   Menu, X, Download, ArrowRight, Star, Clock, Headphones, Award,

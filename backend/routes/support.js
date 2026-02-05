@@ -1,6 +1,7 @@
 import express from 'express'
 import SupportTicket from '../models/SupportTicket.js'
 import User from '../models/User.js'
+import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
 
 const router = express.Router()
 
@@ -153,7 +154,7 @@ router.post('/reply/:ticketId', async (req, res) => {
 // ==================== ADMIN ROUTES ====================
 
 // GET /api/support/admin/all - Get all tickets (admin)
-router.get('/admin/all', async (req, res) => {
+router.get('/admin/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.SUPPORT_TICKETS), async (req, res) => {
   try {
     const { status, priority, category, limit = 50, offset = 0 } = req.query
 
@@ -179,7 +180,7 @@ router.get('/admin/all', async (req, res) => {
 })
 
 // GET /api/support/admin/stats - Get ticket stats
-router.get('/admin/stats', async (req, res) => {
+router.get('/admin/stats', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.SUPPORT_TICKETS), async (req, res) => {
   try {
     const stats = await SupportTicket.getStats()
     res.json({ success: true, stats })
@@ -190,7 +191,7 @@ router.get('/admin/stats', async (req, res) => {
 })
 
 // PUT /api/support/admin/status/:ticketId - Update ticket status
-router.put('/admin/status/:ticketId', async (req, res) => {
+router.put('/admin/status/:ticketId', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_SUPPORT), async (req, res) => {
   try {
     const { ticketId } = req.params
     const { status } = req.body
@@ -221,7 +222,7 @@ router.put('/admin/status/:ticketId', async (req, res) => {
 })
 
 // PUT /api/support/admin/assign/:ticketId - Assign ticket to admin
-router.put('/admin/assign/:ticketId', async (req, res) => {
+router.put('/admin/assign/:ticketId', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_SUPPORT), async (req, res) => {
   try {
     const { ticketId } = req.params
     const { adminId } = req.body
@@ -250,7 +251,7 @@ router.put('/admin/assign/:ticketId', async (req, res) => {
 })
 
 // PUT /api/support/admin/priority/:ticketId - Update ticket priority
-router.put('/admin/priority/:ticketId', async (req, res) => {
+router.put('/admin/priority/:ticketId', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_SUPPORT), async (req, res) => {
   try {
     const { ticketId } = req.params
     const { priority } = req.body

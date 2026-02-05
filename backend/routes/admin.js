@@ -5,11 +5,15 @@ import Transaction from '../models/Transaction.js'
 import Trade from '../models/Trade.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 import EmailSettings from '../models/EmailSettings.js'
+import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
 
 const router = express.Router()
 
+// Apply auth middleware to all routes
+router.use(verifyAdminToken)
+
 // GET /api/admin/dashboard-stats - Get dashboard statistics
-router.get('/dashboard-stats', async (req, res) => {
+router.get('/dashboard-stats', requireSidebarPermission(PERMISSIONS.SIDEBAR.OVERVIEW_DASHBOARD), async (req, res) => {
   try {
     // Get user stats
     const totalUsers = await User.countDocuments()
@@ -50,7 +54,7 @@ router.get('/dashboard-stats', async (req, res) => {
 })
 
 // GET /api/admin/users - Get all users
-router.get('/users', async (req, res) => {
+router.get('/users', requireSidebarPermission(PERMISSIONS.SIDEBAR.USER_MANAGEMENT), async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 })
     res.json({
@@ -66,7 +70,7 @@ router.get('/users', async (req, res) => {
 })
 
 // GET /api/admin/users/:id - Get single user
-router.get('/users/:id', async (req, res) => {
+router.get('/users/:id', requireSidebarPermission(PERMISSIONS.SIDEBAR.USER_MANAGEMENT), async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password')
     if (!user) {
@@ -79,7 +83,7 @@ router.get('/users/:id', async (req, res) => {
 })
 
 // PUT /api/admin/users/:id/password - Change user password
-router.put('/users/:id/password', async (req, res) => {
+router.put('/users/:id/password', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
     const { password } = req.body
     if (!password || password.length < 6) {
@@ -102,7 +106,7 @@ router.put('/users/:id/password', async (req, res) => {
 })
 
 // POST /api/admin/users/:id/deduct - Deduct funds from user wallet
-router.post('/users/:id/deduct', async (req, res) => {
+router.post('/users/:id/deduct', requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
   try {
     const { amount, reason } = req.body
     if (!amount || amount <= 0) {
@@ -142,7 +146,7 @@ router.post('/users/:id/deduct', async (req, res) => {
 })
 
 // POST /api/admin/users/:id/add-fund - Add funds to user wallet (Admin only)
-router.post('/users/:id/add-fund', async (req, res) => {
+router.post('/users/:id/add-fund', requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
   try {
     const { amount, reason, adminId } = req.body
     if (!amount || amount <= 0) {
@@ -196,7 +200,7 @@ router.post('/users/:id/add-fund', async (req, res) => {
 })
 
 // POST /api/admin/trading-account/:id/add-fund - Add funds to trading account (Admin only)
-router.post('/trading-account/:id/add-fund', async (req, res) => {
+router.post('/trading-account/:id/add-fund', requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
   try {
     const { amount, reason, adminId } = req.body
     if (!amount || amount <= 0) {
@@ -242,7 +246,7 @@ router.post('/trading-account/:id/add-fund', async (req, res) => {
 })
 
 // POST /api/admin/trading-account/:id/deduct - Deduct funds from trading account (Admin only)
-router.post('/trading-account/:id/deduct', async (req, res) => {
+router.post('/trading-account/:id/deduct', requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
   try {
     const { amount, reason } = req.body
     if (!amount || amount <= 0) {
@@ -274,7 +278,7 @@ router.post('/trading-account/:id/deduct', async (req, res) => {
 })
 
 // PUT /api/admin/users/:id/block - Block/Unblock user
-router.put('/users/:id/block', async (req, res) => {
+router.put('/users/:id/block', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
     const { blocked, reason } = req.body
     
@@ -299,7 +303,7 @@ router.put('/users/:id/block', async (req, res) => {
 })
 
 // PUT /api/admin/users/:id/ban - Ban/Unban user
-router.put('/users/:id/ban', async (req, res) => {
+router.put('/users/:id/ban', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
     const { banned, reason } = req.body
     
@@ -347,7 +351,7 @@ router.put('/users/:id/ban', async (req, res) => {
 })
 
 // DELETE /api/admin/users/:id - Delete user
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/:id', requireEmployeePermission(PERMISSIONS.EMPLOYEE.DELETE_USERS), async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id)
     if (!user) {
@@ -362,7 +366,7 @@ router.delete('/users/:id', async (req, res) => {
 // ==================== CREDIT/BONUS SYSTEM ====================
 
 // POST /api/admin/trading-account/:id/add-credit - Add credit/bonus to trading account
-router.post('/trading-account/:id/add-credit', async (req, res) => {
+router.post('/trading-account/:id/add-credit', requireSidebarPermission(PERMISSIONS.SIDEBAR.BONUS_MANAGEMENT), async (req, res) => {
   try {
     const { amount, reason, adminId } = req.body
     if (!amount || amount <= 0) {
@@ -411,7 +415,7 @@ router.post('/trading-account/:id/add-credit', async (req, res) => {
 })
 
 // POST /api/admin/trading-account/:id/remove-credit - Remove credit from trading account
-router.post('/trading-account/:id/remove-credit', async (req, res) => {
+router.post('/trading-account/:id/remove-credit', requireSidebarPermission(PERMISSIONS.SIDEBAR.BONUS_MANAGEMENT), async (req, res) => {
   try {
     const { amount, reason, adminId } = req.body
     if (!amount || amount <= 0) {
@@ -462,7 +466,7 @@ router.post('/trading-account/:id/remove-credit', async (req, res) => {
 })
 
 // GET /api/admin/trading-account/:id/summary - Get account summary with equity calculation
-router.get('/trading-account/:id/summary', async (req, res) => {
+router.get('/trading-account/:id/summary', requireSidebarPermission(PERMISSIONS.SIDEBAR.USER_MANAGEMENT), async (req, res) => {
   try {
     const TradingAccount = (await import('../models/TradingAccount.js')).default
     const Trade = (await import('../models/Trade.js')).default
@@ -508,7 +512,7 @@ router.get('/trading-account/:id/summary', async (req, res) => {
 })
 
 // POST /api/admin/login-as-user/:userId - Generate token to login as user
-router.post('/login-as-user/:userId', async (req, res) => {
+router.post('/login-as-user/:userId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
     const { adminId } = req.body
     
@@ -555,7 +559,7 @@ router.post('/login-as-user/:userId', async (req, res) => {
 // ==================== PASSWORD RESET REQUESTS ====================
 
 // GET /api/admin/password-reset-requests - Get all password reset requests
-router.get('/password-reset-requests', async (req, res) => {
+router.get('/password-reset-requests', requireSidebarPermission(PERMISSIONS.SIDEBAR.USER_MANAGEMENT), async (req, res) => {
   try {
     const PasswordResetRequest = (await import('../models/PasswordResetRequest.js')).default
     const { status } = req.query
@@ -582,7 +586,7 @@ router.get('/password-reset-requests', async (req, res) => {
 })
 
 // PUT /api/admin/password-reset-requests/:id/process - Process password reset request
-router.put('/password-reset-requests/:id/process', async (req, res) => {
+router.put('/password-reset-requests/:id/process', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
     const { action, newPassword, adminRemarks } = req.body
     const PasswordResetRequest = (await import('../models/PasswordResetRequest.js')).default

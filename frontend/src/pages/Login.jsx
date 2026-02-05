@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { login } from '../api/auth'
-import suimfxLogo from '../assets/suimfxLogo.jpeg'
+import suimfxLogo from '../assets/suimfxLogo.png'
 
 const Login = () => {
   const navigate = useNavigate()

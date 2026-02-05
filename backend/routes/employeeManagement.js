@@ -2,38 +2,10 @@ import express from 'express'
 import jwt from 'jsonwebtoken'
 import Employee from '../models/Employee.js'
 import Admin from '../models/Admin.js'
+import { verifyAdminToken, requireSuperAdmin, requireSidebarPermission, PERMISSIONS } from '../middleware/rbac.js'
 
 const router = express.Router()
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-
-// Middleware to verify admin token
-const verifyAdmin = async (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1]
-    if (!token) {
-      return res.status(401).json({ success: false, message: 'No token provided' })
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET)
-    if (!decoded.adminId) {
-      return res.status(401).json({ success: false, message: 'Invalid token' })
-    }
-
-    const admin = await Admin.findById(decoded.adminId)
-    if (!admin) {
-      return res.status(404).json({ success: false, message: 'Admin not found' })
-    }
-
-    if (admin.status !== 'ACTIVE') {
-      return res.status(403).json({ success: false, message: 'Admin account is not active' })
-    }
-
-    req.admin = admin
-    next()
-  } catch (error) {
-    res.status(401).json({ success: false, message: 'Invalid token' })
-  }
-}
 
 // Predefined role templates
 const roleTemplates = {
@@ -101,7 +73,7 @@ const roleTemplates = {
 }
 
 // GET /api/employee-mgmt/role-templates
-router.get('/role-templates', verifyAdmin, async (req, res) => {
+router.get('/role-templates', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.EMPLOYEE_MANAGEMENT), async (req, res) => {
   try {
     res.json({ success: true, roleTemplates })
   } catch (error) {
@@ -110,9 +82,9 @@ router.get('/role-templates', verifyAdmin, async (req, res) => {
 })
 
 // GET /api/employee-mgmt/employees
-router.get('/employees', verifyAdmin, async (req, res) => {
+router.get('/employees', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.EMPLOYEE_MANAGEMENT), async (req, res) => {
   try {
-    const employees = await Employee.find({ createdBy: req.admin._id })
+    const employees = await Employee.find({ createdBy: req.user._id })
       .select('-password')
       .sort({ createdAt: -1 })
 
@@ -123,7 +95,7 @@ router.get('/employees', verifyAdmin, async (req, res) => {
 })
 
 // POST /api/employee-mgmt/employees
-router.post('/employees', verifyAdmin, async (req, res) => {
+router.post('/employees', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.EMPLOYEE_MANAGEMENT), async (req, res) => {
   try {
     const { email, password, firstName, lastName, phone, role, permissions } = req.body
 
@@ -154,7 +126,7 @@ router.post('/employees', verifyAdmin, async (req, res) => {
       phone: phone || '',
       role,
       permissions: employeePermissions,
-      createdBy: req.admin._id
+      createdBy: req.user._id
     })
 
     res.status(201).json({
@@ -177,13 +149,13 @@ router.post('/employees', verifyAdmin, async (req, res) => {
 })
 
 // PUT /api/employee-mgmt/employees/:id
-router.put('/employees/:id', verifyAdmin, async (req, res) => {
+router.put('/employees/:id', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.EMPLOYEE_MANAGEMENT), async (req, res) => {
   try {
     const { firstName, lastName, phone, role, status } = req.body
 
     const employee = await Employee.findOne({ 
       _id: req.params.id, 
-      createdBy: req.admin._id 
+      createdBy: req.user._id 
     })
 
     if (!employee) {
@@ -216,13 +188,13 @@ router.put('/employees/:id', verifyAdmin, async (req, res) => {
 })
 
 // PUT /api/employee-mgmt/employees/:id/permissions
-router.put('/employees/:id/permissions', verifyAdmin, async (req, res) => {
+router.put('/employees/:id/permissions', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.EMPLOYEE_MANAGEMENT), async (req, res) => {
   try {
     const { permissions, role } = req.body
 
     const employee = await Employee.findOne({ 
       _id: req.params.id, 
-      createdBy: req.admin._id 
+      createdBy: req.user._id 
     })
 
     if (!employee) {
@@ -254,7 +226,7 @@ router.put('/employees/:id/permissions', verifyAdmin, async (req, res) => {
 })
 
 // PUT /api/employee-mgmt/employees/:id/password
-router.put('/employees/:id/password', verifyAdmin, async (req, res) => {
+router.put('/employees/:id/password', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.EMPLOYEE_MANAGEMENT), async (req, res) => {
   try {
     const { newPassword } = req.body
 
@@ -267,7 +239,7 @@ router.put('/employees/:id/password', verifyAdmin, async (req, res) => {
 
     const employee = await Employee.findOne({ 
       _id: req.params.id, 
-      createdBy: req.admin._id 
+      createdBy: req.user._id 
     })
 
     if (!employee) {
@@ -285,11 +257,11 @@ router.put('/employees/:id/password', verifyAdmin, async (req, res) => {
 })
 
 // DELETE /api/employee-mgmt/employees/:id
-router.delete('/employees/:id', verifyAdmin, async (req, res) => {
+router.delete('/employees/:id', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.EMPLOYEE_MANAGEMENT), async (req, res) => {
   try {
     const employee = await Employee.findOneAndDelete({ 
       _id: req.params.id, 
-      createdBy: req.admin._id 
+      createdBy: req.user._id 
     })
 
     if (!employee) {
@@ -303,7 +275,7 @@ router.delete('/employees/:id', verifyAdmin, async (req, res) => {
 })
 
 // PUT /api/employee-mgmt/employees/:id/status
-router.put('/employees/:id/status', verifyAdmin, async (req, res) => {
+router.put('/employees/:id/status', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.EMPLOYEE_MANAGEMENT), async (req, res) => {
   try {
     const { status } = req.body
 
@@ -313,7 +285,7 @@ router.put('/employees/:id/status', verifyAdmin, async (req, res) => {
 
     const employee = await Employee.findOne({ 
       _id: req.params.id, 
-      createdBy: req.admin._id 
+      createdBy: req.user._id 
     })
 
     if (!employee) {

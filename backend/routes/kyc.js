@@ -7,6 +7,7 @@ import KYC from '../models/KYC.js'
 import User from '../models/User.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 import EmailSettings from '../models/EmailSettings.js'
+import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -265,7 +266,7 @@ router.get('/status/:userId', async (req, res) => {
 })
 
 // GET /api/kyc/all - Get all KYC submissions (Admin)
-router.get('/all', async (req, res) => {
+router.get('/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.KYC_VERIFICATION), async (req, res) => {
   try {
     const { status } = req.query
 
@@ -321,7 +322,7 @@ router.get('/all', async (req, res) => {
 })
 
 // PUT /api/kyc/approve/:kycId - Approve KYC (Admin)
-router.put('/approve/:kycId', async (req, res) => {
+router.put('/approve/:kycId', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.APPROVE_KYC), async (req, res) => {
   try {
     const { kycId } = req.params
 
@@ -385,7 +386,7 @@ router.put('/approve/:kycId', async (req, res) => {
 })
 
 // PUT /api/kyc/reject/:kycId - Reject KYC (Admin)
-router.put('/reject/:kycId', async (req, res) => {
+router.put('/reject/:kycId', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.REJECT_KYC), async (req, res) => {
   try {
     const { kycId } = req.params
     const { reason } = req.body
@@ -446,7 +447,7 @@ router.put('/reject/:kycId', async (req, res) => {
 })
 
 // GET /api/kyc/view/:kycId - View KYC documents (Admin)
-router.get('/view/:kycId', async (req, res) => {
+router.get('/view/:kycId', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.KYC_VERIFICATION), async (req, res) => {
   try {
     const { kycId } = req.params
 

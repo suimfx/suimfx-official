@@ -9,11 +9,15 @@ import AdminLog from '../models/AdminLog.js'
 import tradeEngine from '../services/tradeEngine.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
 import MasterTrader from '../models/MasterTrader.js'
+import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
 
 const router = express.Router()
 
+// Apply auth middleware to all routes
+router.use(verifyAdminToken)
+
 // GET /api/admin/trade/all - Get all trades with pagination (for admin dashboard)
-router.get('/all', async (req, res) => {
+router.get('/all', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MANAGEMENT), async (req, res) => {
   try {
     const { status, limit = 20, offset = 0 } = req.query
 
@@ -42,7 +46,7 @@ router.get('/all', async (req, res) => {
 })
 
 // POST /api/admin/trade/create - Admin create trade for user
-router.post('/create', async (req, res) => {
+router.post('/create', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_TRADES), async (req, res) => {
   try {
     const { userId, tradingAccountId, symbol, side, quantity, openPrice, stopLoss, takeProfit } = req.body
 
@@ -97,7 +101,7 @@ router.post('/create', async (req, res) => {
 })
 
 // PUT /api/admin/trade/modify/:tradeId - Admin modify trade SL/TP
-router.put('/modify/:tradeId', async (req, res) => {
+router.put('/modify/:tradeId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MODIFY_TRADES), async (req, res) => {
   try {
     const { tradeId } = req.params
     const { stopLoss, takeProfit } = req.body
@@ -126,7 +130,7 @@ router.put('/modify/:tradeId', async (req, res) => {
 })
 
 // PUT /api/admin/trade/edit/:tradeId - Admin full edit trade (any field)
-router.put('/edit/:tradeId', async (req, res) => {
+router.put('/edit/:tradeId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_TRADES), async (req, res) => {
   try {
     const { tradeId } = req.params
     const { openPrice, closePrice, quantity, stopLoss, takeProfit, realizedPnl } = req.body
@@ -241,7 +245,7 @@ router.put('/edit/:tradeId', async (req, res) => {
 })
 
 // POST /api/admin/trade/close/:tradeId - Admin close trade
-router.post('/close/:tradeId', async (req, res) => {
+router.post('/close/:tradeId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.CLOSE_TRADES), async (req, res) => {
   try {
     const { tradeId } = req.params
     const { closePrice, marketPrice } = req.body
@@ -312,7 +316,7 @@ router.post('/close/:tradeId', async (req, res) => {
 })
 
 // GET /api/admin/trades - Get all trades with filters
-router.get('/trades', async (req, res) => {
+router.get('/trades', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MANAGEMENT), async (req, res) => {
   try {
     const { 
       status, 
@@ -352,7 +356,7 @@ router.get('/trades', async (req, res) => {
 })
 
 // GET /api/admin/trades/open - Get all open trades
-router.get('/trades/open', async (req, res) => {
+router.get('/trades/open', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MANAGEMENT), async (req, res) => {
   try {
     const trades = await Trade.find({ status: 'OPEN' })
       .populate('userId', 'firstName email')
@@ -371,7 +375,7 @@ router.get('/trades/open', async (req, res) => {
 })
 
 // POST /api/admin/trades/close - Admin close a trade
-router.post('/trades/close', async (req, res) => {
+router.post('/trades/close', requireEmployeePermission(PERMISSIONS.EMPLOYEE.CLOSE_TRADES), async (req, res) => {
   try {
     const { tradeId, bid, ask, adminId, reason } = req.body
 
@@ -413,7 +417,7 @@ router.post('/trades/close', async (req, res) => {
 })
 
 // PUT /api/admin/trades/modify - Admin modify trade SL/TP
-router.put('/trades/modify', async (req, res) => {
+router.put('/trades/modify', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MODIFY_TRADES), async (req, res) => {
   try {
     const { tradeId, sl, tp, adminId, reason } = req.body
 
@@ -443,7 +447,7 @@ router.put('/trades/modify', async (req, res) => {
 })
 
 // POST /api/admin/trades/force-close-all - Force close all trades for an account
-router.post('/trades/force-close-all', async (req, res) => {
+router.post('/trades/force-close-all', requireEmployeePermission(PERMISSIONS.EMPLOYEE.CLOSE_TRADES), async (req, res) => {
   try {
     const { tradingAccountId, adminId, reason, prices } = req.body
 
@@ -493,7 +497,7 @@ router.post('/trades/force-close-all', async (req, res) => {
 })
 
 // POST /api/admin/account/freeze - Freeze a trading account
-router.post('/account/freeze', async (req, res) => {
+router.post('/account/freeze', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_ACCOUNTS), async (req, res) => {
   try {
     const { tradingAccountId, adminId, reason } = req.body
 
@@ -542,7 +546,7 @@ router.post('/account/freeze', async (req, res) => {
 })
 
 // POST /api/admin/account/unfreeze - Unfreeze a trading account
-router.post('/account/unfreeze', async (req, res) => {
+router.post('/account/unfreeze', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_ACCOUNTS), async (req, res) => {
   try {
     const { tradingAccountId, adminId } = req.body
 

@@ -35,7 +35,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { API_URL } from '../config/api'
-import logoImage from '../assets/suimfxLogo.jpeg'
+import logoImage from '../assets/suimfxLogo.png'
 
 const WalletPage = () => {
   const navigate = useNavigate()

@@ -9,6 +9,7 @@ import Bonus from '../models/Bonus.js'
 import UserBonus from '../models/UserBonus.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 import EmailSettings from '../models/EmailSettings.js'
+import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
 
 const router = express.Router()
 
@@ -319,7 +320,7 @@ router.get('/transactions/:userId', async (req, res) => {
 })
 
 // GET /api/wallet/transactions/all - Get all transactions (admin)
-router.get('/admin/transactions', async (req, res) => {
+router.get('/admin/transactions', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
   try {
     const transactions = await Transaction.find()
       .populate('userId', 'firstName lastName email')
@@ -331,7 +332,7 @@ router.get('/admin/transactions', async (req, res) => {
 })
 
 // PUT /api/wallet/admin/approve/:id - Approve transaction (admin)
-router.put('/admin/approve/:id', async (req, res) => {
+router.put('/admin/approve/:id', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.APPROVE_DEPOSITS), async (req, res) => {
   try {
     const transaction = await Transaction.findById(req.params.id)
     
@@ -422,7 +423,7 @@ router.put('/admin/approve/:id', async (req, res) => {
 })
 
 // PUT /api/wallet/admin/reject/:id - Reject transaction (admin)
-router.put('/admin/reject/:id', async (req, res) => {
+router.put('/admin/reject/:id', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.REJECT_DEPOSITS), async (req, res) => {
   try {
     const transaction = await Transaction.findById(req.params.id)
     
@@ -457,7 +458,7 @@ router.put('/admin/reject/:id', async (req, res) => {
 })
 
 // PUT /api/wallet/transaction/:id/approve - Approve transaction (admin)
-router.put('/transaction/:id/approve', async (req, res) => {
+router.put('/transaction/:id/approve', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.APPROVE_DEPOSITS), async (req, res) => {
   try {
     const { adminRemarks } = req.body
     const transaction = await Transaction.findById(req.params.id)
@@ -546,7 +547,7 @@ router.put('/transaction/:id/approve', async (req, res) => {
 })
 
 // PUT /api/wallet/transaction/:id/reject - Reject transaction (admin)
-router.put('/transaction/:id/reject', async (req, res) => {
+router.put('/transaction/:id/reject', verifyAdminToken, requireEmployeePermission(PERMISSIONS.EMPLOYEE.REJECT_DEPOSITS), async (req, res) => {
   try {
     const { adminRemarks } = req.body
     const transaction = await Transaction.findById(req.params.id)
