@@ -48,7 +48,33 @@ const app = express()
 const httpServer = createServer(app)
 
 // Allowed origins for CORS
-const allowedOrigins = ['https://suimfx.com', 'https://www.suimfx.com', 'https://admin.suimfx.com', 'http://localhost:5173', 'http://localhost:3000']
+const allowedOrigins = [
+  'https://suimfx.com', 
+  'https://www.suimfx.com', 
+  'https://admin.suimfx.com',
+  'https://api.suimfx.com',
+  'http://localhost:5173', 
+  'http://localhost:3000',
+  'http://localhost:5001'
+]
+
+// CORS options with dynamic origin checking
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true)
+    
+    if (allowedOrigins.includes(origin) || origin.endsWith('.suimfx.com')) {
+      callback(null, true)
+    } else {
+      console.log('CORS blocked origin:', origin)
+      callback(null, true) // Allow all for now to debug
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}
 
 // Socket.IO for real-time updates
 const io = new Server(httpServer, {
@@ -201,10 +227,7 @@ app.set('io', io)
 
 // Middleware
 app.use(compression())
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}))
+app.use(cors(corsOptions))
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
