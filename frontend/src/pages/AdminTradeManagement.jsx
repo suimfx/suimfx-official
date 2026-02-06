@@ -19,6 +19,7 @@ import priceService from '../services/priceService'
 import binanceApiService from '../services/binanceApi'
 import priceStreamService from '../services/priceStream'
 import { API_URL } from '../config/api'
+import { getAdminHeaders } from '../utils/adminApi'
 
 const AdminTradeManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -162,7 +163,7 @@ const AdminTradeManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/users`)
+      const res = await fetch(`${API_URL}/admin/users`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.users) setUsers(data.users)
     } catch (error) {
@@ -172,7 +173,7 @@ const AdminTradeManagement = () => {
 
   const fetchTradingAccounts = async (userId) => {
     try {
-      const res = await fetch(`${API_URL}/trading-accounts/user/${userId}`)
+      const res = await fetch(`${API_URL}/trading-accounts/user/${userId}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.accounts) setTradingAccounts(data.accounts)
     } catch (error) {
@@ -229,7 +230,7 @@ const AdminTradeManagement = () => {
     try {
       const res = await fetch(`${API_URL}/admin/trade/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           ...createForm,
           quantity: parseFloat(createForm.quantity),
@@ -261,7 +262,7 @@ const AdminTradeManagement = () => {
     try {
       const res = await fetch(`${API_URL}/admin/trade/edit/${selectedTrade._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           openPrice: parseFloat(editForm.openPrice),
           closePrice: editForm.closePrice ? parseFloat(editForm.closePrice) : null,
@@ -297,7 +298,7 @@ const AdminTradeManagement = () => {
 
       const res = await fetch(`${API_URL}/admin/trade/close/${selectedTrade._id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ 
           closePrice: closeFormPrice || null,
           marketPrice: marketPrice 
@@ -371,7 +372,7 @@ const AdminTradeManagement = () => {
     try {
       const offset = (currentPage - 1) * tradesPerPage
       const statusParam = filterStatus !== 'all' ? `&status=${filterStatus.toUpperCase()}` : ''
-      const res = await fetch(`${API_URL}/admin/trade/all?limit=${tradesPerPage}&offset=${offset}${statusParam}`)
+      const res = await fetch(`${API_URL}/admin/trade/all?limit=${tradesPerPage}&offset=${offset}${statusParam}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.trades) {
         setTrades(data.trades)

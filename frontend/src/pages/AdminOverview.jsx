@@ -30,16 +30,29 @@ const AdminOverview = () => {
 
   const fetchData = async () => {
     setLoading(true)
+    const token = localStorage.getItem('adminToken')
+    
+    if (!token) {
+      console.warn('No admin token found, redirecting to login')
+      window.location.href = '/admin'
+      return
+    }
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
+    
     try {
       // Fetch users
-      const usersResponse = await fetch(`${API_URL}/admin/users`)
+      const usersResponse = await fetch(`${API_URL}/admin/users`, { headers })
       if (usersResponse.ok) {
         const data = await usersResponse.json()
         setUsers(data.users || [])
       }
       
       // Fetch dashboard stats
-      const statsResponse = await fetch(`${API_URL}/admin/dashboard-stats`)
+      const statsResponse = await fetch(`${API_URL}/admin/dashboard-stats`, { headers })
       if (statsResponse.ok) {
         const data = await statsResponse.json()
         if (data.success) {

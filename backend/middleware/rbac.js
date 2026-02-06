@@ -76,6 +76,11 @@ export const requireSidebarPermission = (permissionKey) => {
       return next()
     }
     
+    // Dashboard is always accessible to all authenticated admins/employees
+    if (permissionKey === 'overviewDashboard') {
+      return next()
+    }
+    
     // Admin role - check sidebarPermissions
     if (req.userType === 'ADMIN') {
       if (req.sidebarPermissions && req.sidebarPermissions[permissionKey] === true) {

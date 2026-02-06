@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+import { getAdminHeaders } from '../utils/adminApi'
 
 const AdminSupport = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -35,7 +36,7 @@ const AdminSupport = () => {
   const fetchTickets = async () => {
     try {
       const statusParam = filterStatus !== 'all' ? `?status=${filterStatus.toUpperCase()}` : ''
-      const res = await fetch(`${API_URL}/support/admin/all${statusParam}`)
+      const res = await fetch(`${API_URL}/support/admin/all${statusParam}`, { headers: getAdminHeaders() })
       const data = await res.json()
       setTickets(data.tickets || [])
     } catch (error) {
@@ -46,7 +47,7 @@ const AdminSupport = () => {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch(`${API_URL}/support/admin/stats`)
+      const res = await fetch(`${API_URL}/support/admin/stats`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.stats) setStats(data.stats)
     } catch (error) {
@@ -56,7 +57,7 @@ const AdminSupport = () => {
 
   const openTicketChat = async (ticketId) => {
     try {
-      const res = await fetch(`${API_URL}/support/ticket/${ticketId}`)
+      const res = await fetch(`${API_URL}/support/ticket/${ticketId}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setSelectedTicket(data.ticket)
@@ -73,7 +74,7 @@ const AdminSupport = () => {
     try {
       const res = await fetch(`${API_URL}/support/reply/${selectedTicket.ticketId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           senderId: selectedTicket.userId?._id || selectedTicket.userId,
           senderType: 'ADMIN',
@@ -100,7 +101,7 @@ const AdminSupport = () => {
     try {
       const res = await fetch(`${API_URL}/support/admin/status/${ticketId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ status })
       })
       const data = await res.json()

@@ -13,6 +13,7 @@ import {
   Calendar
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+import { getAdminHeaders } from '../utils/adminApi'
 
 const AdminKYC = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -32,7 +33,7 @@ const AdminKYC = () => {
 
   const fetchKycRequests = async () => {
     try {
-      const res = await fetch(`${API_URL}/kyc/all?status=${filterStatus}`)
+      const res = await fetch(`${API_URL}/kyc/all?status=${filterStatus}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setKycRequests(data.kycList || [])
@@ -49,7 +50,7 @@ const AdminKYC = () => {
     try {
       const res = await fetch(`${API_URL}/kyc/approve/${kycId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }
+        headers: getAdminHeaders()
       })
       const data = await res.json()
       if (data.success) {
@@ -72,7 +73,7 @@ const AdminKYC = () => {
     try {
       const res = await fetch(`${API_URL}/kyc/reject/${selectedKyc._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ reason: rejectReason || 'Documents not acceptable' })
       })
       const data = await res.json()

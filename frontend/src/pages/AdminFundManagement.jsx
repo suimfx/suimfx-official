@@ -15,6 +15,7 @@ import {
   Smartphone
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+import { getAdminHeaders } from '../utils/adminApi'
 
 const AdminFundManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -33,7 +34,7 @@ const AdminFundManagement = () => {
   const fetchTransactions = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/wallet/admin/transactions`)
+      const res = await fetch(`${API_URL}/wallet/admin/transactions`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.transactions) {
         let filtered = data.transactions
@@ -66,7 +67,7 @@ const AdminFundManagement = () => {
     try {
       const res = await fetch(`${API_URL}/wallet/transaction/${txnId}/approve`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ adminRemarks: '' })
       })
       const data = await res.json()
@@ -87,7 +88,7 @@ const AdminFundManagement = () => {
     try {
       const res = await fetch(`${API_URL}/wallet/transaction/${txnId}/reject`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ adminRemarks: remarks || '' })
       })
       const data = await res.json()
@@ -126,7 +127,7 @@ const AdminFundManagement = () => {
     
     // Fetch user details including bank info
     try {
-      const res = await fetch(`${API_URL}/auth/user/${txn.userId?._id || txn.userId}`)
+      const res = await fetch(`${API_URL}/auth/user/${txn.userId?._id || txn.userId}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.user) {
         setUserDetails(data.user)

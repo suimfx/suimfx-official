@@ -21,6 +21,7 @@ import {
   Lock
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+import { getAdminHeaders } from '../utils/adminApi'
 
 const AdminManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -76,7 +77,7 @@ const AdminManagement = () => {
 
   const fetchAdmins = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admins`)
+      const res = await fetch(`${API_URL}/admin-mgmt/admins`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setAdmins(data.admins || [])
@@ -91,7 +92,7 @@ const AdminManagement = () => {
     try {
       const res = await fetch(`${API_URL}/admin-mgmt/admins`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify(newAdmin)
       })
       const data = await res.json()
@@ -112,7 +113,7 @@ const AdminManagement = () => {
     try {
       const res = await fetch(`${API_URL}/admin-mgmt/admins/${selectedAdmin._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           firstName: selectedAdmin.firstName,
           lastName: selectedAdmin.lastName,
@@ -137,7 +138,7 @@ const AdminManagement = () => {
     try {
       const res = await fetch(`${API_URL}/admin-mgmt/admins/${selectedAdmin._id}/permissions`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ sidebarPermissions: selectedAdmin.sidebarPermissions })
       })
       const data = await res.json()
@@ -157,7 +158,7 @@ const AdminManagement = () => {
     try {
       const res = await fetch(`${API_URL}/admin-mgmt/wallet/fund`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           adminId: selectedAdmin._id,
           amount: parseFloat(fundAmount),
@@ -184,7 +185,7 @@ const AdminManagement = () => {
     try {
       const res = await fetch(`${API_URL}/admin-mgmt/admins/${admin._id}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ status: newStatus })
       })
       const data = await res.json()
@@ -200,7 +201,8 @@ const AdminManagement = () => {
     if (!confirm(`Are you sure you want to delete ${admin.firstName} ${admin.lastName}?`)) return
     try {
       const res = await fetch(`${API_URL}/admin-mgmt/admins/${admin._id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAdminHeaders()
       })
       const data = await res.json()
       if (data.success) {
@@ -222,7 +224,7 @@ const AdminManagement = () => {
     try {
       const res = await fetch(`${API_URL}/admin-mgmt/admins/${selectedAdmin._id}/reset-password`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ newPassword })
       })
       const data = await res.json()
