@@ -52,8 +52,14 @@ export const verifyAdminToken = async (req, res, next) => {
 
     return res.status(401).json({ success: false, message: 'Invalid token' })
   } catch (error) {
-    console.error('Token verification error:', error.message)
-    return res.status(401).json({ success: false, message: 'Invalid or expired token' })
+    console.error('Token verification error:', error.name, error.message)
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Token expired. Please login again.' })
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ success: false, message: 'Invalid token. Please login again.' })
+    }
+    return res.status(401).json({ success: false, message: 'Authentication failed. Please login again.' })
   }
 }
 

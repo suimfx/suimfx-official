@@ -61,7 +61,7 @@ const EmployeeLogin = () => {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <Link to="/">
-              <img src={suimfxLogo} alt="Suimfx" className="h-18 sm:h-20 w-auto" />
+              <img src={suimfxLogo} alt="Suimfx" className="h-20 sm:h-24 w-auto" />
             </Link>
           </div>
 

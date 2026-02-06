@@ -162,7 +162,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
         {/* Logo */}
         <div className="p-4 flex items-center justify-between border-b border-gray-800">
           <div className="flex items-center gap-2">
-            <img src={logoImage} alt="Suimfx" className="h-16 w-auto object-contain flex-shrink-0" />
+            <img src={logoImage} alt="Suimfx" className="h-20 w-auto object-contain flex-shrink-0" />
           </div>
           <button 
             onClick={() => setSidebarExpanded(!sidebarExpanded)}

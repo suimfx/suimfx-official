@@ -197,7 +197,10 @@ app.set('io', io)
 
 // Middleware
 app.use(compression())
-app.use(cors())
+app.use(cors({
+  origin: ['https://suimfx.com', 'https://www.suimfx.com', 'https://admin.suimfx.com', 'http://localhost:5173', 'http://localhost:3000'],
+  credentials: true
+}))
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
