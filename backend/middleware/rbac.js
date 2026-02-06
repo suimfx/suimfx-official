@@ -3,6 +3,7 @@ import Admin from '../models/Admin.js'
 import Employee from '../models/Employee.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+console.log('[RBAC] JWT_SECRET loaded:', JWT_SECRET ? `${JWT_SECRET.substring(0, 10)}...` : 'MISSING')
 
 /**
  * RBAC Middleware for Suimfx Admin Panel

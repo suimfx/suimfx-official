@@ -9,6 +9,7 @@ import User from '../models/User.js'
 const router = express.Router()
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+console.log('[AdminManagement] JWT_SECRET loaded:', JWT_SECRET ? `${JWT_SECRET.substring(0, 10)}...` : 'MISSING')
 
 // Middleware to verify admin token
 const verifyAdminToken = (req, res, next) => {
