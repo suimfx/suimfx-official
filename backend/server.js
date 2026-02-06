@@ -1,8 +1,10 @@
+import dotenv from 'dotenv'
+dotenv.config() // MUST be first before any other imports that use env vars
+
 import express from 'express'
 import mongoose from 'mongoose'
 import cors from 'cors'
 import compression from 'compression'
-import dotenv from 'dotenv'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import WebSocket from 'ws'
@@ -41,8 +43,6 @@ import infowayService from './services/infowayService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-
-dotenv.config()
 
 const app = express()
 const httpServer = createServer(app)
