@@ -47,16 +47,20 @@ dotenv.config()
 const app = express()
 const httpServer = createServer(app)
 
-// Allowed origins for CORS
-const allowedOrigins = [
+// Allowed origins for CORS - use env variable or defaults
+const envOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []
+const defaultOrigins = [
   'https://suimfx.com', 
   'https://www.suimfx.com', 
+  'https://trade.suimfx.com',
   'https://admin.suimfx.com',
   'https://api.suimfx.com',
   'http://localhost:5173', 
   'http://localhost:3000',
   'http://localhost:5001'
 ]
+const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])]
+console.log('Allowed CORS origins:', allowedOrigins)
 
 // CORS options with dynamic origin checking
 const corsOptions = {
@@ -64,7 +68,8 @@ const corsOptions = {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true)
     
-    if (allowedOrigins.includes(origin) || origin.endsWith('.suimfx.com')) {
+    // Allow if in list or any suimfx.com subdomain
+    if (allowedOrigins.includes(origin) || origin.endsWith('.suimfx.com') || origin.includes('suimfx.com')) {
       callback(null, true)
     } else {
       console.log('CORS blocked origin:', origin)
