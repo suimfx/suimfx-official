@@ -4,7 +4,8 @@ import UserBonus from '../models/UserBonus.js'
 import User from '../models/User.js'
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+// Get JWT_SECRET dynamically to ensure env is loaded
+const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
 
 // Simple auth middleware
 const authMiddleware = (req, res, next) => {
@@ -15,7 +16,7 @@ const authMiddleware = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, getJwtSecret())
     req.admin = decoded
     next()
   } catch (error) {

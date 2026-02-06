@@ -8,8 +8,8 @@ import User from '../models/User.js'
 
 const router = express.Router()
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-console.log('[AdminManagement] JWT_SECRET loaded:', JWT_SECRET ? `${JWT_SECRET.substring(0, 10)}...` : 'MISSING')
+// Get JWT_SECRET dynamically to ensure env is loaded
+const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
 
 // Middleware to verify admin token
 const verifyAdminToken = (req, res, next) => {
@@ -20,7 +20,7 @@ const verifyAdminToken = (req, res, next) => {
   
   const token = authHeader.split(' ')[1]
   try {
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, getJwtSecret())
     req.adminId = decoded.adminId
     next()
   } catch (error) {
@@ -133,7 +133,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign(
       { adminId: admin._id, role: admin.role, email: admin.email },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '24h' }
     )
 
@@ -188,7 +188,7 @@ router.post('/admin-login', async (req, res) => {
 
     const token = jwt.sign(
       { adminId: admin._id, role: admin.role, email: admin.email },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '24h' }
     )
 

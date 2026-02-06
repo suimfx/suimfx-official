@@ -3,7 +3,8 @@ import jwt from 'jsonwebtoken'
 import Employee from '../models/Employee.js'
 
 const router = express.Router()
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+// Get JWT_SECRET dynamically to ensure env is loaded
+const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
 
 // Middleware to verify employee token
 const verifyEmployee = async (req, res, next) => {
@@ -13,7 +14,7 @@ const verifyEmployee = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'No token provided' })
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, getJwtSecret())
     if (!decoded.employeeId) {
       return res.status(401).json({ success: false, message: 'Invalid token' })
     }
@@ -72,7 +73,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign(
       { employeeId: employee._id, role: employee.role, email: employee.email },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '12h' }
     )
 

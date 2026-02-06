@@ -5,7 +5,8 @@ import Admin from '../models/Admin.js'
 import { verifyAdminToken, requireSuperAdmin, requireSidebarPermission, PERMISSIONS } from '../middleware/rbac.js'
 
 const router = express.Router()
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+// Get JWT_SECRET dynamically to ensure env is loaded
+const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
 
 // Predefined role templates
 const roleTemplates = {
