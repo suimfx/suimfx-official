@@ -47,11 +47,15 @@ dotenv.config()
 const app = express()
 const httpServer = createServer(app)
 
+// Allowed origins for CORS
+const allowedOrigins = ['https://suimfx.com', 'https://www.suimfx.com', 'https://admin.suimfx.com', 'http://localhost:5173', 'http://localhost:3000']
+
 // Socket.IO for real-time updates
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 })
 
@@ -198,7 +202,7 @@ app.set('io', io)
 // Middleware
 app.use(compression())
 app.use(cors({
-  origin: ['https://suimfx.com', 'https://www.suimfx.com', 'https://admin.suimfx.com', 'http://localhost:5173', 'http://localhost:3000'],
+  origin: allowedOrigins,
   credentials: true
 }))
 app.use(express.json({ limit: '50mb' }))
