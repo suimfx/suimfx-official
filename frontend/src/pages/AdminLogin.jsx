@@ -167,7 +167,7 @@ const AdminLogin = () => {
           </div>
 
           <button
-            onClick={() => navigate('/admin-employee')}
+            onClick={() => navigate('/employee/login')}
             className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-blue-500/30 text-blue-400 font-medium hover:bg-blue-500/10 transition-all text-sm sm:text-base mb-4"
           >
             <UserCog size={18} />
