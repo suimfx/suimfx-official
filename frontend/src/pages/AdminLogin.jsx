@@ -65,17 +65,17 @@ const AdminLogin = () => {
             </Link>
           </div>
 
-          {/* Admin Badge */}
+          {/* Super Admin Badge */}
           <div className="flex justify-center mb-6">
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20">
               <Shield size={14} />
-              Admin Portal
+              Super Admin Portal
             </span>
           </div>
 
           {/* Header */}
           <div className="text-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Admin Login</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Super Admin Login</h1>
             <p className="text-slate-400">Access the admin dashboard</p>
           </div>
 
