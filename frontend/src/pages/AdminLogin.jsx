@@ -147,21 +147,21 @@ const AdminLogin = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => navigate('/employee/login')}
+          <a
+            href="https://suimfx.com/employee/login"
             className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-blue-500/30 text-blue-400 font-medium hover:bg-blue-500/10 transition-all text-sm sm:text-base mb-4"
           >
             <UserCog size={18} />
             Employee Login
-          </button>
+          </a>
 
           {/* User Login Link */}
-          <button
-            onClick={() => navigate('/user/login')}
+          <a
+            href="https://suimfx.com/user/login"
             className="block w-full text-center py-3 sm:py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all text-sm sm:text-base"
           >
             Go to User Login
-          </button>
+          </a>
         </div>
       </div>
     </div>
