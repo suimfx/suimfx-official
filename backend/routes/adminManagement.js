@@ -159,8 +159,10 @@ router.post('/login', async (req, res) => {
 router.post('/admin-login', async (req, res) => {
   try {
     const { email, password } = req.body
+    console.log('Admin login attempt:', email)
 
     const admin = await Admin.findOne({ email: email.toLowerCase() })
+    console.log('Admin found:', admin ? { id: admin._id, role: admin.role, sidebarPermissions: admin.sidebarPermissions } : null)
     if (!admin) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }

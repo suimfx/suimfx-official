@@ -70,6 +70,12 @@ const AdminLayout = ({ children, title, subtitle }) => {
   // Check if user has sidebar permission (SUPER_ADMIN has all permissions)
   const hasSidebarPermission = (sidebarKey) => {
     if (!admin) return false
+    
+    // Debug: Log admin data on first check
+    if (sidebarKey === 'overviewDashboard') {
+      console.log('Admin data:', { role: admin.role, sidebarPermissions: admin.sidebarPermissions })
+    }
+    
     if (admin.role === 'SUPER_ADMIN') return true
     if (sidebarKey === 'overviewDashboard') return true // Dashboard always visible
     if (sidebarKey === 'myProfile') return true // My Profile always visible
