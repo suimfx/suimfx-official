@@ -156,15 +156,23 @@ const AdminLogin = () => {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-8">
+          {/* Employee Login Link */}
+          <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/80 text-slate-500">Not an admin?</span>
+              <span className="px-4 bg-slate-900/80 text-slate-500">Are you an employee?</span>
             </div>
           </div>
+
+          <button
+            onClick={() => navigate('/admin-employee')}
+            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-blue-500/30 text-blue-400 font-medium hover:bg-blue-500/10 transition-all text-sm sm:text-base mb-4"
+          >
+            <UserCog size={18} />
+            Employee Login
+          </button>
 
           {/* User Login Link */}
           <button

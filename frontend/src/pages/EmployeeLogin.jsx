@@ -25,7 +25,7 @@ const EmployeeLogin = () => {
     setError('')
     
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admin-login`, {
+      const res = await fetch(`${API_URL}/employee/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -33,8 +33,14 @@ const EmployeeLogin = () => {
       const data = await res.json()
       
       if (data.success) {
+        // Store employee token and data (using same keys for compatibility with admin panel)
         localStorage.setItem('adminToken', data.token)
-        localStorage.setItem('adminUser', JSON.stringify(data.admin))
+        localStorage.setItem('adminUser', JSON.stringify({
+          ...data.employee,
+          isEmployee: true,
+          permissions: data.employee.permissions,
+          allowedRoutes: data.allowedRoutes
+        }))
         navigate('/admin/dashboard')
       } else {
         setError(data.message || 'Invalid credentials')
@@ -79,25 +85,7 @@ const EmployeeLogin = () => {
             <p className="text-slate-400">Access based on assigned permissions</p>
           </div>
 
-          {/* Login Type Toggle */}
-          <div className="flex gap-2 mb-6 p-1 bg-slate-800/50 rounded-xl">
-            <button
-              type="button"
-              onClick={() => navigate('/admin')}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-700/50"
-            >
-              <Shield size={16} />
-              Super Admin
-            </button>
-            <button
-              type="button"
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg"
-            >
-              <UserCog size={16} />
-              Employee
-            </button>
-          </div>
-
+          
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
@@ -156,15 +144,23 @@ const EmployeeLogin = () => {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-8">
+          {/* Admin Login Link */}
+          <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/80 text-slate-500">Not an employee?</span>
+              <span className="px-4 bg-slate-900/80 text-slate-500">Are you an admin?</span>
             </div>
           </div>
+
+          <button
+            onClick={() => navigate('/admin')}
+            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-red-500/30 text-red-400 font-medium hover:bg-red-500/10 transition-all text-sm sm:text-base mb-4"
+          >
+            <Shield size={18} />
+            Admin Login
+          </button>
 
           {/* User Login Link */}
           <button
