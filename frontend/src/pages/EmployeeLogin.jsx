@@ -154,13 +154,13 @@ const EmployeeLogin = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => navigate('/admin')}
+          <a
+            href="https://admin.suimfx.com"
             className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-red-500/30 text-red-400 font-medium hover:bg-red-500/10 transition-all text-sm sm:text-base mb-4"
           >
             <Shield size={18} />
             Admin Login
-          </button>
+          </a>
 
           {/* User Login Link */}
           <button

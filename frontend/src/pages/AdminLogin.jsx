@@ -79,25 +79,6 @@ const AdminLogin = () => {
             <p className="text-slate-400">Access the admin dashboard</p>
           </div>
 
-          {/* Login Type Toggle */}
-          <div className="flex gap-2 mb-6 p-1 bg-slate-800/50 rounded-xl">
-            <button
-              type="button"
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg"
-            >
-              <Shield size={16} />
-              Super Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/admin-employee')}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-400 hover:text-white hover:bg-slate-700/50"
-            >
-              <UserCog size={16} />
-              Employee
-            </button>
-          </div>
-
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
