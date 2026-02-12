@@ -174,19 +174,53 @@ const ProfilePage = () => {
     }
   }
   
-  // Handle file to base64 conversion
-  const handleFileChange = (e, field) => {
-    const file = e.target.files[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size should be less than 5MB')
-        return
-      }
+  // Compress image to reduce size
+  const compressImage = (file, maxWidth = 1200, quality = 0.7) => {
+    return new Promise((resolve) => {
       const reader = new FileReader()
-      reader.onloadend = () => {
-        setKycForm(prev => ({ ...prev, [field]: reader.result }))
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let width = img.width
+          let height = img.height
+          
+          // Scale down if too large
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width
+            width = maxWidth
+          }
+          
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, width, height)
+          
+          // Convert to compressed base64
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality)
+          resolve(compressedBase64)
+        }
+        img.src = e.target.result
       }
       reader.readAsDataURL(file)
+    })
+  }
+  
+  // Handle file to base64 conversion with compression
+  const handleFileChange = async (e, field) => {
+    const file = e.target.files[0]
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size should be less than 10MB')
+        return
+      }
+      try {
+        const compressedBase64 = await compressImage(file)
+        setKycForm(prev => ({ ...prev, [field]: compressedBase64 }))
+      } catch (error) {
+        console.error('Error compressing image:', error)
+        alert('Failed to process image')
+      }
     }
   }
   
@@ -207,6 +241,15 @@ const ProfilePage = () => {
           ...kycForm
         })
       })
+      
+      // Check if response is JSON
+      const contentType = res.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text()
+        console.error('Non-JSON response:', text.substring(0, 200))
+        throw new Error('Server error. Please try with smaller image files.')
+      }
+      
       const data = await res.json()
       if (data.success) {
         alert('KYC submitted successfully! Please wait for approval.')
@@ -217,7 +260,7 @@ const ProfilePage = () => {
       }
     } catch (error) {
       console.error('Error submitting KYC:', error)
-      alert('Failed to submit KYC')
+      alert('Failed to submit KYC: ' + (error.message || 'Unknown error'))
     }
     setKycLoading(false)
   }
