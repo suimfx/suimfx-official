@@ -143,32 +143,6 @@ const EmployeeLogin = () => {
               {loading ? 'Signing in...' : <>Sign In <ArrowRight size={18} /></>}
             </button>
           </form>
-
-          {/* Admin Login Link */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-700"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/80 text-slate-500">Are you an admin?</span>
-            </div>
-          </div>
-
-          <a
-            href="https://admin.suimfx.com"
-            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-red-500/30 text-red-400 font-medium hover:bg-red-500/10 transition-all text-sm sm:text-base mb-4"
-          >
-            <Shield size={18} />
-            Admin Login
-          </a>
-
-          {/* User Login Link */}
-          <button
-            onClick={() => navigate('/user/login')}
-            className="block w-full text-center py-3 sm:py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all text-sm sm:text-base"
-          >
-            Go to User Login
-          </button>
         </div>
       </div>
     </div>
