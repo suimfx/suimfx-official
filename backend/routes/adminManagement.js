@@ -406,8 +406,33 @@ router.put('/admins/:id/permissions', async (req, res) => {
       return res.status(404).json({ message: 'Employee not found' })
     }
 
-    admin.sidebarPermissions = { ...admin.sidebarPermissions, ...sidebarPermissions }
+    // Default all permissions to false, then apply the provided ones
+    const defaultPermissions = {
+      overviewDashboard: true,
+      userManagement: false,
+      tradeManagement: false,
+      fundManagement: false,
+      bankSettings: false,
+      ibManagement: false,
+      forexCharges: false,
+      earningsReport: false,
+      copyTrade: false,
+      propFirmChallenges: false,
+      accountTypes: false,
+      themeSettings: false,
+      emailTemplates: false,
+      bonusManagement: false,
+      adminManagement: false,
+      employeeManagement: false,
+      kycVerification: false,
+      supportTickets: false
+    }
+    
+    // Replace permissions entirely (not merge) to ensure unchecked items become false
+    admin.sidebarPermissions = { ...defaultPermissions, ...sidebarPermissions }
     await admin.save()
+    
+    console.log('Updated permissions for admin:', admin._id, admin.sidebarPermissions)
 
     res.json({
       success: true,
@@ -416,6 +441,47 @@ router.put('/admins/:id/permissions', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({ message: 'Error updating permissions', error: error.message })
+  }
+})
+
+// POST /api/admin-mgmt/fix-subadmin-permissions - Fix all subadmin permissions (one-time migration)
+router.post('/fix-subadmin-permissions', async (req, res) => {
+  try {
+    const defaultPermissions = {
+      overviewDashboard: true,
+      userManagement: false,
+      tradeManagement: false,
+      fundManagement: false,
+      bankSettings: false,
+      ibManagement: false,
+      forexCharges: false,
+      earningsReport: false,
+      copyTrade: false,
+      propFirmChallenges: false,
+      accountTypes: false,
+      themeSettings: false,
+      emailTemplates: false,
+      bonusManagement: false,
+      adminManagement: false,
+      employeeManagement: false,
+      kycVerification: false,
+      supportTickets: false
+    }
+
+    // Find all ADMIN role users and reset their permissions to defaults
+    const result = await Admin.updateMany(
+      { role: 'ADMIN' },
+      { $set: { sidebarPermissions: defaultPermissions } }
+    )
+
+    console.log('Fixed subadmin permissions:', result)
+    res.json({
+      success: true,
+      message: `Reset permissions for ${result.modifiedCount} subadmins`,
+      modifiedCount: result.modifiedCount
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Error fixing permissions', error: error.message })
   }
 })
 
