@@ -52,17 +52,24 @@ const checkPermission = (permission) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
+    console.log('Employee login attempt:', { email, passwordLength: password?.length })
 
     const employee = await Employee.findOne({ email: email.toLowerCase() })
+    console.log('Employee found:', employee ? { id: employee._id, email: employee.email, status: employee.status, hasPassword: !!employee.password } : null)
+    
     if (!employee) {
+      console.log('Employee not found for email:', email.toLowerCase())
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
     if (employee.status !== 'ACTIVE') {
+      console.log('Employee account not active:', employee.status)
       return res.status(403).json({ success: false, message: 'Account is suspended or inactive' })
     }
 
     const isMatch = await employee.comparePassword(password)
+    console.log('Password match result:', isMatch)
+    
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }

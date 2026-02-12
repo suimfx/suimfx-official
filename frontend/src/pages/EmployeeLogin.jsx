@@ -25,7 +25,7 @@ const EmployeeLogin = () => {
     setError('')
     
     try {
-      const res = await fetch(`${API_URL}/employee/login`, {
+      const res = await fetch(`${API_URL}/admin-mgmt/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -33,14 +33,9 @@ const EmployeeLogin = () => {
       const data = await res.json()
       
       if (data.success) {
-        // Store employee token and data (using same keys for compatibility with admin panel)
+        // Store admin token and data
         localStorage.setItem('adminToken', data.token)
-        localStorage.setItem('adminUser', JSON.stringify({
-          ...data.employee,
-          isEmployee: true,
-          permissions: data.employee.permissions,
-          allowedRoutes: data.allowedRoutes
-        }))
+        localStorage.setItem('adminUser', JSON.stringify(data.admin))
         navigate('/admin/dashboard')
       } else {
         setError(data.message || 'Invalid credentials')
