@@ -71,17 +71,17 @@ const EmployeeLogin = () => {
             </Link>
           </div>
 
-          {/* Employee Badge */}
+          {/* Admin Badge */}
           <div className="flex justify-center mb-6">
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
               <UserCog size={14} />
-              Employee Portal
+              Admin Portal
             </span>
           </div>
 
           {/* Header */}
           <div className="text-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Employee Login</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Admin Login</h1>
             <p className="text-slate-400">Access based on assigned permissions</p>
           </div>
 
