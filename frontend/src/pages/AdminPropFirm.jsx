@@ -31,6 +31,8 @@ const AdminPropFirm = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showChallengeModal, setShowChallengeModal] = useState(false)
   const [editingChallenge, setEditingChallenge] = useState(null)
+  const [selectedParticipant, setSelectedParticipant] = useState(null)
+  const [showParticipantModal, setShowParticipantModal] = useState(false)
   const [settings, setSettings] = useState({
     displayName: 'Prop Trading Challenge',
     description: 'Trade with our capital. Pass the challenge and get funded.',
@@ -538,7 +540,10 @@ const AdminPropFirm = () => {
                         </td>
                         <td className="py-4 px-4 text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</td>
                         <td className="py-4 px-4">
-                          <button className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-white">
+                          <button 
+                            onClick={() => { setSelectedParticipant(p); setShowParticipantModal(true); }}
+                            className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-white"
+                          >
                             <Eye size={16} />
                           </button>
                         </td>
@@ -925,6 +930,138 @@ const AdminPropFirm = () => {
                   {editingChallenge ? 'Update Challenge' : 'Create Challenge'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Participant Details Modal */}
+      {showParticipantModal && selectedParticipant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Participant Details</h2>
+              <button onClick={() => setShowParticipantModal(false)} className="text-gray-400 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* User Info */}
+              <div className="bg-dark-700 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-3">User Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Name</p>
+                    <p className="text-white">{selectedParticipant.userId?.firstName || 'N/A'} {selectedParticipant.userId?.lastName || ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Email</p>
+                    <p className="text-white">{selectedParticipant.userId?.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Phone</p>
+                    <p className="text-white">{selectedParticipant.userId?.phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Account ID</p>
+                    <p className="text-white font-mono text-xs">{selectedParticipant._id}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Challenge Info */}
+              <div className="bg-dark-700 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-3">Challenge Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Challenge</p>
+                    <p className="text-white">{selectedParticipant.challengeId?.name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Status</p>
+                    <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(selectedParticipant.status)}`}>
+                      {selectedParticipant.status}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Current Phase</p>
+                    <p className="text-white">Phase {selectedParticipant.currentPhase || 1}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Start Date</p>
+                    <p className="text-white">{new Date(selectedParticipant.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trading Stats */}
+              <div className="bg-dark-700 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-3">Trading Statistics</h3>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Balance</p>
+                    <p className="text-white font-semibold">${(selectedParticipant.balance || 0).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">P&L</p>
+                    <p className={`font-semibold ${(selectedParticipant.balance - (selectedParticipant.challengeId?.fundSize || 10000)) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {(selectedParticipant.balance - (selectedParticipant.challengeId?.fundSize || 10000)) >= 0 ? '+' : ''}
+                      ${(selectedParticipant.balance - (selectedParticipant.challengeId?.fundSize || 10000)).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Total Trades</p>
+                    <p className="text-white">{selectedParticipant.totalTrades || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Daily Drawdown</p>
+                    <p className="text-white">{(selectedParticipant.dailyDrawdown || 0).toFixed(2)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Max Drawdown</p>
+                    <p className="text-white">{(selectedParticipant.maxDrawdown || 0).toFixed(2)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Profit Target</p>
+                    <p className="text-white">{(selectedParticipant.profitPercent || 0).toFixed(2)}%</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rules Compliance */}
+              <div className="bg-dark-700 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-3">Rules Compliance</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Daily Drawdown Limit</span>
+                    <span className={selectedParticipant.dailyDrawdownBreached ? 'text-red-500' : 'text-green-500'}>
+                      {selectedParticipant.dailyDrawdownBreached ? '✗ Breached' : '✓ OK'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Max Drawdown Limit</span>
+                    <span className={selectedParticipant.maxDrawdownBreached ? 'text-red-500' : 'text-green-500'}>
+                      {selectedParticipant.maxDrawdownBreached ? '✗ Breached' : '✓ OK'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Profit Target</span>
+                    <span className={selectedParticipant.profitTargetReached ? 'text-green-500' : 'text-yellow-500'}>
+                      {selectedParticipant.profitTargetReached ? '✓ Reached' : '○ In Progress'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-800">
+              <button
+                onClick={() => setShowParticipantModal(false)}
+                className="w-full py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
