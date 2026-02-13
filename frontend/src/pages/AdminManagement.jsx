@@ -66,7 +66,7 @@ const AdminManagement = () => {
     { key: 'emailTemplates', label: 'Email Templates' },
     { key: 'bonusManagement', label: 'Bonus Management' },
     { key: 'adminManagement', label: 'Admin Management' },
-    { key: 'employeeManagement', label: 'Employee Management' },
+    { key: 'employeeManagement', label: 'Admin Management' },
     { key: 'kycVerification', label: 'KYC Verification' },
     { key: 'supportTickets', label: 'Support Tickets' },
   ]
@@ -97,15 +97,15 @@ const AdminManagement = () => {
       })
       const data = await res.json()
       if (data.success) {
-        alert('Employee created successfully!')
+        alert('Admin created successfully!')
         setShowAddModal(false)
         setNewAdmin({ email: '', password: '', firstName: '', lastName: '', phone: '', sidebarPermissions: { overviewDashboard: true } })
         fetchAdmins()
       } else {
-        alert(data.message || 'Failed to create employee')
+        alert(data.message || 'Failed to create admin')
       }
     } catch (error) {
-      alert('Error creating employee')
+      alert('Error creating admin')
     }
   }
 
@@ -123,14 +123,14 @@ const AdminManagement = () => {
       })
       const data = await res.json()
       if (data.success) {
-        alert('Employee updated successfully!')
+        alert('Admin updated successfully!')
         setShowEditModal(false)
         fetchAdmins()
       } else {
-        alert(data.message || 'Failed to update employee')
+        alert(data.message || 'Failed to update admin')
       }
     } catch (error) {
-      alert('Error updating employee')
+      alert('Error updating admin')
     }
   }
 
@@ -206,13 +206,13 @@ const AdminManagement = () => {
       })
       const data = await res.json()
       if (data.success) {
-        alert('Employee deleted successfully!')
+        alert('Admin deleted successfully!')
         fetchAdmins()
       } else {
-        alert(data.message || 'Failed to delete employee')
+        alert(data.message || 'Failed to delete admin')
       }
     } catch (error) {
-      alert('Error deleting employee')
+      alert('Error deleting admin')
     }
   }
 
@@ -271,7 +271,7 @@ const AdminManagement = () => {
   }
 
   return (
-    <AdminLayout title="Employee Management" subtitle="Manage employees and their sidebar permissions">
+    <AdminLayout title="Admin Management" subtitle="Manage admins and their sidebar permissions">
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
@@ -280,7 +280,7 @@ const AdminManagement = () => {
               <Shield size={20} className="text-blue-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Total Employees</p>
+              <p className="text-gray-500 text-sm">Total Admins</p>
               <p className="text-white text-xl font-bold">{admins.length}</p>
             </div>
           </div>
@@ -291,7 +291,7 @@ const AdminManagement = () => {
               <Check size={20} className="text-green-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Active Employees</p>
+              <p className="text-gray-500 text-sm">Active Admins</p>
               <p className="text-white text-xl font-bold">{admins.filter(a => a.status === 'ACTIVE').length}</p>
             </div>
           </div>
@@ -323,13 +323,13 @@ const AdminManagement = () => {
       {/* Employee List */}
       <div className="bg-dark-800 rounded-xl border border-gray-800 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 border-b border-gray-800">
-          <h2 className="text-white font-semibold text-lg">Employees</h2>
+          <h2 className="text-white font-semibold text-lg">Admins</h2>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 type="text"
-                placeholder="Search employees..."
+                placeholder="Search admins..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full sm:w-64 bg-dark-700 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
@@ -340,18 +340,18 @@ const AdminManagement = () => {
               className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
             >
               <Plus size={16} />
-              <span>Add Employee</span>
+              <span>Add Admin</span>
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading employees...</div>
+          <div className="p-8 text-center text-gray-500">Loading admins...</div>
         ) : filteredAdmins.length === 0 ? (
           <div className="p-8 text-center">
             <Shield size={48} className="mx-auto text-gray-600 mb-4" />
-            <p className="text-gray-500">No employees found</p>
-            <p className="text-gray-600 text-sm mt-1">Create your first employee to get started</p>
+            <p className="text-gray-500">No admins found</p>
+            <p className="text-gray-600 text-sm mt-1">Create your first admin to get started</p>
           </div>
         ) : (
           <>
@@ -420,7 +420,7 @@ const AdminManagement = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-700">
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Employee</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Admin</th>
                     <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Permissions</th>
                     <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Joined</th>
                     <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Status</th>
@@ -503,7 +503,7 @@ const AdminManagement = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">Create New Employee</h3>
+              <h3 className="text-white font-semibold text-lg">Create New Admin</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
@@ -538,7 +538,7 @@ const AdminManagement = () => {
                   value={newAdmin.email}
                   onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
                   className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
-                  placeholder="employee@example.com"
+                  placeholder="admin@example.com"
                 />
               </div>
               <div>
@@ -616,7 +616,7 @@ const AdminManagement = () => {
                 onClick={handleCreateAdmin}
                 className="flex-1 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
               >
-                Create Employee
+                Create Admin
               </button>
             </div>
           </div>
@@ -628,7 +628,7 @@ const AdminManagement = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-800 rounded-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">Edit Employee</h3>
+              <h3 className="text-white font-semibold text-lg">Edit Admin</h3>
               <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>

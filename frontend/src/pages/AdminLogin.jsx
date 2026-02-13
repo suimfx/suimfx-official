@@ -143,16 +143,16 @@ const AdminLogin = () => {
               <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/80 text-slate-500">Are you an employee?</span>
+              <span className="px-4 bg-slate-900/80 text-slate-500">Are you an admin?</span>
             </div>
           </div>
 
           <a
-            href="https://suimfx.com/employee/login"
+            href="https://suimfx.com/admin/login"
             className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-blue-500/30 text-blue-400 font-medium hover:bg-blue-500/10 transition-all text-sm sm:text-base mb-4"
           >
             <UserCog size={18} />
-            Employee Login
+            Admin Login
           </a>
 
           {/* User Login Link */}

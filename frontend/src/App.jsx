@@ -92,8 +92,7 @@ function App() {
         <Route path="/admin/bonus-management" element={<ProtectedAdminRoute requiredPermission="bonusManagement"><AdminBonusManagement /></ProtectedAdminRoute>} />
         <Route path="/admin/banners" element={<ProtectedAdminRoute requiredPermission="bonusManagement"><AdminBannerManagement /></ProtectedAdminRoute>} />
         <Route path="/admin/profile" element={<ProtectedAdminRoute><AdminProfile /></ProtectedAdminRoute>} />
-        <Route path="/admin-employee" element={<EmployeeLogin />} />
-        <Route path="/employee/login" element={<EmployeeLogin />} />
+        <Route path="/admin/login" element={<EmployeeLogin />} />
         <Route path="/buy-challenge" element={<BuyChallengePage />} />
         <Route path="/challenge-dashboard" element={<ChallengeDashboardPage />} />
         <Route path="/:slug/login" element={<BrandedLogin />} />

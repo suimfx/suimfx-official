@@ -61,7 +61,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
     { name: 'Email Templates', icon: Mail, path: '/admin/email-templates', sidebarKey: 'emailTemplates' },
     { name: 'Bonus Management', icon: Gift, path: '/admin/bonus-management', sidebarKey: 'bonusManagement' },
     { name: 'Banner Management', icon: Image, path: '/admin/banners', sidebarKey: 'bonusManagement' },
-    { name: 'Employee Management', icon: Shield, path: '/admin/admin-management', sidebarKey: 'employeeManagement' },
+    { name: 'Admin Management', icon: Shield, path: '/admin/admin-management', sidebarKey: 'employeeManagement' },
     { name: 'KYC Verification', icon: FileCheck, path: '/admin/kyc', sidebarKey: 'kycVerification' },
     { name: 'Support Tickets', icon: HeadphonesIcon, path: '/admin/support', sidebarKey: 'supportTickets' },
     { name: 'My Profile', icon: User, path: '/admin/profile', sidebarKey: 'myProfile' },
@@ -128,9 +128,9 @@ const AdminLayout = ({ children, title, subtitle }) => {
     const currentAdmin = admin
     localStorage.removeItem('adminToken')
     localStorage.removeItem('adminUser')
-    // Redirect based on role - ADMIN goes to /admin-employee, SUPER_ADMIN goes to /admin
+    // Redirect based on role - ADMIN goes to /admin/login, SUPER_ADMIN goes to /admin
     if (currentAdmin?.role === 'ADMIN') {
-      navigate('/admin-employee')
+      navigate('/admin/login')
     } else {
       navigate('/admin')
     }

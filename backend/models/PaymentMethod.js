@@ -6,6 +6,12 @@ const paymentMethodSchema = new mongoose.Schema({
     enum: ['Bank Transfer', 'UPI', 'QR Code'],
     required: true
   },
+  // Currency - INR for Indian payments, USD for international
+  currency: {
+    type: String,
+    enum: ['INR', 'USD'],
+    default: 'INR'
+  },
   // Bank Transfer fields
   bankName: {
     type: String

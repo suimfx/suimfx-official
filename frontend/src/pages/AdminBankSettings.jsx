@@ -25,6 +25,7 @@ const AdminBankSettings = () => {
   const [editingMethod, setEditingMethod] = useState(null)
   const [form, setForm] = useState({
     type: 'Bank Transfer',
+    currency: 'INR',
     bankName: '',
     accountNumber: '',
     accountHolderName: '',
@@ -345,6 +346,7 @@ const AdminBankSettings = () => {
     setEditingMethod(method)
     setForm({
       type: method.type,
+      currency: method.currency || 'INR',
       bankName: method.bankName || '',
       accountNumber: method.accountNumber || '',
       accountHolderName: method.accountHolderName || '',
@@ -359,6 +361,7 @@ const AdminBankSettings = () => {
   const resetForm = () => {
     setForm({
       type: 'Bank Transfer',
+      currency: 'INR',
       bankName: '',
       accountNumber: '',
       accountHolderName: '',
@@ -583,7 +586,14 @@ const AdminBankSettings = () => {
                         <Building2 size={24} className="text-blue-400" />
                       </div>
                       <div>
-                        <p className="text-white font-medium">{bank.bankName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-white font-medium">{bank.bankName}</p>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            bank.currency === 'USD' ? 'bg-green-500/20 text-green-500' : 'bg-orange-500/20 text-orange-500'
+                          }`}>
+                            {bank.currency || 'INR'}
+                          </span>
+                        </div>
                         <p className="text-gray-500 text-sm">A/C: {bank.accountNumber} | IFSC: {bank.ifscCode}</p>
                         <p className="text-gray-500 text-sm">Holder: {bank.accountHolderName}</p>
                       </div>
@@ -641,7 +651,14 @@ const AdminBankSettings = () => {
                         <Smartphone size={24} className="text-purple-400" />
                       </div>
                       <div>
-                        <p className="text-white font-medium">UPI ID</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-white font-medium">UPI ID</p>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            upi.currency === 'USD' ? 'bg-green-500/20 text-green-500' : 'bg-orange-500/20 text-orange-500'
+                          }`}>
+                            {upi.currency || 'INR'}
+                          </span>
+                        </div>
                         <p className="text-purple-400 text-lg font-mono">{upi.upiId}</p>
                       </div>
                     </div>
@@ -702,7 +719,14 @@ const AdminBankSettings = () => {
                         </div>
                       )}
                       <div>
-                        <p className="text-white font-medium">QR Code Payment</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-white font-medium">QR Code Payment</p>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            qr.currency === 'USD' ? 'bg-green-500/20 text-green-500' : 'bg-orange-500/20 text-orange-500'
+                          }`}>
+                            {qr.currency || 'INR'}
+                          </span>
+                        </div>
                         <p className="text-gray-500 text-sm">Scan to pay</p>
                       </div>
                     </div>
@@ -979,6 +1003,29 @@ const AdminBankSettings = () => {
                       }`}
                     >
                       {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Currency Selection */}
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">Currency</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { code: 'INR', label: 'INR (₹) - Indian Rupee', color: 'orange' },
+                    { code: 'USD', label: 'USD ($) - US Dollar', color: 'green' }
+                  ].map((curr) => (
+                    <button
+                      key={curr.code}
+                      onClick={() => setForm({ ...form, currency: curr.code })}
+                      className={`p-3 rounded-lg border text-sm ${
+                        form.currency === curr.code 
+                          ? `border-${curr.color}-500 bg-${curr.color}-500/20 text-${curr.color}-500` 
+                          : 'border-gray-700 text-gray-400 hover:border-gray-600'
+                      }`}
+                    >
+                      {curr.label}
                     </button>
                   ))}
                 </div>
