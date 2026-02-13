@@ -91,7 +91,11 @@ const AdminEmailTemplates = () => {
   const toggleSmtp = async () => {
     setTogglingSmtp(true)
     try {
-      const res = await fetch(`${API_URL}/email-templates/settings/toggle-smtp`, { method: 'PUT' })
+      const token = localStorage.getItem('adminToken')
+      const res = await fetch(`${API_URL}/email-templates/settings/toggle-smtp`, { 
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
       const data = await res.json()
       if (data.success) {
         setSmtpEnabled(data.smtpEnabled)
@@ -236,9 +240,13 @@ const AdminEmailTemplates = () => {
   const handleSaveSettings = async () => {
     setSaving(true)
     try {
+      const token = localStorage.getItem('adminToken')
       const res = await fetch(`${API_URL}/email-templates/settings/smtp`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(smtpSettings)
       })
       const data = await res.json()
@@ -259,7 +267,11 @@ const AdminEmailTemplates = () => {
   const testConnection = async () => {
     setTestingConnection(true)
     try {
-      const res = await fetch(`${API_URL}/email-templates/settings/test`, { method: 'POST' })
+      const token = localStorage.getItem('adminToken')
+      const res = await fetch(`${API_URL}/email-templates/settings/test`, { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
       const data = await res.json()
       if (data.success) {
         setSuccess('SMTP connection successful!')
@@ -283,9 +295,13 @@ const AdminEmailTemplates = () => {
     }
     setSendingTestEmail(true)
     try {
+      const token = localStorage.getItem('adminToken')
       const res = await fetch(`${API_URL}/email-templates/settings/send-test`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ toEmail: testEmail })
       })
       const data = await res.json()
