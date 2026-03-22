@@ -14,8 +14,22 @@ import {
   Building2,
   Smartphone
 } from 'lucide-react'
-import { API_URL } from '../config/api'
+import { API_URL, API_BASE_URL } from '../config/api'
 import { getAdminHeaders } from '../utils/adminApi'
+
+/** Stored value can be /uploads/..., full URL, or data: (preview fallback from wallet deposit). */
+function resolveDepositScreenshotSrc(value) {
+  if (!value || typeof value !== 'string') return ''
+  const v = value.trim()
+  if (v.startsWith('http://') || v.startsWith('https://')) return v
+  if (v.startsWith('data:')) return v
+  if (v.startsWith('//')) {
+    const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https:' : 'http:'
+    return `${proto}${v}`
+  }
+  const path = v.startsWith('/') ? v : `/${v}`
+  return `${API_BASE_URL.replace(/\/$/, '')}${path}`
+}
 
 const AdminFundManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -436,15 +450,18 @@ const AdminFundManagement = () => {
               </div>
 
               {/* Payment Screenshot */}
-              {selectedTxn.screenshot && (
+              {selectedTxn.screenshot?.trim() && (
                 <div className="border-t border-gray-700 pt-4">
                   <h3 className="text-white font-semibold mb-3">Payment Screenshot</h3>
                   <div className="bg-dark-700 rounded-lg p-2">
                     <img 
-                      src={selectedTxn.screenshot.startsWith('http') ? selectedTxn.screenshot : `${API_URL.replace('/api', '')}${selectedTxn.screenshot}`} 
+                      src={resolveDepositScreenshotSrc(selectedTxn.screenshot)} 
                       alt="Payment proof" 
                       className="w-full rounded-lg max-h-64 object-contain cursor-pointer"
-                      onClick={() => window.open(selectedTxn.screenshot.startsWith('http') ? selectedTxn.screenshot : `${API_URL.replace('/api', '')}${selectedTxn.screenshot}`, '_blank')}
+                      onClick={() => {
+                        const src = resolveDepositScreenshotSrc(selectedTxn.screenshot)
+                        if (src) window.open(src, '_blank')
+                      }}
                     />
                     <p className="text-gray-500 text-xs text-center mt-2">Click to view full image</p>
                   </div>

@@ -14,6 +14,10 @@ const __dirname = path.dirname(__filename)
 
 const router = express.Router()
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // Ensure KYC uploads directory exists
 const kycUploadsDir = path.join(__dirname, '../uploads/kyc')
 if (!fs.existsSync(kycUploadsDir)) {
@@ -265,41 +269,64 @@ router.get('/status/:userId', async (req, res) => {
   }
 })
 
-// GET /api/kyc/all - Get all KYC submissions (Admin)
+// GET /api/kyc/all - KYC list for admin (no base64 / large image fields — fast payload)
 router.get('/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.KYC_VERIFICATION), async (req, res) => {
   try {
     const { status } = req.query
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50))
+    const searchRaw = (req.query.search || '').trim()
 
     const filter = {}
     if (status && status !== 'all') {
       filter.status = status
     }
+    if (searchRaw) {
+      const re = new RegExp(escapeRegex(searchRaw), 'i')
+      const matchingUsers = await User.find({
+        $or: [{ firstName: re }, { lastName: re }, { email: re }, { phone: re }]
+      })
+        .select('_id')
+        .lean()
+      filter.userId = { $in: matchingUsers.map((u) => u._id) }
+    }
 
-    const kycList = await KYC.find(filter)
-      .populate('userId', 'firstName lastName email phone')
-      .sort({ submittedAt: -1 })
-
-    // Get stats
-    const totalCount = await KYC.countDocuments()
-    const pendingCount = await KYC.countDocuments({ status: 'pending' })
-    const approvedCount = await KYC.countDocuments({ status: 'approved' })
-    const rejectedCount = await KYC.countDocuments({ status: 'rejected' })
+    const [
+      kycList,
+      totalFiltered,
+      totalCount,
+      pendingCount,
+      approvedCount,
+      rejectedCount
+    ] = await Promise.all([
+      KYC.find(filter)
+        .select('-frontImage -backImage -selfieImage')
+        .populate('userId', 'firstName lastName email phone')
+        .sort({ submittedAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      KYC.countDocuments(filter),
+      KYC.countDocuments(),
+      KYC.countDocuments({ status: 'pending' }),
+      KYC.countDocuments({ status: 'approved' }),
+      KYC.countDocuments({ status: 'rejected' })
+    ])
 
     res.json({
       success: true,
-      kycList: kycList.map(kyc => ({
+      kycList: kycList.map((kyc) => ({
         _id: kyc._id,
-        user: kyc.userId ? {
-          _id: kyc.userId._id,
-          name: `${kyc.userId.firstName || ''} ${kyc.userId.lastName || ''}`.trim() || 'Unknown',
-          email: kyc.userId.email,
-          phone: kyc.userId.phone
-        } : { name: 'Unknown', email: 'N/A' },
+        user: kyc.userId
+          ? {
+              _id: kyc.userId._id,
+              name: `${kyc.userId.firstName || ''} ${kyc.userId.lastName || ''}`.trim() || 'Unknown',
+              email: kyc.userId.email,
+              phone: kyc.userId.phone
+            }
+          : { name: 'Unknown', email: 'N/A' },
         documentType: kyc.documentType,
         documentNumber: kyc.documentNumber,
-        frontImage: kyc.frontImage,
-        backImage: kyc.backImage,
-        selfieImage: kyc.selfieImage,
         status: kyc.status,
         submittedAt: kyc.submittedAt,
         reviewedAt: kyc.reviewedAt,
@@ -310,6 +337,12 @@ router.get('/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBA
         pending: pendingCount,
         approved: approvedCount,
         rejected: rejectedCount
+      },
+      pagination: {
+        page,
+        limit,
+        total: totalFiltered,
+        totalPages: Math.max(1, Math.ceil(totalFiltered / limit))
       }
     })
   } catch (error) {
@@ -464,11 +497,14 @@ router.get('/view/:kycId', verifyAdminToken, requireSidebarPermission(PERMISSION
       success: true,
       kyc: {
         _id: kyc._id,
-        user: kyc.userId ? {
-          name: `${kyc.userId.firstName || ''} ${kyc.userId.lastName || ''}`.trim(),
-          email: kyc.userId.email,
-          phone: kyc.userId.phone
-        } : null,
+        user: kyc.userId
+          ? {
+              _id: kyc.userId._id,
+              name: `${kyc.userId.firstName || ''} ${kyc.userId.lastName || ''}`.trim() || 'Unknown',
+              email: kyc.userId.email,
+              phone: kyc.userId.phone
+            }
+          : { name: 'Unknown', email: 'N/A' },
         documentType: kyc.documentType,
         documentNumber: kyc.documentNumber,
         frontImage: kyc.frontImage,

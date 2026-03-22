@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import AdminLayout from '../components/AdminLayout'
 import { 
   FileCheck,
@@ -27,7 +27,10 @@ function resolveKycImageSrc(value) {
 
 const AdminKYC = () => {
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 })
   const [kycRequests, setKycRequests] = useState([])
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 })
   const [loading, setLoading] = useState(true)
@@ -36,24 +39,42 @@ const AdminKYC = () => {
   const [rejectReason, setRejectReason] = useState('')
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [detailFetchId, setDetailFetchId] = useState(null)
 
   useEffect(() => {
-    fetchKycRequests()
-  }, [filterStatus])
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350)
+    return () => clearTimeout(t)
+  }, [searchTerm])
 
-  const fetchKycRequests = async () => {
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
+  const fetchKycRequests = useCallback(async () => {
+    setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/kyc/all?status=${filterStatus}`, { headers: getAdminHeaders() })
+      const params = new URLSearchParams({
+        status: filterStatus,
+        page: String(page),
+        limit: '50'
+      })
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      const res = await fetch(`${API_URL}/kyc/all?${params.toString()}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setKycRequests(data.kycList || [])
         setStats(data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 })
+        if (data.pagination) setPagination(data.pagination)
       }
     } catch (error) {
       console.error('Error fetching KYC requests:', error)
     }
     setLoading(false)
-  }
+  }, [filterStatus, page, debouncedSearch])
+
+  useEffect(() => {
+    fetchKycRequests()
+  }, [fetchKycRequests])
 
   const handleApprove = async (kycId) => {
     setActionLoading(true)
@@ -104,8 +125,21 @@ const AdminKYC = () => {
   }
 
   const viewKycDetails = async (kyc) => {
-    setSelectedKyc(kyc)
-    setShowViewModal(true)
+    setDetailFetchId(kyc._id)
+    try {
+      const res = await fetch(`${API_URL}/kyc/view/${kyc._id}`, { headers: getAdminHeaders() })
+      const data = await res.json()
+      if (data.success && data.kyc) {
+        setSelectedKyc(data.kyc)
+        setShowViewModal(true)
+      } else {
+        alert(data.message || 'Failed to load KYC documents')
+      }
+    } catch (error) {
+      console.error('Error loading KYC detail:', error)
+      alert('Failed to load KYC documents')
+    }
+    setDetailFetchId(null)
   }
 
   const formatDocType = (type) => {
@@ -129,14 +163,6 @@ const AdminKYC = () => {
       default: return null
     }
   }
-
-  const filteredRequests = kycRequests.filter(req => {
-    const userName = req.user?.name || ''
-    const userEmail = req.user?.email || ''
-    const matchesSearch = userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         userEmail.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
-  })
 
   return (
     <AdminLayout title="KYC Verification" subtitle="Verify user identity documents">
@@ -189,7 +215,10 @@ const AdminKYC = () => {
             </div>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => {
+                setPage(1)
+                setFilterStatus(e.target.value)
+              }}
               className="bg-dark-700 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-gray-600"
             >
               <option value="all">All Status</option>
@@ -204,10 +233,10 @@ const AdminKYC = () => {
         <div className="block lg:hidden p-4 space-y-3">
           {loading ? (
             <div className="text-center py-8 text-gray-400">Loading...</div>
-          ) : filteredRequests.length === 0 ? (
+          ) : kycRequests.length === 0 ? (
             <div className="text-center py-8 text-gray-400">No KYC requests found</div>
           ) : (
-            filteredRequests.map((req) => (
+            kycRequests.map((req) => (
               <div key={req._id} className="bg-dark-700 rounded-xl p-4 border border-gray-700">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -237,9 +266,10 @@ const AdminKYC = () => {
                 <div className="flex gap-2 pt-3 border-t border-gray-600">
                   <button 
                     onClick={() => viewKycDetails(req)}
-                    className="flex-1 flex items-center justify-center gap-1 py-2 bg-blue-500/20 text-blue-500 rounded-lg text-sm"
+                    disabled={detailFetchId === req._id}
+                    className="flex-1 flex items-center justify-center gap-1 py-2 bg-blue-500/20 text-blue-500 rounded-lg text-sm disabled:opacity-50"
                   >
-                    <Eye size={14} /> View
+                    <Eye size={14} /> {detailFetchId === req._id ? 'Loading...' : 'View'}
                   </button>
                   {req.status === 'pending' && (
                     <>
@@ -278,10 +308,10 @@ const AdminKYC = () => {
             <tbody>
               {loading ? (
                 <tr><td colSpan="5" className="text-center py-8 text-gray-400">Loading...</td></tr>
-              ) : filteredRequests.length === 0 ? (
+              ) : kycRequests.length === 0 ? (
                 <tr><td colSpan="5" className="text-center py-8 text-gray-400">No KYC requests found</td></tr>
               ) : (
-                filteredRequests.map((req) => (
+                kycRequests.map((req) => (
                   <tr key={req._id} className="border-b border-gray-800 hover:bg-dark-700/50">
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
@@ -306,7 +336,8 @@ const AdminKYC = () => {
                       <div className="flex items-center gap-1">
                         <button 
                           onClick={() => viewKycDetails(req)}
-                          className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-white" 
+                          disabled={detailFetchId === req._id}
+                          className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-white disabled:opacity-40" 
                           title="View Documents"
                         >
                           <Eye size={16} />
@@ -337,6 +368,32 @@ const AdminKYC = () => {
             </tbody>
           </table>
         </div>
+
+        {pagination.totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-5 py-4 border-t border-gray-800">
+            <p className="text-gray-500 text-sm">
+              Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-4 py-2 rounded-lg bg-dark-700 text-white text-sm border border-gray-700 hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={page >= pagination.totalPages || loading}
+                onClick={() => setPage((p) => p + 1)}
+                className="px-4 py-2 rounded-lg bg-dark-700 text-white text-sm border border-gray-700 hover:bg-dark-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* View KYC Modal */}
