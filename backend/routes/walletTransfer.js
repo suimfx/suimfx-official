@@ -8,7 +8,16 @@ import Transaction from '../models/Transaction.js'
 
 const router = express.Router()
 
-// POST /api/wallet-transfer/to-trading - Transfer from User Wallet to Trading Account
+async function getOrCreateWallet(userId) {
+  let wallet = await Wallet.findOne({ userId })
+  if (!wallet) {
+    wallet = new Wallet({ userId, balance: 0 })
+    await wallet.save()
+  }
+  return wallet
+}
+
+// POST /api/wallet-transfer/to-trading - Transfer from main Wallet (same as /api/wallet) to Trading Account
 router.post('/to-trading', async (req, res) => {
   try {
     const { userId, tradingAccountId, amount } = req.body
@@ -28,7 +37,6 @@ router.post('/to-trading', async (req, res) => {
       })
     }
 
-    // Get user wallet
     const user = await User.findById(userId)
     if (!user) {
       return res.status(404).json({
@@ -37,8 +45,8 @@ router.post('/to-trading', async (req, res) => {
       })
     }
 
-    // Check if user has sufficient balance
-    if (user.walletBalance < transferAmount) {
+    const wallet = await getOrCreateWallet(userId)
+    if (wallet.balance < transferAmount) {
       return res.status(400).json({
         success: false,
         message: 'Insufficient wallet balance'
@@ -81,16 +89,15 @@ router.post('/to-trading', async (req, res) => {
       }
     }
 
-    // Perform transfer
-    user.walletBalance -= transferAmount
+    wallet.balance -= transferAmount
     tradingAccount.balance += transferAmount
 
-    await user.save()
+    await wallet.save()
     await tradingAccount.save()
 
-    // Log transaction
     await Transaction.create({
       userId,
+      walletId: wallet._id,
       type: 'Transfer_To_Account',
       amount: transferAmount,
       paymentMethod: 'Internal',
@@ -103,7 +110,8 @@ router.post('/to-trading', async (req, res) => {
     res.json({
       success: true,
       message: 'Transfer successful',
-      userWalletBalance: user.walletBalance,
+      userWalletBalance: wallet.balance,
+      walletBalance: wallet.balance,
       tradingAccountBalance: tradingAccount.balance
     })
   } catch (error) {
@@ -188,7 +196,6 @@ router.post('/from-trading', async (req, res) => {
       })
     }
 
-    // Get user
     const user = await User.findById(userId)
     if (!user) {
       return res.status(404).json({
@@ -197,16 +204,17 @@ router.post('/from-trading', async (req, res) => {
       })
     }
 
-    // Perform transfer
+    const wallet = await getOrCreateWallet(userId)
+
     tradingAccount.balance -= transferAmount
-    user.walletBalance += transferAmount
+    wallet.balance += transferAmount
 
     await tradingAccount.save()
-    await user.save()
+    await wallet.save()
 
-    // Log transaction
     await Transaction.create({
       userId,
+      walletId: wallet._id,
       type: 'Transfer_From_Account',
       amount: transferAmount,
       paymentMethod: 'Internal',
@@ -219,7 +227,8 @@ router.post('/from-trading', async (req, res) => {
     res.json({
       success: true,
       message: 'Transfer successful',
-      userWalletBalance: user.walletBalance,
+      userWalletBalance: wallet.balance,
+      walletBalance: wallet.balance,
       tradingAccountBalance: tradingAccount.balance
     })
   } catch (error) {
@@ -243,6 +252,8 @@ router.get('/balances/:userId', async (req, res) => {
         message: 'User not found'
       })
     }
+
+    const wallet = await getOrCreateWallet(userId)
 
     const tradingAccounts = await TradingAccount.find({ userId })
       .populate('accountTypeId', 'name')
@@ -278,7 +289,8 @@ router.get('/balances/:userId', async (req, res) => {
 
     res.json({
       success: true,
-      userWalletBalance: user.walletBalance,
+      userWalletBalance: wallet.balance,
+      walletBalance: wallet.balance,
       tradingAccounts: accountBalances
     })
   } catch (error) {

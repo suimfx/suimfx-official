@@ -59,14 +59,14 @@ const challengeSchema = new mongoose.Schema({
       default: null
     },
     
-    // Profit Rules
+    // Profit Rules (null = unset; engine uses fallbacks for 1/2-step; 0-step ignores targets)
     profitTargetPhase1Percent: {
       type: Number,
-      default: 8
+      default: null
     },
     profitTargetPhase2Percent: {
       type: Number,
-      default: 5
+      default: null
     },
     
     // Lot Size Rules

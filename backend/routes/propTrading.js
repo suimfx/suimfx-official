@@ -8,6 +8,36 @@ import propTradingEngine from '../services/propTradingEngine.js'
 
 const router = express.Router()
 
+/** Eligibility + cap for moving prop profit share to main wallet (funded or 0-step active). */
+function getProfitWithdrawalMeta(account, challenge) {
+  const totalProfit = (account.currentBalance || 0) - (account.initialBalance || 0)
+  const profitSplit =
+    account.profitSplitPercent || challenge?.fundedSettings?.profitSplitPercent || 80
+  const userShare = (totalProfit * profitSplit) / 100
+  const alreadyWithdrawn = account.totalWithdrawn || 0
+  const availableUsd = Math.max(0, Math.round((userShare - alreadyWithdrawn) * 100) / 100)
+  const funded = account.accountType === 'FUNDED' || account.status === 'FUNDED'
+  const instantActive = account.status === 'ACTIVE' && challenge?.stepsCount === 0
+  if (!funded && !instantActive) {
+    return {
+      allowed: false,
+      availableUsd,
+      reason: 'Profit withdrawals are available on funded accounts or instant-fund challenges only.'
+    }
+  }
+  if ((account.openTradesCount || 0) > 0) {
+    return {
+      allowed: false,
+      availableUsd,
+      reason: 'Close all open positions before withdrawing profit.'
+    }
+  }
+  if (availableUsd < 0.01) {
+    return { allowed: false, availableUsd, reason: 'No withdrawable profit yet.' }
+  }
+  return { allowed: true, availableUsd }
+}
+
 // ==================== PUBLIC ROUTES ====================
 
 // GET /api/prop/status - Check if challenge mode is enabled
@@ -146,6 +176,81 @@ router.post('/buy', async (req, res) => {
   }
 })
 
+// POST /api/prop/withdraw-profit — participant moves prop profit share to main wallet
+router.post('/withdraw-profit', async (req, res) => {
+  try {
+    const { userId, challengeAccountId, amount } = req.body
+    if (!userId || !challengeAccountId) {
+      return res.status(400).json({ success: false, message: 'userId and challengeAccountId are required' })
+    }
+    const amt = Number(amount)
+    if (!Number.isFinite(amt) || amt < 0.01) {
+      return res.status(400).json({ success: false, message: 'Enter a valid amount (min $0.01)' })
+    }
+
+    const account = await ChallengeAccount.findById(challengeAccountId).populate('challengeId')
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Account not found' })
+    }
+    if (account.userId.toString() !== String(userId)) {
+      return res.status(403).json({ success: false, message: 'This challenge account does not belong to you' })
+    }
+
+    const meta = getProfitWithdrawalMeta(account, account.challengeId)
+    if (!meta.allowed) {
+      return res.status(400).json({ success: false, message: meta.reason || 'Withdrawal not allowed' })
+    }
+    if (amt > meta.availableUsd + 1e-9) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum you can withdraw is $${meta.availableUsd.toFixed(2)}`
+      })
+    }
+
+    let wallet = await Wallet.findOne({ userId })
+    if (!wallet) {
+      wallet = new Wallet({ userId, balance: 0 })
+      await wallet.save()
+    }
+
+    account.totalWithdrawn = (account.totalWithdrawn || 0) + amt
+    account.lastWithdrawalDate = new Date()
+    account.currentBalance -= amt
+    account.currentEquity -= amt
+    await account.save()
+
+    wallet.balance += amt
+    await wallet.save()
+
+    const tx = new Transaction({
+      userId,
+      walletId: wallet._id,
+      type: 'Challenge_Profit_Withdrawal',
+      amount: amt,
+      status: 'Approved',
+      paymentMethod: 'Wallet',
+      description: `Prop profit to wallet — ${account.accountId}`,
+      challengeAccountId: account._id,
+      processedAt: new Date()
+    })
+    await tx.save()
+
+    res.json({
+      success: true,
+      message: `$${amt.toFixed(2)} sent to your wallet`,
+      newWalletBalance: wallet.balance,
+      account: {
+        _id: account._id,
+        accountId: account.accountId,
+        currentBalance: account.currentBalance,
+        totalWithdrawn: account.totalWithdrawn
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 // GET /api/prop/my-accounts/:userId - Get user's challenge accounts
 router.get('/my-accounts/:userId', async (req, res) => {
   try {
@@ -224,6 +329,8 @@ router.get('/my-accounts/:userId', async (req, res) => {
       
       // Profit = (currentEquity - initialBalance) / initialBalance * 100
       const realTimeProfit = ((realTimeEquity - initialBalance) / initialBalance) * 100
+
+      const profitWithdrawal = getProfitWithdrawalMeta(account, account.challengeId)
       
       return {
         ...accountObj,
@@ -231,7 +338,8 @@ router.get('/my-accounts/:userId', async (req, res) => {
         currentDailyDrawdownPercent: Math.round(realTimeDailyDD * 100) / 100,
         currentOverallDrawdownPercent: Math.round(realTimeOverallDD * 100) / 100,
         currentProfitPercent: Math.round(realTimeProfit * 100) / 100,
-        floatingPnl: Math.round(floatingPnl * 100) / 100
+        floatingPnl: Math.round(floatingPnl * 100) / 100,
+        profitWithdrawal
       }
     }))
 
@@ -509,6 +617,107 @@ router.post('/admin/reset/:id', async (req, res) => {
     res.json({ success: true, message: 'Challenge reset', account })
   } catch (error) {
     res.status(400).json({ success: false, message: error.message })
+  }
+})
+
+// POST /api/prop/admin/withdraw/:id - Process profit share withdrawal for funded account
+router.post('/admin/withdraw/:id', async (req, res) => {
+  try {
+    const { adminId, amount } = req.body
+    const accountId = req.params.id
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid withdrawal amount' })
+    }
+    
+    const account = await ChallengeAccount.findById(accountId).populate('challengeId')
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Account not found' })
+    }
+    
+    if (account.accountType !== 'FUNDED' && account.status !== 'FUNDED') {
+      return res.status(400).json({ success: false, message: 'Only funded accounts can withdraw profits' })
+    }
+    
+    // Calculate available profit for withdrawal
+    const totalProfit = account.currentBalance - account.initialBalance
+    const profitSplit = account.profitSplitPercent || 80
+    const userShare = (totalProfit * profitSplit) / 100
+    const alreadyWithdrawn = account.totalWithdrawn || 0
+    const availableForWithdrawal = Math.max(0, userShare - alreadyWithdrawn)
+    
+    if (amount > availableForWithdrawal) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Insufficient withdrawable amount. Available: $${availableForWithdrawal.toFixed(2)}` 
+      })
+    }
+    
+    // Process withdrawal
+    account.totalWithdrawn = alreadyWithdrawn + amount
+    account.lastWithdrawalDate = new Date()
+    
+    // Deduct from balance (user's share only)
+    account.currentBalance -= amount
+    account.currentEquity -= amount
+    
+    await account.save()
+    
+    res.json({ 
+      success: true, 
+      message: `Withdrawal of $${amount.toFixed(2)} processed successfully`,
+      account: {
+        _id: account._id,
+        accountId: account.accountId,
+        currentBalance: account.currentBalance,
+        totalWithdrawn: account.totalWithdrawn,
+        availableForWithdrawal: availableForWithdrawal - amount
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/prop/admin/funded-accounts - Get all funded accounts with withdrawal info
+router.get('/admin/funded-accounts', async (req, res) => {
+  try {
+    const fundedAccounts = await ChallengeAccount.find({ 
+      $or: [{ accountType: 'FUNDED' }, { status: 'FUNDED' }]
+    })
+    .populate('userId', 'firstName lastName email phone')
+    .populate('challengeId', 'name fundSize fundedSettings')
+    .sort({ createdAt: -1 })
+    
+    const accountsWithProfitInfo = fundedAccounts.map(acc => {
+      const totalProfit = acc.currentBalance - acc.initialBalance
+      const profitSplit = acc.profitSplitPercent || acc.challengeId?.fundedSettings?.profitSplitPercent || 80
+      const userShare = (totalProfit * profitSplit) / 100
+      const alreadyWithdrawn = acc.totalWithdrawn || 0
+      const availableForWithdrawal = Math.max(0, userShare - alreadyWithdrawn)
+      
+      return {
+        _id: acc._id,
+        accountId: acc.accountId,
+        userId: acc.userId,
+        challengeId: acc.challengeId,
+        initialBalance: acc.initialBalance,
+        currentBalance: acc.currentBalance,
+        currentEquity: acc.currentEquity,
+        totalProfit,
+        profitSplitPercent: profitSplit,
+        userShare,
+        totalWithdrawn: alreadyWithdrawn,
+        availableForWithdrawal,
+        lastWithdrawalDate: acc.lastWithdrawalDate,
+        status: acc.status,
+        createdAt: acc.createdAt
+      }
+    })
+    
+    res.json({ success: true, accounts: accountsWithProfitInfo })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
   }
 })
 

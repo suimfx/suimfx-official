@@ -15,6 +15,7 @@ import accountTypesRoutes from './routes/accountTypes.js'
 import tradingAccountsRoutes from './routes/tradingAccounts.js'
 import walletRoutes from './routes/wallet.js'
 import paymentMethodsRoutes from './routes/paymentMethods.js'
+import manualCryptoRoutes from './routes/manualCrypto.js'
 import tradeRoutes from './routes/trade.js'
 import walletTransferRoutes from './routes/walletTransfer.js'
 import adminTradeRoutes from './routes/adminTrade.js'
@@ -55,7 +56,8 @@ const defaultOrigins = [
   'https://trade.suimfx.com',
   'https://admin.suimfx.com',
   'https://api.suimfx.com',
-  'http://localhost:5173', 
+  'http://localhost:5173',
+  'http://localhost:5174',
   'http://localhost:3000',
   'http://localhost:5001'
 ]
@@ -248,6 +250,7 @@ app.use('/api/account-types', accountTypesRoutes)
 app.use('/api/trading-accounts', tradingAccountsRoutes)
 app.use('/api/wallet', walletRoutes)
 app.use('/api/payment-methods', paymentMethodsRoutes)
+app.use('/api/manual-crypto', manualCryptoRoutes)
 app.use('/api/trade', tradeRoutes)
 app.use('/api/wallet-transfer', walletTransferRoutes)
 app.use('/api/admin/trade', adminTradeRoutes)

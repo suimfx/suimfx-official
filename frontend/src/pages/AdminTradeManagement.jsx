@@ -85,7 +85,17 @@ const AdminTradeManagement = () => {
       })
     })
     
-    return () => unsubscribe()
+    // Subscribe to SL/TP triggered events - auto-refresh trades when SL/TP closes a trade
+    const unsubscribeSlTp = priceStreamService.subscribeSlTp('adminTradeManagement', (data) => {
+      console.log('[AdminTrade] SL/TP triggered, refreshing trades:', data)
+      // Refresh trades list when any trade is closed by SL/TP
+      fetchTrades()
+    })
+    
+    return () => {
+      unsubscribe()
+      unsubscribeSlTp()
+    }
   }, [])
 
   // Fallback: Fetch prices via API if WebSocket prices are empty

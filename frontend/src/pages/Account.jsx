@@ -57,6 +57,10 @@ const Account = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showRulesModal, setShowRulesModal] = useState(false)
   const [selectedChallengeAccount, setSelectedChallengeAccount] = useState(null)
+  const [showChallengeWithdrawModal, setShowChallengeWithdrawModal] = useState(false)
+  const [withdrawTargetAccount, setWithdrawTargetAccount] = useState(null)
+  const [challengeWithdrawAmount, setChallengeWithdrawAmount] = useState('')
+  const [challengeWithdrawLoading, setChallengeWithdrawLoading] = useState(false)
   const [showAccountMenu, setShowAccountMenu] = useState(null)
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
@@ -130,6 +134,51 @@ const Account = () => {
     } catch (error) {
       console.error('Error fetching challenge status:', error)
     }
+  }
+
+  const challengeShowsProfitWithdraw = (account) => {
+    if (!account) return false
+    const instant =
+      account.status === 'ACTIVE' && account.challengeId?.stepsCount === 0
+    const funded =
+      account.status === 'FUNDED' || account.accountType === 'FUNDED'
+    return instant || funded
+  }
+
+  const handleChallengeProfitWithdraw = async () => {
+    if (!withdrawTargetAccount || !user._id) return
+    const amt = parseFloat(challengeWithdrawAmount)
+    if (!Number.isFinite(amt) || amt < 0.01) {
+      alert('Enter a valid amount (minimum $0.01)')
+      return
+    }
+    setChallengeWithdrawLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/prop/withdraw-profit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user._id,
+          challengeAccountId: withdrawTargetAccount._id,
+          amount: amt
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert(data.message || 'Profit sent to your wallet')
+        setShowChallengeWithdrawModal(false)
+        setWithdrawTargetAccount(null)
+        setChallengeWithdrawAmount('')
+        fetchChallengeAccounts()
+        fetchWalletBalance()
+      } else {
+        alert(data.message || 'Withdrawal failed')
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Withdrawal failed')
+    }
+    setChallengeWithdrawLoading(false)
   }
 
   const fetchChallengeAccounts = async () => {
@@ -778,17 +827,44 @@ const Account = () => {
                       </div>
 
                       {/* Card Footer - Actions */}
-                      <div className={`flex border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+                      <div className={`flex flex-col border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
                         {account.status === 'ACTIVE' || account.status === 'FUNDED' ? (
-                          <button
-                            onClick={() => {
-                              setSelectedChallengeAccount(account)
-                              setShowRulesModal(true)
-                            }}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-yellow-500 text-black font-medium hover:bg-yellow-400 transition-colors"
-                          >
-                            <ArrowRight size={16} /> Start Trading
-                          </button>
+                          <>
+                            {challengeShowsProfitWithdraw(account) && (
+                              <button
+                                type="button"
+                                title={account.profitWithdrawal?.reason || ''}
+                                onClick={() => {
+                                  setWithdrawTargetAccount(account)
+                                  setChallengeWithdrawAmount('')
+                                  setShowChallengeWithdrawModal(true)
+                                }}
+                                className={`w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium border-b ${
+                                  isDarkMode
+                                    ? 'border-gray-800 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                                    : 'border-gray-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                }`}
+                              >
+                                <ArrowDownLeft size={16} />
+                                Withdraw profit
+                                {account.profitWithdrawal?.allowed &&
+                                  account.profitWithdrawal?.availableUsd > 0 && (
+                                    <span className="opacity-80">
+                                      (up to ${account.profitWithdrawal.availableUsd.toFixed(2)})
+                                    </span>
+                                  )}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedChallengeAccount(account)
+                                setShowRulesModal(true)
+                              }}
+                              className="flex-1 flex items-center justify-center gap-2 py-3 bg-yellow-500 text-black font-medium hover:bg-yellow-400 transition-colors"
+                            >
+                              <ArrowRight size={16} /> Start Trading
+                            </button>
+                          </>
                         ) : (
                           <div className={`flex-1 flex items-center justify-center gap-2 py-3 text-gray-500 ${isDarkMode ? 'bg-dark-700' : 'bg-gray-100'}`}>
                             {account.status === 'PASSED' ? 'Awaiting Funded Account' : account.status}
@@ -832,7 +908,12 @@ const Account = () => {
                         </div>
                         <div>
                           <h3 className={`font-semibold ${isMobile ? 'text-sm' : ''} ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{account.accountId}</h3>
-                          <p className="text-gray-500 text-xs uppercase">{account.accountTypeId?.name || 'STANDARD'}</p>
+                          <p className="text-gray-500 text-xs uppercase flex items-center gap-2 flex-wrap">
+                            {account.accountTypeId?.name || 'STANDARD'}
+                            {(account.isDemo || account.accountTypeId?.isDemo) && (
+                              <span className="normal-case px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-medium">DEMO</span>
+                            )}
+                          </p>
                         </div>
                       </div>
                       <div className="relative">
@@ -1419,11 +1500,19 @@ const Account = () => {
             </div>
 
             {/* To Account Selection */}
+            <p className="text-gray-500 text-xs mb-3">
+              Only {selectedAccount.isDemo ? 'demo' : 'live'} accounts are shown. Live ↔ demo transfers are blocked — use main wallet to fund or withdraw real accounts.
+            </p>
+
             <div className="mb-4">
               <label className="block text-gray-400 text-sm mb-2">To Account</label>
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {userAccounts
-                  .filter(acc => acc._id !== selectedAccount._id && acc.status === 'Active')
+                  .filter(acc =>
+                    acc._id !== selectedAccount._id &&
+                    acc.status === 'Active' &&
+                    Boolean(acc.isDemo) === Boolean(selectedAccount.isDemo)
+                  )
                   .map(acc => (
                     <button
                       key={acc._id}
@@ -1438,12 +1527,19 @@ const Account = () => {
                         <TrendingUp size={14} className="text-gray-400" />
                         <span className="text-white text-sm">{acc.accountId}</span>
                         <span className="text-gray-500 text-xs">({acc.accountTypeId?.name})</span>
+                        {acc.isDemo && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">DEMO</span>
+                        )}
                       </div>
                       <span className="text-gray-400 text-sm">${acc.balance.toLocaleString()}</span>
                     </button>
                   ))}
-                {userAccounts.filter(acc => acc._id !== selectedAccount._id && acc.status === 'Active').length === 0 && (
-                  <p className="text-gray-500 text-sm text-center py-2">No other accounts available</p>
+                {userAccounts.filter(acc =>
+                  acc._id !== selectedAccount._id &&
+                  acc.status === 'Active' &&
+                  Boolean(acc.isDemo) === Boolean(selectedAccount.isDemo)
+                ).length === 0 && (
+                  <p className="text-gray-500 text-sm text-center py-2">No other {selectedAccount.isDemo ? 'demo' : 'live'} accounts</p>
                 )}
               </div>
             </div>
@@ -1492,6 +1588,108 @@ const Account = () => {
               >
                 Transfer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Challenge profit → wallet */}
+      {showChallengeWithdrawModal && withdrawTargetAccount && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div
+            className={`rounded-2xl w-full max-w-md border ${
+              isDarkMode ? 'bg-dark-800 border-gray-700' : 'bg-white border-gray-200 shadow-xl'
+            }`}
+          >
+            <div className={`p-6 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'} flex items-center justify-between`}>
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                Withdraw profit to wallet
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowChallengeWithdrawModal(false)
+                  setWithdrawTargetAccount(null)
+                  setChallengeWithdrawAmount('')
+                }}
+                className={isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Account{' '}
+                <span className="font-mono text-accent-green">{withdrawTargetAccount.accountId}</span>
+                <br />
+                Profit share (after split) is sent to your main wallet. You can request a bank/crypto withdrawal from the Wallet page.
+              </p>
+              {withdrawTargetAccount.profitWithdrawal?.allowed ? (
+                <>
+                  <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-dark-700' : 'bg-gray-100'}`}>
+                    <p className="text-gray-400 text-xs">Available to withdraw now</p>
+                    <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      ${(withdrawTargetAccount.profitWithdrawal.availableUsd || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">Amount (USD)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={challengeWithdrawAmount}
+                      onChange={(e) => setChallengeWithdrawAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full bg-dark-700 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setChallengeWithdrawAmount(
+                          String(withdrawTargetAccount.profitWithdrawal.availableUsd || 0)
+                        )
+                      }
+                      className="text-emerald-400 text-xs hover:underline mt-2"
+                    >
+                      Withdraw max
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200 text-sm">
+                  {withdrawTargetAccount.profitWithdrawal?.reason ||
+                    'You cannot withdraw profit from this account right now.'}
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChallengeWithdrawModal(false)
+                    setWithdrawTargetAccount(null)
+                    setChallengeWithdrawAmount('')
+                  }}
+                  className="flex-1 py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    challengeWithdrawLoading ||
+                    !withdrawTargetAccount.profitWithdrawal?.allowed ||
+                    !challengeWithdrawAmount ||
+                    parseFloat(challengeWithdrawAmount) < 0.01 ||
+                    parseFloat(challengeWithdrawAmount) >
+                      (withdrawTargetAccount.profitWithdrawal?.availableUsd || 0) + 1e-9
+                  }
+                  onClick={handleChallengeProfitWithdraw}
+                  className="flex-1 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {challengeWithdrawLoading ? 'Processing…' : 'Send to wallet'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1590,26 +1788,42 @@ const Account = () => {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowRulesModal(false)}
-                  className="flex-1 py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShowRulesModal(false)
-                    if (isMobile) {
-                      navigate(`/mobile?account=${selectedChallengeAccount._id}`)
-                    } else {
-                      navigate(`/trade/${selectedChallengeAccount._id}?type=challenge`)
-                    }
-                  }}
-                  className="flex-1 py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2"
-                >
-                  I Agree, Start Trading <ArrowRight size={18} />
-                </button>
+              <div className="flex flex-col gap-3">
+                {challengeShowsProfitWithdraw(selectedChallengeAccount) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWithdrawTargetAccount(selectedChallengeAccount)
+                      setChallengeWithdrawAmount('')
+                      setShowRulesModal(false)
+                      setShowChallengeWithdrawModal(true)
+                    }}
+                    className="w-full py-3 border border-emerald-500/50 text-emerald-400 rounded-lg hover:bg-emerald-500/10 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ArrowDownLeft size={18} /> Withdraw profit to wallet
+                  </button>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowRulesModal(false)}
+                    className="flex-1 py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowRulesModal(false)
+                      if (isMobile) {
+                        navigate(`/mobile?account=${selectedChallengeAccount._id}`)
+                      } else {
+                        navigate(`/trade/${selectedChallengeAccount._id}?type=challenge`)
+                      }
+                    }}
+                    className="flex-1 py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2"
+                  >
+                    I Agree, Start Trading <ArrowRight size={18} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -530,6 +530,7 @@ export default function AdminPropTrading() {
         {/* Challenge Modal */}
         {showChallengeModal && (
           <ChallengeModal
+            key={editingChallenge?._id ?? 'new'}
             challenge={editingChallenge}
             onClose={() => {
               setShowChallengeModal(false)
@@ -547,28 +548,54 @@ export default function AdminPropTrading() {
   )
 }
 
-function ChallengeModal({ challenge, onClose, onSave }) {
-  const [form, setForm] = useState({
-    name: challenge?.name || '',
-    stepsCount: challenge?.stepsCount ?? 2,
-    fundSize: challenge?.fundSize || 10000,
-    challengeFee: challenge?.challengeFee || 100,
-    isActive: challenge?.isActive ?? true,
+function initialChallengeForm(challenge) {
+  if (!challenge) {
+    return {
+      name: '',
+      stepsCount: 2,
+      fundSize: 10000,
+      challengeFee: 100,
+      isActive: true,
+      rules: {
+        maxDailyDrawdownPercent: 5,
+        maxOverallDrawdownPercent: 10,
+        profitTargetPhase1Percent: 8,
+        profitTargetPhase2Percent: 5,
+        stopLossMandatory: true,
+        maxTradesPerDay: null,
+        maxConcurrentTrades: null,
+        minTradeHoldTimeSeconds: 0,
+        challengeExpiryDays: 30
+      },
+      fundedSettings: { profitSplitPercent: 80 }
+    }
+  }
+  const sc = challenge.stepsCount ?? 2
+  return {
+    name: challenge.name || '',
+    stepsCount: sc,
+    fundSize: challenge.fundSize || 10000,
+    challengeFee: challenge.challengeFee || 100,
+    isActive: challenge.isActive ?? true,
     rules: {
-      maxDailyDrawdownPercent: challenge?.rules?.maxDailyDrawdownPercent || 5,
-      maxOverallDrawdownPercent: challenge?.rules?.maxOverallDrawdownPercent || 10,
-      profitTargetPhase1Percent: challenge?.rules?.profitTargetPhase1Percent || 8,
-      profitTargetPhase2Percent: challenge?.rules?.profitTargetPhase2Percent || 5,
-      stopLossMandatory: challenge?.rules?.stopLossMandatory ?? true,
-      maxTradesPerDay: challenge?.rules?.maxTradesPerDay || null,
-      maxConcurrentTrades: challenge?.rules?.maxConcurrentTrades || null,
-      minTradeHoldTimeSeconds: challenge?.rules?.minTradeHoldTimeSeconds || 0,
-      challengeExpiryDays: challenge?.rules?.challengeExpiryDays || 30
+      maxDailyDrawdownPercent: challenge.rules?.maxDailyDrawdownPercent ?? 5,
+      maxOverallDrawdownPercent: challenge.rules?.maxOverallDrawdownPercent ?? 10,
+      profitTargetPhase1Percent: challenge.rules?.profitTargetPhase1Percent ?? (sc === 0 ? null : 8),
+      profitTargetPhase2Percent: challenge.rules?.profitTargetPhase2Percent ?? (sc === 0 ? null : 5),
+      stopLossMandatory: challenge.rules?.stopLossMandatory ?? true,
+      maxTradesPerDay: challenge.rules?.maxTradesPerDay ?? null,
+      maxConcurrentTrades: challenge.rules?.maxConcurrentTrades ?? null,
+      minTradeHoldTimeSeconds: challenge.rules?.minTradeHoldTimeSeconds ?? 0,
+      challengeExpiryDays: challenge.rules?.challengeExpiryDays ?? (sc === 0 ? null : 30)
     },
     fundedSettings: {
-      profitSplitPercent: challenge?.fundedSettings?.profitSplitPercent || 80
+      profitSplitPercent: challenge.fundedSettings?.profitSplitPercent ?? 80
     }
-  })
+  }
+}
+
+function ChallengeModal({ challenge, onClose, onSave }) {
+  const [form, setForm] = useState(() => initialChallengeForm(challenge))
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -623,7 +650,24 @@ function ChallengeModal({ challenge, onClose, onSave }) {
               <label className="block text-gray-400 text-sm mb-1">Steps</label>
               <select
                 value={form.stepsCount}
-                onChange={(e) => setForm({ ...form, stepsCount: parseInt(e.target.value) })}
+                onChange={(e) => {
+                  const next = parseInt(e.target.value, 10)
+                  setForm((prev) => {
+                    if (next !== 0 && prev.stepsCount === 0) {
+                      return {
+                        ...prev,
+                        stepsCount: next,
+                        rules: {
+                          ...prev.rules,
+                          challengeExpiryDays: prev.rules.challengeExpiryDays ?? 30,
+                          profitTargetPhase1Percent: prev.rules.profitTargetPhase1Percent ?? 8,
+                          profitTargetPhase2Percent: prev.rules.profitTargetPhase2Percent ?? 5
+                        }
+                      }
+                    }
+                    return { ...prev, stepsCount: next }
+                  })
+                }}
                 className="w-full px-3 py-2 bg-dark-700 border border-gray-700 rounded-lg text-white"
               >
                 <option value={0}>Instant Fund (0 Steps)</option>
@@ -682,38 +726,72 @@ function ChallengeModal({ challenge, onClose, onSave }) {
                 />
               </div>
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Phase 1 Target (%)</label>
+                <label className="block text-gray-400 text-sm mb-1">
+                  Phase 1 Target (%){form.stepsCount === 0 ? ' (optional)' : ''}
+                </label>
                 <input
                   type="number"
-                  value={form.rules.profitTargetPhase1Percent}
-                  onChange={(e) => setForm({
-                    ...form,
-                    rules: { ...form.rules, profitTargetPhase1Percent: parseFloat(e.target.value) }
-                  })}
+                  value={form.stepsCount === 0 ? (form.rules.profitTargetPhase1Percent ?? '') : form.rules.profitTargetPhase1Percent}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setForm({
+                      ...form,
+                      rules: {
+                        ...form.rules,
+                        profitTargetPhase1Percent: form.stepsCount === 0
+                          ? (v === '' ? null : parseFloat(v))
+                          : parseFloat(v)
+                      }
+                    })
+                  }}
+                  placeholder={form.stepsCount === 0 ? 'Optional' : undefined}
                   className="w-full px-3 py-2 bg-dark-700 border border-gray-700 rounded-lg text-white"
                 />
               </div>
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Phase 2 Target (%)</label>
+                <label className="block text-gray-400 text-sm mb-1">
+                  Phase 2 Target (%){form.stepsCount === 0 ? ' (optional)' : ''}
+                </label>
                 <input
                   type="number"
-                  value={form.rules.profitTargetPhase2Percent}
-                  onChange={(e) => setForm({
-                    ...form,
-                    rules: { ...form.rules, profitTargetPhase2Percent: parseFloat(e.target.value) }
-                  })}
-                  className="w-full px-3 py-2 bg-dark-700 border border-gray-700 rounded-lg text-white"
+                  value={form.stepsCount === 0 ? (form.rules.profitTargetPhase2Percent ?? '') : form.rules.profitTargetPhase2Percent}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setForm({
+                      ...form,
+                      rules: {
+                        ...form.rules,
+                        profitTargetPhase2Percent: form.stepsCount === 0
+                          ? (v === '' ? null : parseFloat(v))
+                          : parseFloat(v)
+                      }
+                    })
+                  }}
+                  placeholder={form.stepsCount === 0 ? 'Optional' : undefined}
+                  disabled={form.stepsCount === 1}
+                  className="w-full px-3 py-2 bg-dark-700 border border-gray-700 rounded-lg text-white disabled:opacity-50"
                 />
               </div>
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Expiry Days</label>
+                <label className="block text-gray-400 text-sm mb-1">
+                  Expiry Days{form.stepsCount === 0 ? ' (optional)' : ''}
+                </label>
                 <input
                   type="number"
-                  value={form.rules.challengeExpiryDays}
-                  onChange={(e) => setForm({
-                    ...form,
-                    rules: { ...form.rules, challengeExpiryDays: parseInt(e.target.value) }
-                  })}
+                  value={form.stepsCount === 0 ? (form.rules.challengeExpiryDays ?? '') : form.rules.challengeExpiryDays}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setForm({
+                      ...form,
+                      rules: {
+                        ...form.rules,
+                        challengeExpiryDays: form.stepsCount === 0
+                          ? (v === '' ? null : parseInt(v, 10))
+                          : (parseInt(v, 10) || 30)
+                      }
+                    })
+                  }}
+                  placeholder={form.stepsCount === 0 ? 'No limit if empty' : undefined}
                   className="w-full px-3 py-2 bg-dark-700 border border-gray-700 rounded-lg text-white"
                 />
               </div>

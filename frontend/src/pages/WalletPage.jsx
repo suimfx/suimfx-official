@@ -66,6 +66,13 @@ const WalletPage = () => {
   const [bonusInfo, setBonusInfo] = useState(null)
   const [calculatingBonus, setCalculatingBonus] = useState(false)
   const fileInputRef = useRef(null)
+  const [manualCryptoWallets, setManualCryptoWallets] = useState([])
+  /** 'standard' = bank/UPI/QR from admin; 'crypto' = manual on-chain deposit */
+  const [depositPayMode, setDepositPayMode] = useState('standard')
+  const [selectedManualWallet, setSelectedManualWallet] = useState(null)
+  const [manualTxHash, setManualTxHash] = useState('')
+  const [manualFeeInfo, setManualFeeInfo] = useState(null)
+  const [cryptoSubmitLoading, setCryptoSubmitLoading] = useState(false)
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
@@ -126,6 +133,7 @@ const WalletPage = () => {
 
   useEffect(() => {
     fetchChallengeStatus()
+    fetchManualCryptoWallets()
     if (user._id) {
       fetchWallet()
       fetchTransactions()
@@ -134,6 +142,16 @@ const WalletPage = () => {
     fetchPaymentMethods()
     fetchCurrencies()
   }, [user._id])
+
+  const fetchManualCryptoWallets = async () => {
+    try {
+      const res = await fetch(`${API_URL}/manual-crypto/wallets`)
+      const data = await res.json()
+      if (data.success) setManualCryptoWallets(data.wallets || [])
+    } catch (e) {
+      console.error('Manual crypto wallets:', e)
+    }
+  }
 
   const fetchUserBankAccounts = async () => {
     try {
@@ -172,6 +190,43 @@ const WalletPage = () => {
     const effectiveRate = currency.rateToUSD * (1 + (currency.markup || 0) / 100)
     return usdAmt * effectiveRate
   }
+
+  const getDepositUsdAmount = () => {
+    if (!localAmount || parseFloat(localAmount) <= 0) return null
+    return selectedCurrency && selectedCurrency.currency !== 'USD'
+      ? calculateUSDAmount(parseFloat(localAmount), selectedCurrency)
+      : parseFloat(localAmount)
+  }
+
+  useEffect(() => {
+    if (!showDepositModal || depositPayMode !== 'crypto' || !selectedManualWallet) {
+      setManualFeeInfo(null)
+      return
+    }
+    const usd = getDepositUsdAmount()
+    if (!usd || usd <= 0) {
+      setManualFeeInfo(null)
+      return
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_URL}/manual-crypto/calculate-fee`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            walletId: selectedManualWallet._id,
+            amount: usd
+          })
+        })
+        const data = await res.json()
+        if (data.success) setManualFeeInfo(data.manual)
+        else setManualFeeInfo(null)
+      } catch {
+        setManualFeeInfo(null)
+      }
+    }, 350)
+    return () => clearTimeout(t)
+  }, [showDepositModal, depositPayMode, selectedManualWallet, localAmount, selectedCurrency])
 
   const fetchChallengeStatus = async () => {
     try {
@@ -267,7 +322,103 @@ const WalletPage = () => {
     }
   }
 
+  const resetDepositModal = () => {
+    setShowDepositModal(false)
+    setAmount('')
+    setLocalAmount('')
+    setTransactionRef('')
+    setSelectedPaymentMethod(null)
+    setSelectedCurrency(null)
+    setScreenshot(null)
+    setScreenshotPreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    setDepositPayMode('standard')
+    setSelectedManualWallet(null)
+    setManualTxHash('')
+    setManualFeeInfo(null)
+    setBonusInfo(null)
+    setError('')
+  }
+
+  const handleManualCryptoSubmit = async () => {
+    const token = localStorage.getItem('token')
+    if (!user._id) {
+      setError('Please login')
+      return
+    }
+    if (!token) {
+      setError('Please login again to submit a crypto deposit')
+      return
+    }
+    if (!selectedManualWallet) {
+      setError('Select a crypto payment option')
+      return
+    }
+    const amt = getDepositUsdAmount()
+    if (!amt || amt < (selectedManualWallet.minDeposit || 0)) {
+      setError(`Enter amount — minimum credit is $${selectedManualWallet.minDeposit}`)
+      return
+    }
+    if (amt > (selectedManualWallet.maxDeposit || 1e12)) {
+      setError(`Maximum credit for this wallet is $${selectedManualWallet.maxDeposit}`)
+      return
+    }
+    if (!manualTxHash || manualTxHash.trim().length < 8) {
+      setError('Enter a valid on-chain transaction hash')
+      return
+    }
+
+    setCryptoSubmitLoading(true)
+    setError('')
+    try {
+      let screenshotUrl = null
+      if (screenshot) {
+        const formData = new FormData()
+        formData.append('screenshot', screenshot)
+        formData.append('userId', user._id)
+        const uploadRes = await fetch(`${API_URL}/upload/screenshot`, {
+          method: 'POST',
+          body: formData
+        })
+        const uploadData = await uploadRes.json()
+        if (uploadData.success) screenshotUrl = uploadData.url
+      }
+
+      const res = await fetch(`${API_URL}/manual-crypto/submit-deposit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          walletId: selectedManualWallet._id,
+          amount: amt,
+          txHash: manualTxHash.trim(),
+          screenshot: screenshotUrl || screenshotPreview || ''
+        })
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setSuccess(data.message || 'Crypto deposit submitted for review')
+        resetDepositModal()
+        fetchWallet()
+        fetchTransactions()
+        setTimeout(() => setSuccess(''), 4000)
+      } else {
+        setError(data.message || 'Submission failed')
+      }
+    } catch (e) {
+      console.error(e)
+      setError('Submission failed')
+    }
+    setCryptoSubmitLoading(false)
+  }
+
   const handleDeposit = async () => {
+    if (depositPayMode === 'crypto') {
+      setError('Use the crypto payment option and Submit crypto deposit')
+      return
+    }
     if (!user._id) {
       setError('Please login to make a deposit')
       return
@@ -326,14 +477,7 @@ const WalletPage = () => {
       
       if (res.ok) {
         setSuccess('Deposit request submitted successfully!')
-        setShowDepositModal(false)
-        setAmount('')
-        setLocalAmount('')
-        setTransactionRef('')
-        setSelectedPaymentMethod(null)
-        setSelectedCurrency(null)
-        setScreenshot(null)
-        setScreenshotPreview(null)
+        resetDepositModal()
         fetchWallet()
         fetchTransactions()
         setTimeout(() => setSuccess(''), 3000)
@@ -534,10 +678,14 @@ const WalletPage = () => {
                   </div>
                 </div>
               </div>
-              <div className={`flex gap-2 ${isMobile ? 'mt-4' : ''}`}>
+              <div className={`flex flex-wrap gap-2 ${isMobile ? 'mt-4' : ''}`}>
                 <button
                   onClick={() => {
                     setShowDepositModal(true)
+                    setDepositPayMode('standard')
+                    setSelectedManualWallet(null)
+                    setManualTxHash('')
+                    setManualFeeInfo(null)
                     setError('')
                   }}
                   className={`flex items-center gap-2 bg-accent-green text-black font-medium ${isMobile ? 'px-4 py-2 text-sm' : 'px-6 py-3'} rounded-lg hover:bg-accent-green/90 transition-colors`}
@@ -613,6 +761,7 @@ const WalletPage = () => {
                             {tx.type === 'Account_Transfer_Out' && <ArrowUpCircle size={18} className="text-orange-500" />}
                             {tx.type === 'Account_Transfer_In' && <ArrowDownCircle size={18} className="text-teal-500" />}
                             {tx.type === 'Challenge_Purchase' && <ArrowUpCircle size={18} className="text-yellow-500" />}
+                            {tx.type === 'Challenge_Profit_Withdrawal' && <ArrowDownCircle size={18} className="text-emerald-500" />}
                             {tx.type === 'Admin_Fund_Add' && <Gift size={18} className="text-emerald-500" />}
                             {tx.type === 'Admin_Credit_Add' && <Gift size={18} className="text-cyan-500" />}
                             {tx.type === 'Admin_Credit_Remove' && <ArrowUpCircle size={18} className="text-pink-500" />}
@@ -623,6 +772,7 @@ const WalletPage = () => {
                                  tx.type === 'Account_Transfer_Out' ? 'Account Transfer (Out)' :
                                  tx.type === 'Account_Transfer_In' ? 'Account Transfer (In)' :
                                  tx.type === 'Challenge_Purchase' ? 'Challenge Purchase' :
+                                 tx.type === 'Challenge_Profit_Withdrawal' ? 'Prop profit (wallet)' :
                                  tx.type === 'Admin_Fund_Add' ? 'Admin Fund Addition' :
                                  tx.type === 'Admin_Credit_Add' ? 'Admin Credit Addition' :
                                  tx.type === 'Admin_Credit_Remove' ? 'Admin Credit Removal' :
@@ -643,13 +793,18 @@ const WalletPage = () => {
                               {(tx.type === 'Admin_Fund_Add' || tx.type === 'Admin_Credit_Add' || tx.type === 'Admin_Credit_Remove') && tx.description && (
                                 <p className="text-gray-500 text-xs">{tx.description}</p>
                               )}
+                              {tx.type === 'Deposit' && tx.paymentMethod === 'Manual Crypto' && tx.cryptoTxHash && (
+                                <p className="text-gray-500 text-xs font-mono truncate max-w-[200px]" title={tx.cryptoTxHash}>
+                                  Tx: {tx.cryptoTxHash}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </td>
                         <td className={`py-4 px-4 font-medium ${
-                          tx.type === 'Deposit' || tx.type === 'Transfer_From_Account' || tx.type === 'Account_Transfer_In' || tx.type === 'Admin_Fund_Add' || tx.type === 'Admin_Credit_Add' ? 'text-green-500' : 'text-red-500'
+                          tx.type === 'Deposit' || tx.type === 'Transfer_From_Account' || tx.type === 'Account_Transfer_In' || tx.type === 'Admin_Fund_Add' || tx.type === 'Admin_Credit_Add' || tx.type === 'Challenge_Profit_Withdrawal' ? 'text-green-500' : 'text-red-500'
                         }`}>
-                          {tx.type === 'Deposit' || tx.type === 'Transfer_From_Account' || tx.type === 'Account_Transfer_In' || tx.type === 'Admin_Fund_Add' || tx.type === 'Admin_Credit_Add' ? '+' : '-'}${tx.amount.toLocaleString()}
+                          {tx.type === 'Deposit' || tx.type === 'Transfer_From_Account' || tx.type === 'Account_Transfer_In' || tx.type === 'Admin_Fund_Add' || tx.type === 'Admin_Credit_Add' || tx.type === 'Challenge_Profit_Withdrawal' ? '+' : '-'}${tx.amount.toLocaleString()}
                         </td>
                         <td className="py-4 px-4">
                           {tx.type === 'Deposit' ? (
@@ -704,13 +859,8 @@ const WalletPage = () => {
             <div className="flex items-center justify-between mb-6">
               <h3 className={`font-semibold text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Deposit Funds</h3>
               <button 
-                onClick={() => {
-                  setShowDepositModal(false)
-                  setAmount('')
-                  setTransactionRef('')
-                  setSelectedPaymentMethod(null)
-                  setError('')
-                }}
+                type="button"
+                onClick={resetDepositModal}
                 className={isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
               >
                 <X size={20} />
@@ -781,8 +931,8 @@ const WalletPage = () => {
                 </div>
               )}
               
-              {/* Bonus Display */}
-              {(!selectedCurrency || selectedCurrency.currency === 'USD') && localAmount && parseFloat(localAmount) > 0 && (
+              {/* Bonus Display (fiat / bank flow only) */}
+              {depositPayMode !== 'crypto' && (!selectedCurrency || selectedCurrency.currency === 'USD') && localAmount && parseFloat(localAmount) > 0 && (
                 <div className="mt-2">
                   {calculatingBonus ? (
                     <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
@@ -825,14 +975,21 @@ const WalletPage = () => {
                           </div>
 
             <div className="mb-4">
-              <label className="block text-gray-400 text-sm mb-2">Payment Method</label>
+              <label className="block text-gray-400 text-sm mb-2">Payment method</label>
+              <p className="text-gray-500 text-xs mb-2">Choose bank/UPI/QR or a crypto network to pay manually on-chain.</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                 {paymentMethods.map((method) => (
                   <button
                     key={method._id}
-                    onClick={() => setSelectedPaymentMethod(method)}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPaymentMethod(method)
+                      setDepositPayMode('standard')
+                      setSelectedManualWallet(null)
+                      setManualTxHash('')
+                    }}
                     className={`p-4 rounded-lg border transition-colors flex flex-col items-center gap-2 ${
-                      selectedPaymentMethod?._id === method._id
+                      depositPayMode === 'standard' && selectedPaymentMethod?._id === method._id
                         ? 'border-accent-green bg-accent-green/10'
                         : 'border-gray-700 bg-dark-700 hover:border-gray-600'
                     }`}
@@ -841,13 +998,71 @@ const WalletPage = () => {
                     <span className="text-white text-sm">{method.type}</span>
                   </button>
                 ))}
+                {manualCryptoWallets.map((w) => (
+                  <button
+                    key={`mc-${w._id}`}
+                    type="button"
+                    onClick={() => {
+                      setDepositPayMode('crypto')
+                      setSelectedManualWallet(w)
+                      setSelectedPaymentMethod(null)
+                      setTransactionRef('')
+                      setManualTxHash('')
+                    }}
+                    className={`p-4 rounded-lg border transition-colors flex flex-col items-center gap-2 ${
+                      depositPayMode === 'crypto' && selectedManualWallet?._id === w._id
+                        ? 'border-purple-500 bg-purple-500/15'
+                        : 'border-gray-700 bg-dark-700 hover:border-gray-600'
+                    }`}
+                  >
+                    <QrCode size={18} className="text-purple-400" />
+                    <span className="text-white text-sm">Crypto · {w.currency}</span>
+                    <span className="text-gray-500 text-[10px]">{w.network}</span>
+                  </button>
+                ))}
               </div>
-              {paymentMethods.length === 0 && (
+              {paymentMethods.length === 0 && manualCryptoWallets.length === 0 && (
                 <p className="text-gray-500 text-sm text-center py-4">No payment methods available</p>
               )}
             </div>
 
-            {selectedPaymentMethod && (
+            {depositPayMode === 'crypto' && selectedManualWallet && (
+              <div className="mb-4 p-4 bg-dark-700 rounded-lg border border-purple-500/30">
+                <p className="text-gray-400 text-xs mb-1">Send to this address ({selectedManualWallet.network})</p>
+                <p className="text-white font-mono text-xs break-all">{selectedManualWallet.address}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedManualWallet.address)
+                    setSuccess('Address copied')
+                    setTimeout(() => setSuccess(''), 2000)
+                  }}
+                  className="text-purple-400 text-xs mt-2 hover:underline flex items-center gap-1"
+                >
+                  <Copy size={12} /> Copy address
+                </button>
+                {selectedManualWallet.qrCodeData && (
+                  <img
+                    src={selectedManualWallet.qrCodeData}
+                    alt="QR"
+                    className="mx-auto mt-3 max-w-40 rounded border border-gray-600"
+                  />
+                )}
+                <p className="text-gray-500 text-xs mt-3 whitespace-pre-wrap">{selectedManualWallet.instructions}</p>
+                {manualFeeInfo && (
+                  <div className="mt-3 p-3 rounded-lg bg-purple-500/10 border border-purple-500/25 text-sm">
+                    <p className="text-gray-400 text-xs">Send on-chain (total)</p>
+                    <p className="text-white font-bold text-lg">${manualFeeInfo.totalToPay?.toFixed(2)}</p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      Wallet credit: ${manualFeeInfo.depositAmount?.toFixed(2)} + fee {manualFeeInfo.feePercentage}% ($
+                      {manualFeeInfo.feeAmount?.toFixed(2)})
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {depositPayMode === 'standard' && selectedPaymentMethod && (
               <div className="mb-4 p-4 bg-dark-700 rounded-lg">
                 {selectedPaymentMethod.type === 'Bank Transfer' && (
                   <div className="space-y-2 text-sm">
@@ -881,16 +1096,29 @@ const WalletPage = () => {
               </div>
             )}
 
-            <div className="mb-4">
-              <label className="block text-gray-400 text-sm mb-2">Transaction Reference (Optional)</label>
-              <input
-                type="text"
-                value={transactionRef}
-                onChange={(e) => setTransactionRef(e.target.value)}
-                placeholder="Enter transaction ID or reference"
-                className={`w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:border-accent-green border ${isDarkMode ? 'bg-dark-700 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
-              />
-            </div>
+            {depositPayMode === 'crypto' ? (
+              <div className="mb-4">
+                <label className="block text-gray-400 text-sm mb-2">Transaction hash (required)</label>
+                <input
+                  type="text"
+                  value={manualTxHash}
+                  onChange={(e) => setManualTxHash(e.target.value)}
+                  placeholder="Paste blockchain tx hash after you send"
+                  className={`w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:border-purple-500 border font-mono text-sm ${isDarkMode ? 'bg-dark-700 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
+                />
+              </div>
+            ) : (
+              <div className="mb-4">
+                <label className="block text-gray-400 text-sm mb-2">Transaction Reference (Optional)</label>
+                <input
+                  type="text"
+                  value={transactionRef}
+                  onChange={(e) => setTransactionRef(e.target.value)}
+                  placeholder="Enter transaction ID or reference"
+                  className={`w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:border-accent-green border ${isDarkMode ? 'bg-dark-700 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
+                />
+              </div>
+            )}
 
             {/* Screenshot Upload */}
             <div className="mb-6">
@@ -936,30 +1164,30 @@ const WalletPage = () => {
 
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  setShowDepositModal(false)
-                  setAmount('')
-                  setLocalAmount('')
-                  setTransactionRef('')
-                  setSelectedPaymentMethod(null)
-                  setSelectedCurrency(null)
-                  setScreenshot(null)
-                  setScreenshotPreview(null)
-                  setError('')
-                }}
+                type="button"
+                onClick={resetDepositModal}
                 className="flex-1 bg-dark-700 text-white py-3 rounded-lg hover:bg-dark-600 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDeposit}
-                disabled={uploadingScreenshot}
-                className="flex-1 bg-accent-green text-black font-medium py-3 rounded-lg hover:bg-accent-green/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                type="button"
+                onClick={() =>
+                  depositPayMode === 'crypto' ? handleManualCryptoSubmit() : handleDeposit()
+                }
+                disabled={uploadingScreenshot || cryptoSubmitLoading}
+                className={`flex-1 font-medium py-3 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
+                  depositPayMode === 'crypto'
+                    ? 'bg-purple-600 text-white hover:bg-purple-500'
+                    : 'bg-accent-green text-black hover:bg-accent-green/90'
+                }`}
               >
-                {uploadingScreenshot ? (
+                {uploadingScreenshot || cryptoSubmitLoading ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" /> Submitting...
                   </>
+                ) : depositPayMode === 'crypto' ? (
+                  'Submit crypto deposit'
                 ) : (
                   'Submit Deposit'
                 )}

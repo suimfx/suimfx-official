@@ -280,6 +280,13 @@ router.post('/account-transfer', async (req, res) => {
       return res.status(400).json({ message: 'Target account is not active' })
     }
 
+    // Never move funds between live and demo (prevents real money appearing in demo / confusion with main wallet)
+    if (Boolean(fromAccount.isDemo) !== Boolean(toAccount.isDemo)) {
+      return res.status(400).json({
+        message: 'Cannot transfer between live and demo accounts. Use “Withdraw to Main Wallet” on your live account, or fund demo only from your main wallet.'
+      })
+    }
+
     // Perform transfer
     fromAccount.balance -= amount
     toAccount.balance += amount

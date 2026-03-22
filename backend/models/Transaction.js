@@ -12,7 +12,7 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Deposit', 'Withdrawal', 'Transfer_To_Account', 'Transfer_From_Account', 'Account_Transfer_Out', 'Account_Transfer_In', 'Demo_Credit', 'Demo_Reset', 'Challenge_Purchase', 'Admin_Fund_Add', 'Admin_Credit_Add', 'Admin_Credit_Remove'],
+    enum: ['Deposit', 'Withdrawal', 'Transfer_To_Account', 'Transfer_From_Account', 'Account_Transfer_Out', 'Account_Transfer_In', 'Demo_Credit', 'Demo_Reset', 'Challenge_Purchase', 'Challenge_Profit_Withdrawal', 'Admin_Fund_Add', 'Admin_Credit_Add', 'Admin_Credit_Remove'],
     required: true
   },
   amount: {
@@ -22,7 +22,7 @@ const transactionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['Bank Transfer', 'UPI', 'QR Code', 'Internal', 'System', 'Wallet'],
+    enum: ['Bank Transfer', 'UPI', 'QR Code', 'Internal', 'System', 'Wallet', 'Manual Crypto'],
     default: 'Internal'
   },
   description: {
@@ -109,7 +109,27 @@ const transactionSchema = new mongoose.Schema({
   bonusId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Bonus'
-  }
+  },
+  cryptoCurrency: { type: String, default: null },
+  cryptoNetwork: { type: String, default: null },
+  cryptoTxHash: {
+    type: String,
+    default: null,
+    sparse: true,
+    unique: true
+  },
+  manualCryptoWalletId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ManualCryptoWallet',
+    default: null
+  },
+  manualCryptoAddress: { type: String, default: null },
+  feePercentage: { type: Number, default: 0 },
+  feeAmount: { type: Number, default: 0 },
+  totalPaid: { type: Number, default: 0 },
+  submittedAt: { type: Date, default: null },
+  walletCredited: { type: Boolean, default: false },
+  walletCreditedAt: { type: Date, default: null }
 }, { timestamps: true })
 
 export default mongoose.model('Transaction', transactionSchema)

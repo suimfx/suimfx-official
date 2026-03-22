@@ -33,6 +33,10 @@ const AdminPropFirm = () => {
   const [editingChallenge, setEditingChallenge] = useState(null)
   const [selectedParticipant, setSelectedParticipant] = useState(null)
   const [showParticipantModal, setShowParticipantModal] = useState(false)
+  const [fundedAccounts, setFundedAccounts] = useState([])
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false)
+  const [selectedFundedAccount, setSelectedFundedAccount] = useState(null)
+  const [withdrawAmount, setWithdrawAmount] = useState('')
   const [settings, setSettings] = useState({
     displayName: 'Prop Trading Challenge',
     description: 'Trade with our capital. Pass the challenge and get funded.',
@@ -114,10 +118,51 @@ const AdminPropFirm = () => {
       if (dashData.success) {
         setStats(dashData.stats || {})
       }
+
+      // Fetch funded accounts
+      const fundedRes = await fetch(`${API_URL}/prop/admin/funded-accounts`)
+      const fundedData = await fundedRes.json()
+      if (fundedData.success) {
+        setFundedAccounts(fundedData.accounts || [])
+      }
     } catch (error) {
       console.error('Error fetching prop data:', error)
     }
     setLoading(false)
+  }
+
+  const handleWithdraw = async () => {
+    if (!selectedFundedAccount || !withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+      alert('Please enter a valid withdrawal amount')
+      return
+    }
+    
+    const amount = parseFloat(withdrawAmount)
+    if (amount > selectedFundedAccount.availableForWithdrawal) {
+      alert(`Maximum withdrawable amount is $${selectedFundedAccount.availableForWithdrawal.toFixed(2)}`)
+      return
+    }
+    
+    try {
+      const res = await fetch(`${API_URL}/prop/admin/withdraw/${selectedFundedAccount._id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: 'admin', amount })
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert(data.message)
+        setShowWithdrawModal(false)
+        setWithdrawAmount('')
+        setSelectedFundedAccount(null)
+        fetchData()
+      } else {
+        alert(data.message || 'Failed to process withdrawal')
+      }
+    } catch (error) {
+      console.error('Error processing withdrawal:', error)
+      alert('Failed to process withdrawal')
+    }
   }
 
   const toggleChallengeMode = async () => {
@@ -168,15 +213,19 @@ const AdminPropFirm = () => {
 
   const openEditChallenge = (challenge) => {
     setEditingChallenge(challenge)
+    const mergedRules = { ...defaultChallengeForm.rules, ...challenge.rules }
+    const sc = challenge.stepsCount ?? 2
     setChallengeForm({
       name: challenge.name || '',
       description: challenge.description || '',
-      stepsCount: challenge.stepsCount || 2,
+      stepsCount: sc,
       fundSize: challenge.fundSize || 10000,
       challengeFee: challenge.challengeFee || 99,
       rules: {
-        ...defaultChallengeForm.rules,
-        ...challenge.rules
+        ...mergedRules,
+        profitTargetPhase1Percent: mergedRules.profitTargetPhase1Percent ?? (sc === 0 ? null : 8),
+        profitTargetPhase2Percent: mergedRules.profitTargetPhase2Percent ?? (sc === 0 ? null : 5),
+        challengeExpiryDays: mergedRules.challengeExpiryDays ?? (sc === 0 ? null : 30)
       },
       fundedSettings: {
         ...defaultChallengeForm.fundedSettings,
@@ -364,6 +413,14 @@ const AdminPropFirm = () => {
           }`}
         >
           Participants
+        </button>
+        <button
+          onClick={() => setActiveTab('funded')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            activeTab === 'funded' ? 'bg-purple-500 text-white' : 'bg-dark-700 text-gray-400 hover:text-white'
+          }`}
+        >
+          Funded Accounts
         </button>
       </div>
 
@@ -557,6 +614,157 @@ const AdminPropFirm = () => {
         </div>
       )}
 
+      {/* Funded Accounts Tab */}
+      {activeTab === 'funded' && (
+        <div className="bg-dark-800 rounded-xl border border-gray-800 overflow-hidden">
+          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-800">
+            <h2 className="text-white font-semibold text-lg">Funded Accounts - Profit Share Withdrawals</h2>
+          </div>
+
+          {fundedAccounts.length === 0 ? (
+            <div className="p-8 text-center">
+              <DollarSign size={48} className="text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-500">No funded accounts yet</p>
+              <p className="text-gray-600 text-sm">Funded accounts will appear here after users pass their challenges</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">User</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Account</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Balance</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Total Profit</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">User Share ({'>'}%)</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Withdrawn</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Available</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fundedAccounts.map((acc) => (
+                    <tr key={acc._id} className="border-b border-gray-800 hover:bg-dark-700/50">
+                      <td className="py-4 px-4">
+                        <p className="text-white font-medium">{acc.userId?.firstName || 'N/A'} {acc.userId?.lastName || ''}</p>
+                        <p className="text-gray-500 text-sm">{acc.userId?.email || ''}</p>
+                      </td>
+                      <td className="py-4 px-4">
+                        <p className="text-white font-mono text-sm">{acc.accountId}</p>
+                        <p className="text-gray-500 text-xs">{acc.challengeId?.name || 'Funded'}</p>
+                      </td>
+                      <td className="py-4 px-4 text-white font-medium">${(acc.currentBalance || 0).toLocaleString()}</td>
+                      <td className={`py-4 px-4 font-medium ${acc.totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {acc.totalProfit >= 0 ? '+' : ''}${(acc.totalProfit || 0).toLocaleString()}
+                      </td>
+                      <td className="py-4 px-4">
+                        <p className="text-purple-400 font-medium">${(acc.userShare || 0).toFixed(2)}</p>
+                        <p className="text-gray-500 text-xs">{acc.profitSplitPercent}% split</p>
+                      </td>
+                      <td className="py-4 px-4 text-yellow-500">${(acc.totalWithdrawn || 0).toFixed(2)}</td>
+                      <td className="py-4 px-4">
+                        <span className={`font-medium ${acc.availableForWithdrawal > 0 ? 'text-green-500' : 'text-gray-500'}`}>
+                          ${(acc.availableForWithdrawal || 0).toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <button 
+                          onClick={() => { 
+                            setSelectedFundedAccount(acc)
+                            setWithdrawAmount('')
+                            setShowWithdrawModal(true)
+                          }}
+                          disabled={acc.availableForWithdrawal <= 0}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            acc.availableForWithdrawal > 0 
+                              ? 'bg-green-500/20 text-green-500 hover:bg-green-500/30' 
+                              : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                          }`}
+                        >
+                          Withdraw
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Withdraw Modal */}
+      {showWithdrawModal && selectedFundedAccount && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-800 rounded-2xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Process Profit Withdrawal</h2>
+              <button onClick={() => setShowWithdrawModal(false)} className="text-gray-400 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="bg-dark-700 rounded-xl p-4">
+                <p className="text-gray-400 text-sm mb-1">Account</p>
+                <p className="text-white font-medium">{selectedFundedAccount.userId?.firstName} {selectedFundedAccount.userId?.lastName}</p>
+                <p className="text-gray-500 text-sm">{selectedFundedAccount.accountId}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-dark-700 rounded-xl p-4">
+                  <p className="text-gray-400 text-sm mb-1">Total Profit</p>
+                  <p className={`font-bold ${selectedFundedAccount.totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    ${(selectedFundedAccount.totalProfit || 0).toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-dark-700 rounded-xl p-4">
+                  <p className="text-gray-400 text-sm mb-1">User Share ({selectedFundedAccount.profitSplitPercent}%)</p>
+                  <p className="text-purple-400 font-bold">${(selectedFundedAccount.userShare || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-dark-700 rounded-xl p-4">
+                  <p className="text-gray-400 text-sm mb-1">Already Withdrawn</p>
+                  <p className="text-yellow-500 font-bold">${(selectedFundedAccount.totalWithdrawn || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-dark-700 rounded-xl p-4">
+                  <p className="text-gray-400 text-sm mb-1">Available</p>
+                  <p className="text-green-500 font-bold">${(selectedFundedAccount.availableForWithdrawal || 0).toFixed(2)}</p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">Withdrawal Amount ($)</label>
+                <input
+                  type="number"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder={`Max: ${(selectedFundedAccount.availableForWithdrawal || 0).toFixed(2)}`}
+                  max={selectedFundedAccount.availableForWithdrawal}
+                  step="0.01"
+                  className="w-full bg-dark-700 border border-gray-700 rounded-lg px-4 py-3 text-white"
+                />
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="flex-1 py-3 bg-dark-700 text-white rounded-lg hover:bg-dark-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleWithdraw}
+                  disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > selectedFundedAccount.availableForWithdrawal}
+                  className="flex-1 py-3 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                >
+                  Process Withdrawal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Settings Modal */}
       {showSettingsModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -667,7 +875,24 @@ const AdminPropFirm = () => {
                     <label className="block text-gray-400 text-sm mb-2">Challenge Type</label>
                     <select
                       value={challengeForm.stepsCount}
-                      onChange={(e) => setChallengeForm({...challengeForm, stepsCount: parseInt(e.target.value)})}
+                      onChange={(e) => {
+                        const next = parseInt(e.target.value, 10)
+                        setChallengeForm((prev) => {
+                          if (next !== 0 && prev.stepsCount === 0) {
+                            return {
+                              ...prev,
+                              stepsCount: next,
+                              rules: {
+                                ...prev.rules,
+                                challengeExpiryDays: prev.rules.challengeExpiryDays ?? 30,
+                                profitTargetPhase1Percent: prev.rules.profitTargetPhase1Percent ?? 8,
+                                profitTargetPhase2Percent: prev.rules.profitTargetPhase2Percent ?? 5
+                              }
+                            }
+                          }
+                          return { ...prev, stepsCount: next }
+                        })
+                      }}
                       className="w-full bg-dark-600 border border-gray-600 rounded-lg px-4 py-3 text-white"
                     >
                       <option value={0}>Instant Fund (0-Step)</option>
@@ -719,22 +944,34 @@ const AdminPropFirm = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-400 text-sm mb-2">Phase 1 Target %</label>
+                    <label className="block text-gray-400 text-sm mb-2">
+                      Phase 1 Target %{challengeForm.stepsCount === 0 ? ' (optional)' : ''}
+                    </label>
                     <input
                       type="number"
-                      value={challengeForm.rules.profitTargetPhase1Percent}
-                      onChange={(e) => updateFormRules('profitTargetPhase1Percent', parseFloat(e.target.value) || 0)}
+                      value={challengeForm.stepsCount === 0 ? (challengeForm.rules.profitTargetPhase1Percent ?? '') : challengeForm.rules.profitTargetPhase1Percent}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        updateFormRules('profitTargetPhase1Percent', challengeForm.stepsCount === 0 ? (v === '' ? null : parseFloat(v)) : (parseFloat(v) || 0))
+                      }}
+                      placeholder={challengeForm.stepsCount === 0 ? 'Optional' : undefined}
                       className="w-full bg-dark-600 border border-gray-600 rounded-lg px-4 py-3 text-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-400 text-sm mb-2">Phase 2 Target %</label>
+                    <label className="block text-gray-400 text-sm mb-2">
+                      Phase 2 Target %{challengeForm.stepsCount === 0 ? ' (optional)' : ''}
+                    </label>
                     <input
                       type="number"
-                      value={challengeForm.rules.profitTargetPhase2Percent}
-                      onChange={(e) => updateFormRules('profitTargetPhase2Percent', parseFloat(e.target.value) || 0)}
+                      value={challengeForm.stepsCount === 0 ? (challengeForm.rules.profitTargetPhase2Percent ?? '') : challengeForm.rules.profitTargetPhase2Percent}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        updateFormRules('profitTargetPhase2Percent', challengeForm.stepsCount === 0 ? (v === '' ? null : parseFloat(v)) : (parseFloat(v) || 0))
+                      }}
+                      placeholder={challengeForm.stepsCount === 0 ? 'Optional' : undefined}
                       className="w-full bg-dark-600 border border-gray-600 rounded-lg px-4 py-3 text-white"
-                      disabled={challengeForm.stepsCount < 2}
+                      disabled={challengeForm.stepsCount === 1}
                     />
                   </div>
                 </div>
@@ -829,11 +1066,22 @@ const AdminPropFirm = () => {
                 <h3 className="text-white font-semibold mb-4">Time & Duration</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-gray-400 text-sm mb-2">Challenge Duration (days)</label>
+                    <label className="block text-gray-400 text-sm mb-2">
+                      Challenge Duration (days){challengeForm.stepsCount === 0 ? ' (optional)' : ''}
+                    </label>
                     <input
                       type="number"
-                      value={challengeForm.rules.challengeExpiryDays}
-                      onChange={(e) => updateFormRules('challengeExpiryDays', parseInt(e.target.value) || 30)}
+                      value={challengeForm.stepsCount === 0 ? (challengeForm.rules.challengeExpiryDays ?? '') : challengeForm.rules.challengeExpiryDays}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        updateFormRules(
+                          'challengeExpiryDays',
+                          challengeForm.stepsCount === 0
+                            ? (v === '' ? null : parseInt(v, 10))
+                            : (parseInt(v, 10) || 30)
+                        )
+                      }}
+                      placeholder={challengeForm.stepsCount === 0 ? 'No limit if empty' : undefined}
                       className="w-full bg-dark-600 border border-gray-600 rounded-lg px-4 py-3 text-white"
                     />
                   </div>

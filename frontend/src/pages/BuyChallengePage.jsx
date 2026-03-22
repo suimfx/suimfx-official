@@ -254,7 +254,11 @@ export default function BuyChallengePage() {
                   )}
                   <div className="bg-dark-700 rounded-lg p-4">
                     <p className="text-gray-400 text-sm">Time Limit</p>
-                    <p className="text-white font-bold text-lg">{selectedChallenge.rules?.challengeExpiryDays || 30} days</p>
+                    <p className="text-white font-bold text-lg">
+                      {selectedChallenge.stepsCount === 0 && selectedChallenge.rules?.challengeExpiryDays == null
+                        ? 'No limit'
+                        : `${selectedChallenge.rules?.challengeExpiryDays ?? 30} days`}
+                    </p>
                   </div>
                   <div className="bg-dark-700 rounded-lg p-4">
                     <p className="text-gray-400 text-sm">Min Lot Size</p>

@@ -1205,7 +1205,7 @@ const MobileTradingApp = () => {
       <div className="flex-1 bg-[#0d0d0d] relative min-h-0" ref={chartContainerRef}>
         <iframe
           key={activeChartTab}
-          src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_mobile&symbol=${getSymbolForTradingView(activeChartTab)}&interval=5&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=0d0d0d&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=["left_toolbar","header_widget","drawing_templates"]&disabled_features=["hide_left_toolbar_by_default"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=0`}
+          src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_mobile&symbol=${encodeURIComponent(getSymbolForTradingView(activeChartTab))}&interval=5&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=0d0d0d&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=["left_toolbar","header_widget","drawing_templates"]&disabled_features=["hide_left_toolbar_by_default"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=0`}
           style={{ width: '100%', height: '100%', border: 'none' }}
           allowFullScreen
           title="TradingView Chart"

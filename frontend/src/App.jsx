@@ -19,6 +19,7 @@ import AdminAccounts from './pages/AdminAccounts'
 import AdminAccountTypes from './pages/AdminAccountTypes'
 import AdminTransactions from './pages/AdminTransactions'
 import AdminPaymentMethods from './pages/AdminPaymentMethods'
+import AdminManualCrypto from './pages/AdminManualCrypto'
 import AdminTradeManagement from './pages/AdminTradeManagement'
 import AdminFundManagement from './pages/AdminFundManagement'
 import AdminBankSettings from './pages/AdminBankSettings'
@@ -77,6 +78,7 @@ function App() {
         <Route path="/admin/trades" element={<ProtectedAdminRoute requiredPermission="tradeManagement"><AdminTradeManagement /></ProtectedAdminRoute>} />
         <Route path="/admin/funds" element={<ProtectedAdminRoute requiredPermission="fundManagement"><AdminFundManagement /></ProtectedAdminRoute>} />
         <Route path="/admin/bank-settings" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminBankSettings /></ProtectedAdminRoute>} />
+        <Route path="/admin/manual-crypto" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminManualCrypto /></ProtectedAdminRoute>} />
         <Route path="/admin/ib-management" element={<ProtectedAdminRoute requiredPermission="ibManagement"><AdminIBManagement /></ProtectedAdminRoute>} />
         <Route path="/admin/forex-charges" element={<ProtectedAdminRoute requiredPermission="forexCharges"><AdminForexCharges /></ProtectedAdminRoute>} />
         <Route path="/admin/indian-charges" element={<ProtectedAdminRoute requiredPermission="forexCharges"><AdminIndianCharges /></ProtectedAdminRoute>} />

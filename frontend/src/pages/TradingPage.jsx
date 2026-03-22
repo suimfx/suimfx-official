@@ -1301,7 +1301,7 @@ const TradingPage = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Global Notification Banner - Top of Page */}
         {globalNotification && (
           <div className="fixed top-0 left-0 right-0 z-[100] animate-slide-down">
@@ -1440,7 +1440,7 @@ const TradingPage = () => {
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* Instruments Panel */}
           {showInstruments && (
             <div className={`${isMobile ? 'absolute inset-0 z-20' : 'w-[280px]'} border-r flex flex-col shrink-0 ${isDarkMode ? 'bg-[#0d0d0d] border-gray-800' : 'bg-white border-gray-200'}`}>
@@ -1558,7 +1558,7 @@ const TradingPage = () => {
           )}
 
         {/* Center - Chart Area */}
-        <div className={`flex-1 flex flex-col min-w-0 ${isDarkMode ? 'bg-[#0d0d0d]' : 'bg-gray-50'}`}>
+        <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${isDarkMode ? 'bg-[#0d0d0d]' : 'bg-gray-50'}`}>
           {/* Symbol Tab Bar */}
           <div className={`h-9 border-b flex items-center px-2 shrink-0 gap-1 ${isDarkMode ? 'bg-[#0d0d0d] border-gray-800' : 'bg-white border-gray-200'}`}>
             {openTabs.map(tab => (
@@ -1610,7 +1610,7 @@ const TradingPage = () => {
                 {fourChartTimeframes.map((interval, index) => (
                   <div key={`chart-${index}-${interval}`} className="relative">
                     <iframe
-                      src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart_${index}&symbol=${getSymbolForTradingView(selectedInstrument.symbol)}&interval=${interval}&hidesidetoolbar=1&hidetoptoolbar=0&symboledit=0&saveimage=1&toolbarbg=${isDarkMode ? '0d0d0d' : 'ffffff'}&studies=[]&theme=${isDarkMode ? 'dark' : 'light'}&style=1&timezone=Etc%2FUTC&withdateranges=0&showpopupbutton=0&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=["left_toolbar","header_symbol_search","header_compare"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=1&allow_symbol_change=0&details=0&calendar=0&hotlist=0`}
+                      src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart_${index}&symbol=${encodeURIComponent(getSymbolForTradingView(selectedInstrument?.symbol))}&interval=${interval}&hidesidetoolbar=1&hidetoptoolbar=0&symboledit=0&saveimage=1&toolbarbg=${isDarkMode ? '0d0d0d' : 'ffffff'}&studies=[]&theme=${isDarkMode ? 'dark' : 'light'}&style=1&timezone=Etc%2FUTC&withdateranges=0&showpopupbutton=0&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=["left_toolbar","header_symbol_search","header_compare"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=1&allow_symbol_change=0&details=0&calendar=0&hotlist=0`}
                       style={{ width: '100%', height: '100%', border: 'none' }}
                       allowFullScreen
                       title={`TradingView Chart ${interval}`}
@@ -1622,7 +1622,7 @@ const TradingPage = () => {
               /* Single Chart View */
               <iframe
                 key={`${selectedInstrument.symbol}-${isDarkMode}-${isMobile}`}
-                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${getSymbolForTradingView(selectedInstrument.symbol)}&interval=5&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=${isDarkMode ? '0d0d0d' : 'ffffff'}&studies=[]&theme=${isDarkMode ? 'dark' : 'light'}&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=["left_toolbar","header_widget","drawing_templates"]&disabled_features=["hide_left_toolbar_by_default"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=0&allow_symbol_change=1&details=1&calendar=0&hotlist=0`}
+                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${encodeURIComponent(getSymbolForTradingView(selectedInstrument?.symbol))}&interval=5&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=${isDarkMode ? '0d0d0d' : 'ffffff'}&studies=[]&theme=${isDarkMode ? 'dark' : 'light'}&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=["left_toolbar","header_widget","drawing_templates"]&disabled_features=["hide_left_toolbar_by_default"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=0&allow_symbol_change=1&details=1&calendar=0&hotlist=0`}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 allowFullScreen
                 title="TradingView Chart"

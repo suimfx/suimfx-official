@@ -486,6 +486,10 @@ router.put('/transaction/:id/approve', verifyAdminToken, requireEmployeePermissi
     transaction.status = 'Approved'
     transaction.adminRemarks = adminRemarks || ''
     transaction.processedAt = new Date()
+    if (transaction.paymentMethod === 'Manual Crypto') {
+      transaction.walletCredited = true
+      transaction.walletCreditedAt = new Date()
+    }
 
     await wallet.save()
     await transaction.save()

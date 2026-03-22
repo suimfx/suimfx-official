@@ -12,8 +12,18 @@ import {
   FileText,
   Calendar
 } from 'lucide-react'
-import { API_URL } from '../config/api'
+import { API_URL, API_BASE_URL } from '../config/api'
 import { getAdminHeaders } from '../utils/adminApi'
+
+/** KYC stores file paths (/uploads/kyc/...), full URLs, or base64 data URLs from web submit */
+function resolveKycImageSrc(value) {
+  if (!value || typeof value !== 'string') return ''
+  const v = value.trim()
+  if (v.startsWith('http://') || v.startsWith('https://')) return v
+  if (v.startsWith('data:')) return v
+  const path = v.startsWith('/') ? v : `/${v}`
+  return `${API_BASE_URL.replace(/\/$/, '')}${path}`
+}
 
 const AdminKYC = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -371,30 +381,30 @@ const AdminKYC = () => {
                 {selectedKyc.frontImage && (
                   <div>
                     <p className="text-gray-400 text-sm mb-2">Front Side</p>
-                    <img 
-                      src={selectedKyc.frontImage.startsWith('http') ? selectedKyc.frontImage : `${API_URL.replace('/api', '')}${selectedKyc.frontImage}`} 
-                      alt="Front" 
-                      className="max-w-full rounded-lg border border-gray-700" 
+                    <img
+                      src={resolveKycImageSrc(selectedKyc.frontImage)}
+                      alt="Front"
+                      className="max-w-full rounded-lg border border-gray-700"
                     />
                   </div>
                 )}
                 {selectedKyc.backImage && (
                   <div>
                     <p className="text-gray-400 text-sm mb-2">Back Side</p>
-                    <img 
-                      src={selectedKyc.backImage.startsWith('http') ? selectedKyc.backImage : `${API_URL.replace('/api', '')}${selectedKyc.backImage}`} 
-                      alt="Back" 
-                      className="max-w-full rounded-lg border border-gray-700" 
+                    <img
+                      src={resolveKycImageSrc(selectedKyc.backImage)}
+                      alt="Back"
+                      className="max-w-full rounded-lg border border-gray-700"
                     />
                   </div>
                 )}
                 {selectedKyc.selfieImage && (
                   <div>
                     <p className="text-gray-400 text-sm mb-2">Selfie with Document</p>
-                    <img 
-                      src={selectedKyc.selfieImage.startsWith('http') ? selectedKyc.selfieImage : `${API_URL.replace('/api', '')}${selectedKyc.selfieImage}`} 
-                      alt="Selfie" 
-                      className="max-w-full rounded-lg border border-gray-700" 
+                    <img
+                      src={resolveKycImageSrc(selectedKyc.selfieImage)}
+                      alt="Selfie"
+                      className="max-w-full rounded-lg border border-gray-700"
                     />
                   </div>
                 )}

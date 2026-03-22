@@ -7,6 +7,19 @@ import Charges from '../models/Charges.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 
 class PropTradingEngine {
+  /** Expiry for new/reset challenge accounts. 0-step with no duration = effectively unlimited. */
+  computeChallengeExpiresAt(challenge) {
+    const expiresAt = new Date()
+    const days = challenge.rules?.challengeExpiryDays
+    if (challenge.stepsCount === 0 && (days === null || days === undefined)) {
+      expiresAt.setFullYear(expiresAt.getFullYear() + 50)
+      return expiresAt
+    }
+    const n = Number(days)
+    expiresAt.setDate(expiresAt.getDate() + (Number.isFinite(n) && n > 0 ? n : 30))
+    return expiresAt
+  }
+
   constructor() {
     this.ERROR_CODES = {
       CHALLENGE_MODE_DISABLED: 'CHALLENGE_MODE_DISABLED',
@@ -41,8 +54,7 @@ class PropTradingEngine {
     }
 
     const accountId = await ChallengeAccount.generateAccountId('CH')
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + (challenge.rules.challengeExpiryDays || 30))
+    const expiresAt = this.computeChallengeExpiresAt(challenge)
 
     const account = await ChallengeAccount.create({
       userId,
@@ -754,8 +766,7 @@ class PropTradingEngine {
     if (!account) throw new Error('Account not found')
 
     const challenge = account.challengeId
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + (challenge.rules.challengeExpiryDays || 30))
+    const expiresAt = this.computeChallengeExpiresAt(challenge)
 
     account.status = 'ACTIVE'
     account.currentPhase = 1

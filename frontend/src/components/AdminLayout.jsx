@@ -24,7 +24,8 @@ import {
   Mail,
   Gift,
   Image,
-  User
+  User,
+  Bitcoin
 } from 'lucide-react'
 import logoImage from '../assets/suimfxLogo.png'
 
@@ -51,6 +52,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
     { name: 'Trade Management', icon: TrendingUp, path: '/admin/trades', sidebarKey: 'tradeManagement' },
     { name: 'Fund Management', icon: Wallet, path: '/admin/funds', sidebarKey: 'fundManagement' },
     { name: 'Bank Settings', icon: Building2, path: '/admin/bank-settings', sidebarKey: 'bankSettings' },
+    { name: 'Manual crypto', icon: Bitcoin, path: '/admin/manual-crypto', sidebarKey: 'bankSettings' },
     { name: 'IB Management', icon: UserCog, path: '/admin/ib-management', sidebarKey: 'ibManagement' },
     { name: 'Forex Charges', icon: DollarSign, path: '/admin/forex-charges', sidebarKey: 'forexCharges' },
     { name: 'Earnings Report', icon: TrendingUp, path: '/admin/earnings', sidebarKey: 'earningsReport' },
