@@ -240,7 +240,15 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
+  .then(async () => {
+    console.log('Connected to MongoDB')
+    try {
+      const Transaction = (await import('./models/Transaction.js')).default
+      await Transaction.syncIndexes()
+    } catch (e) {
+      console.warn('[MongoDB] Transaction.syncIndexes:', e.message)
+    }
+  })
   .catch((err) => console.error('MongoDB connection error:', err))
 
 // Routes

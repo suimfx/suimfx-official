@@ -112,11 +112,9 @@ const transactionSchema = new mongoose.Schema({
   },
   cryptoCurrency: { type: String, default: null },
   cryptoNetwork: { type: String, default: null },
+  /** Omit for non–manual-crypto txs. Do not default null — unique index would treat many nulls as duplicates. */
   cryptoTxHash: {
-    type: String,
-    default: null,
-    sparse: true,
-    unique: true
+    type: String
   },
   manualCryptoWalletId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -131,5 +129,16 @@ const transactionSchema = new mongoose.Schema({
   walletCredited: { type: Boolean, default: false },
   walletCreditedAt: { type: Date, default: null }
 }, { timestamps: true })
+
+// Only enforce uniqueness when a real hash is stored (challenge purchases, etc. omit cryptoTxHash)
+transactionSchema.index(
+  { cryptoTxHash: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      cryptoTxHash: { $exists: true, $type: 'string', $gt: '' }
+    }
+  }
+)
 
 export default mongoose.model('Transaction', transactionSchema)

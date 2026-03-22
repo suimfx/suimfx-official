@@ -357,8 +357,13 @@ router.put('/:id/archive', async (req, res) => {
       })
     }
 
-    // Check if account has balance - require withdrawal first
-    if (account.balance > 0 && !forceArchive) {
+    // Real accounts: withdraw balance before archive. Demo uses virtual funds — archive immediately.
+    let isDemo = account.isDemo === true
+    if (!isDemo && account.accountTypeId) {
+      const at = await AccountType.findById(account.accountTypeId).select('isDemo').lean()
+      if (at?.isDemo) isDemo = true
+    }
+    if (!isDemo && account.balance > 0 && !forceArchive) {
       return res.status(400).json({ 
         success: false, 
         requiresWithdrawal: true,
