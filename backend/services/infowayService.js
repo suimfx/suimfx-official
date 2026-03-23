@@ -657,17 +657,38 @@ async function connect() {
   // Initialize symbol lists (use fallback lists)
   await initializeSymbols()
   
-  // Start REST API polling for price updates (works without API key)
-  startRestPolling()
-  
-  // Skip WebSocket connection - use REST API fallback only
-  // The Infoway API key is invalid/expired, so we rely on free APIs
-  log('info', 'Using REST API fallback for prices (Binance + free forex APIs)')
-  log('info', 'WebSocket connections disabled - using polling mode')
-  
-  // Log status after initial fetch
+  // First REST pass completes before returning so prices exist on cold start
+  await startRestPolling()
+
+  // WebSocket: opt-in (INFOWAY_WEBSOCKET=1) so invalid/expired keys do not spam 401 reconnects
+  if (INFOWAY_API_KEY && process.env.INFOWAY_WEBSOCKET === '1') {
+    try {
+      const forexPart = (dynamicSymbols.forex.length ? dynamicSymbols.forex : FOREX_SYMBOLS).slice(0, 60)
+      const metalPart = dynamicSymbols.metals.length ? dynamicSymbols.metals : METAL_SYMBOLS
+      const energyPart = (dynamicSymbols.energy.length ? dynamicSymbols.energy : ENERGY_SYMBOLS).slice(0, 12)
+      const commonList = [...new Set([...forexPart, ...metalPart, ...energyPart])].filter(Boolean)
+      const cryptoList = (dynamicSymbols.crypto.length ? dynamicSymbols.crypto : CRYPTO_SYMBOLS).slice(0, 80)
+      const stockList = (dynamicSymbols.stocks.length ? dynamicSymbols.stocks : STOCK_SYMBOLS).slice(0, 50)
+
+      if (commonList.length) createConnection('common', commonList)
+      setTimeout(() => {
+        if (cryptoList.length) createConnection('crypto', cryptoList)
+      }, 600)
+      setTimeout(() => {
+        if (stockList.length) createConnection('stock', stockList)
+      }, 1200)
+      log('info', 'Infoway WebSocket enabled (INFOWAY_WEBSOCKET=1); REST polling also active')
+    } catch (e) {
+      log('warn', 'Infoway WebSocket failed to start:', e.message)
+    }
+  } else if (INFOWAY_API_KEY) {
+    log('info', 'INFOWAY_API_KEY set — set INFOWAY_WEBSOCKET=1 to enable live WS (REST polling active)')
+  } else {
+    log('info', 'No INFOWAY_API_KEY — prices via REST polling (Binance + Yahoo + exchangerate)')
+  }
+
   setTimeout(() => {
-    log('info', `Price cache: ${priceCache.size} symbols loaded via REST API`)
+    log('info', `Price cache: ${priceCache.size} symbols`)
   }, 5000)
 }
 
@@ -678,14 +699,12 @@ let restPollingInterval = null
  * Start REST API polling for price updates
  */
 async function startRestPolling() {
-  // Initial fetch
   await fetchAllPricesREST()
-  
-  // Poll every 3 seconds
-  restPollingInterval = setInterval(async () => {
-    await fetchAllPricesREST()
+
+  restPollingInterval = setInterval(() => {
+    fetchAllPricesREST().catch(err => log('warn', 'REST poll tick:', err.message))
   }, 3000)
-  
+
   log('info', 'REST API polling started (3s interval)')
 }
 
@@ -725,14 +744,23 @@ async function fetchAllPricesREST() {
       }
     }
     
-    // Fetch forex/metals prices
-    const forexSymbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD', 'XAUUSD', 'XAGUSD']
-    for (const symbol of forexSymbols) {
-      const price = await fetchPriceREST(symbol)
-      if (price && onPriceUpdate) {
-        onPriceUpdate(symbol, price)
-      }
-    }
+    // Forex, metals, energy (REST fallbacks; metals no longer use exchangerate XAU/XAG)
+    const forexSymbols = [
+      'EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD',
+      'EURGBP', 'EURJPY', 'GBPJPY',
+      'XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD',
+      'USOIL', 'UKOIL', 'NGAS', 'BRENT', 'WTI'
+    ]
+    await Promise.all(
+      forexSymbols.map(async (symbol) => {
+        try {
+          const price = await fetchPriceREST(symbol)
+          if (price && onPriceUpdate) onPriceUpdate(symbol, price)
+        } catch (e) {
+          log('warn', `REST poll ${symbol}:`, e.message)
+        }
+      })
+    )
     
     // Update connection status
     if (priceCache.size > 0 && !isConnected) {
@@ -802,8 +830,51 @@ function getPriceCache() {
   return priceCache
 }
 
+/** ISO precious-metal codes: exchangerate "USD base + rates.XAU" is NOT spot USD/oz — caused ~4412 for XAUUSD */
+const PRECIOUS_THREE_LETTER = new Set(['XAU', 'XAG', 'XPT', 'XPD'])
+
 /**
- * Fetch price via REST API (fallback) - Uses Binance for crypto, free forex API for others
+ * Yahoo Finance chart mid (futures / spot proxies). Used when REST-only mode has no Infoway ticks.
+ */
+async function fetchYahooChartMidPrice(chartSymbol) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(chartSymbol)}?range=1d&interval=5m`
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SuimFX-PriceBot/1.0)' },
+      timeout: 8000
+    })
+    if (!response.ok) return null
+    const json = await response.json()
+    const meta = json.chart?.result?.[0]?.meta
+    const p = meta?.regularMarketPrice ?? meta?.previousClose
+    if (typeof p === 'number' && p > 0 && Number.isFinite(p)) return p
+  } catch (e) {
+    log('warn', `Yahoo chart ${chartSymbol}:`, e.message)
+  }
+  return null
+}
+
+function storeBidAsk(symbol, bid, ask, source) {
+  const priceData = {
+    symbol,
+    bid,
+    ask,
+    mid: (bid + ask) / 2,
+    spread: ask - bid,
+    timestamp: Date.now(),
+    source
+  }
+  priceCache.set(symbol, priceData)
+  return priceData
+}
+
+function storeMidSpread(symbol, mid, spreadAbs, source) {
+  const half = spreadAbs / 2
+  return storeBidAsk(symbol, mid - half, mid + half, source)
+}
+
+/**
+ * Fetch price via REST API (fallback) - Uses Binance for crypto; metals/energy never use fiat XAU/XAG rates
  */
 async function fetchPriceREST(symbol) {
   // Check cache first
@@ -833,23 +904,86 @@ async function fetchPriceREST(symbol) {
         priceCache.set(symbol, priceData)
         return priceData
       }
-    } else if (category === 'Forex' || category === 'Metals') {
-      // Use free forex API
+    } else if (category === 'Metals') {
+      // Spot proxies: never use exchangerate-api 6-char math for XAU*/XAG* (wrong ~4412 for gold).
+      const GOLD_MIN = 800
+      const GOLD_MAX = 12000
+      const SILVER_MIN = 8
+      const SILVER_MAX = 80
+
+      if (symbol === 'XAUUSD') {
+        let mid = await fetchYahooChartMidPrice('GC=F')
+        if (mid == null || mid < GOLD_MIN || mid > GOLD_MAX) {
+          mid = await fetchYahooChartMidPrice('FX_IDC:XAUUSD')
+        }
+        if (mid == null || mid < GOLD_MIN || mid > GOLD_MAX) {
+          mid = await fetchYahooChartMidPrice('XAUUSD=X')
+        }
+        if (mid != null && mid >= GOLD_MIN && mid <= GOLD_MAX) {
+          return storeMidSpread(symbol, mid, Math.max(mid * 0.00008, 0.25), 'yahoo-gold')
+        }
+        try {
+          const r = await fetch('https://api.binance.com/api/v3/ticker/bookTicker?symbol=PAXGUSDT', { timeout: 5000 })
+          if (r.ok) {
+            const d = await r.json()
+            const bid = parseFloat(d.bidPrice)
+            const ask = parseFloat(d.askPrice)
+            const paxgMid = (bid + ask) / 2
+            if (bid > 0 && ask > 0 && paxgMid >= GOLD_MIN && paxgMid <= GOLD_MAX) {
+              return storeBidAsk(symbol, bid, ask, 'binance-paxg')
+            }
+          }
+        } catch (_) { /* fall through */ }
+        return storeMidSpread(symbol, 2650, 0.5, 'fallback-static')
+      }
+      if (symbol === 'XAGUSD') {
+        // SI=F often mis-resolves (~69); prefer FX spot IDs
+        let mid = await fetchYahooChartMidPrice('FX_IDC:XAGUSD')
+        if (mid == null || mid < SILVER_MIN || mid > SILVER_MAX) {
+          mid = await fetchYahooChartMidPrice('XAGUSD=X')
+        }
+        if (mid != null && mid >= SILVER_MIN && mid <= SILVER_MAX) {
+          return storeMidSpread(symbol, mid, Math.max(mid * 0.00012, 0.02), 'yahoo-silver')
+        }
+        return storeMidSpread(symbol, 31.5, 0.04, 'fallback-static')
+      }
+      if (symbol === 'XPTUSD') {
+        const mid = await fetchYahooChartMidPrice('PL=F')
+        if (mid) return storeMidSpread(symbol, mid, Math.max(mid * 0.00015, 0.5), 'yahoo-pl')
+      }
+      if (symbol === 'XPDUSD') {
+        const mid = await fetchYahooChartMidPrice('PA=F')
+        if (mid) return storeMidSpread(symbol, mid, Math.max(mid * 0.00015, 0.5), 'yahoo-pa')
+      }
+      return priceCache.get(symbol) || null
+    } else if (category === 'Energy') {
+      const yahooMap = {
+        USOIL: 'CL=F', WTI: 'CL=F', UKOIL: 'BZ=F', BRENT: 'BZ=F', NGAS: 'NG=F',
+        GASOLINE: 'RB=F', HEATING: 'HO=F'
+      }
+      const ySym = yahooMap[symbol]
+      if (ySym) {
+        const mid = await fetchYahooChartMidPrice(ySym)
+        if (mid) return storeMidSpread(symbol, mid, Math.max(Math.abs(mid) * 0.0002, 0.03), 'yahoo-energy')
+      }
+      return priceCache.get(symbol) || null
+    } else if (category === 'Forex') {
       const response = await fetch(`https://api.exchangerate-api.com/v4/latest/USD`, { timeout: 5000 })
       if (response.ok) {
         const data = await response.json()
-        // Parse forex pair (e.g., EURUSD -> EUR rate)
         if (symbol.length === 6) {
           const base = symbol.substring(0, 3)
           const quote = symbol.substring(3, 6)
-          
+          if (PRECIOUS_THREE_LETTER.has(base) || PRECIOUS_THREE_LETTER.has(quote)) {
+            return priceCache.get(symbol) || null
+          }
           if (quote === 'USD' && data.rates[base]) {
             const rate = 1 / data.rates[base]
-            const spread = rate * 0.0001 // 1 pip spread
+            const spread = rate * 0.0001 // ~1 pip
             const priceData = {
               symbol,
-              bid: rate - spread/2,
-              ask: rate + spread/2,
+              bid: rate - spread / 2,
+              ask: rate + spread / 2,
               mid: rate,
               spread,
               timestamp: Date.now(),
@@ -857,13 +991,14 @@ async function fetchPriceREST(symbol) {
             }
             priceCache.set(symbol, priceData)
             return priceData
-          } else if (base === 'USD' && data.rates[quote]) {
+          }
+          if (base === 'USD' && data.rates[quote]) {
             const rate = data.rates[quote]
             const spread = rate * 0.0001
             const priceData = {
               symbol,
-              bid: rate - spread/2,
-              ask: rate + spread/2,
+              bid: rate - spread / 2,
+              ask: rate + spread / 2,
               mid: rate,
               spread,
               timestamp: Date.now(),
@@ -872,38 +1007,6 @@ async function fetchPriceREST(symbol) {
             priceCache.set(symbol, priceData)
             return priceData
           }
-        }
-        // Handle metals like XAUUSD
-        if (symbol === 'XAUUSD') {
-          // Gold price approximation (use a gold API or hardcode recent price)
-          const goldPrice = 2650 // Approximate gold price
-          const spread = 0.50
-          const priceData = {
-            symbol,
-            bid: goldPrice - spread/2,
-            ask: goldPrice + spread/2,
-            mid: goldPrice,
-            spread,
-            timestamp: Date.now(),
-            source: 'fallback'
-          }
-          priceCache.set(symbol, priceData)
-          return priceData
-        }
-        if (symbol === 'XAGUSD') {
-          const silverPrice = 31.50
-          const spread = 0.02
-          const priceData = {
-            symbol,
-            bid: silverPrice - spread/2,
-            ask: silverPrice + spread/2,
-            mid: silverPrice,
-            spread,
-            timestamp: Date.now(),
-            source: 'fallback'
-          }
-          priceCache.set(symbol, priceData)
-          return priceData
         }
       }
     }

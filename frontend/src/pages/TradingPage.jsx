@@ -1525,10 +1525,16 @@ const TradingPage = () => {
                       <div className={`px-1.5 py-0.5 rounded text-[10px] font-medium min-w-[28px] text-center mx-2 ${isDarkMode ? 'bg-[#2a2a2a] text-cyan-400' : 'bg-blue-100 text-blue-600'}`}>
                         {/* Show admin-set spread if available, otherwise show market spread */}
                         {adminSpreads[inst.symbol]?.spread > 0 ? (
-                          // Convert admin spread to pips for display
-                          inst.symbol.includes('JPY') ? (adminSpreads[inst.symbol].spread * 100).toFixed(1) :
-                          inst.bid > 100 ? adminSpreads[inst.symbol].spread.toFixed(2) :
-                          (adminSpreads[inst.symbol].spread * 10000).toFixed(1)
+                          // Metals: spreadValue is stored in cents (50 = $0.50) per Charges model
+                          (inst.category === 'Metals' || ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XAUEUR', 'XAUAUD', 'XAUGBP', 'XAUCHF', 'XAUJPY', 'XAGEUR', 'XAGAUD', 'XAGGBP'].includes(inst.symbol))
+                            ? (adminSpreads[inst.symbol].spread / 100).toFixed(2)
+                            : inst.category === 'Crypto'
+                              ? adminSpreads[inst.symbol].spread.toFixed(2)
+                              : inst.symbol.includes('JPY')
+                                ? (adminSpreads[inst.symbol].spread * 100).toFixed(1)
+                                : inst.bid > 100
+                                  ? adminSpreads[inst.symbol].spread.toFixed(2)
+                                  : (adminSpreads[inst.symbol].spread * 10000).toFixed(1)
                         ) : inst.spread > 0 ? (
                           // Convert market spread to pips
                           inst.symbol.includes('JPY') ? (inst.spread * 100).toFixed(1) :
