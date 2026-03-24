@@ -24,6 +24,7 @@ import { getAdminHeaders } from '../utils/adminApi'
 const AdminTradeManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [accountTypeFilter, setAccountTypeFilter] = useState('real') // 'real' or 'demo'
   const [trades, setTrades] = useState([])
   const [stats, setStats] = useState({ total: 0, open: 0, volume: 0, pnl: 0 })
   const [loading, setLoading] = useState(true)
@@ -65,7 +66,7 @@ const AdminTradeManagement = () => {
   useEffect(() => {
     fetchTrades()
     fetchUsers()
-  }, [filterStatus, currentPage])
+  }, [filterStatus, currentPage, accountTypeFilter])
 
   // Fetch live prices for open trades via WebSocket for institutional-grade streaming
   useEffect(() => {
@@ -387,16 +388,25 @@ const AdminTradeManagement = () => {
       if (data.trades) {
         setTrades(data.trades)
         setTotalTrades(data.total || data.trades.length)
-        // Calculate stats
-        const openTrades = data.trades.filter(t => t.status === 'OPEN')
-        const closedTrades = data.trades.filter(t => t.status === 'CLOSED')
-        const totalVolume = data.trades.reduce((sum, t) => sum + (t.quantity * t.contractSize * t.openPrice), 0)
+        
+        // Separate real and demo trades for stats
+        const realTrades = data.trades.filter(t => !(t.tradingAccountId?.isDemo || t.accountType === 'ChallengeAccount' || t.isChallengeAccount))
+        const demoTrades = data.trades.filter(t => t.tradingAccountId?.isDemo || t.accountType === 'ChallengeAccount' || t.isChallengeAccount)
+        
+        // Calculate stats based on current filter
+        const tradesForStats = accountTypeFilter === 'real' ? realTrades : demoTrades
+        const openTrades = tradesForStats.filter(t => t.status === 'OPEN')
+        const closedTrades = tradesForStats.filter(t => t.status === 'CLOSED')
+        const totalVolume = tradesForStats.reduce((sum, t) => sum + (t.quantity * t.contractSize * t.openPrice), 0)
         const totalPnl = closedTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0)
+        
         setStats({
-          total: data.total || data.trades.length,
+          total: tradesForStats.length,
           open: openTrades.length,
           volume: totalVolume,
-          pnl: totalPnl
+          pnl: totalPnl,
+          realTotal: realTrades.length,
+          demoTotal: demoTrades.length
         })
       }
     } catch (error) {
@@ -420,7 +430,12 @@ const AdminTradeManagement = () => {
       trade.symbol?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       trade.userId?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       trade.userId?.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
+    
+    // Filter by account type (real vs demo)
+    const isDemo = trade.tradingAccountId?.isDemo || trade.accountType === 'ChallengeAccount' || trade.isChallengeAccount
+    const matchesAccountType = accountTypeFilter === 'real' ? !isDemo : isDemo
+    
+    return matchesSearch && matchesAccountType
   })
 
   const getStatusIcon = (status) => {
@@ -439,10 +454,16 @@ const AdminTradeManagement = () => {
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
           <p className="text-gray-500 text-sm mb-1">Total Trades</p>
           <p className="text-white text-2xl font-bold">{stats.total.toLocaleString()}</p>
+          <p className="text-gray-500 text-xs mt-1">
+            {accountTypeFilter === 'real' ? 'Real Accounts' : 'Demo Accounts'}
+          </p>
         </div>
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
           <p className="text-gray-500 text-sm mb-1">Open Positions</p>
           <p className="text-white text-2xl font-bold">{stats.open}</p>
+          <p className="text-gray-500 text-xs mt-1">
+            {accountTypeFilter === 'real' ? 'Real Accounts' : 'Demo Accounts'}
+          </p>
         </div>
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
           <p className="text-gray-500 text-sm mb-1">Total Volume</p>
@@ -456,10 +477,45 @@ const AdminTradeManagement = () => {
         </div>
       </div>
 
+      {/* Account Type Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setAccountTypeFilter('real')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+            accountTypeFilter === 'real' 
+              ? 'bg-green-500/20 text-green-500 border border-green-500/30' 
+              : 'bg-dark-700 text-gray-400 hover:text-white'
+          }`}
+        >
+          <TrendingUp size={18} />
+          Real Account Trades
+        </button>
+        <button
+          onClick={() => setAccountTypeFilter('demo')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+            accountTypeFilter === 'demo' 
+              ? 'bg-blue-500/20 text-blue-500 border border-blue-500/30' 
+              : 'bg-dark-700 text-gray-400 hover:text-white'
+          }`}
+        >
+          <TrendingUp size={18} />
+          Demo Account Trades
+        </button>
+      </div>
+
       {/* Trades Table */}
       <div className="bg-dark-800 rounded-xl border border-gray-800 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 border-b border-gray-800">
-          <h2 className="text-white font-semibold text-lg">All Trades</h2>
+          <div>
+            <h2 className="text-white font-semibold text-lg">
+              {accountTypeFilter === 'real' ? 'Real Account Trades' : 'Demo Account Trades'}
+            </h2>
+            <p className="text-gray-500 text-sm">
+              {accountTypeFilter === 'real' 
+                ? 'Live trading with real funds' 
+                : 'Practice trades with virtual funds'}
+            </p>
+          </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
               onClick={() => {
@@ -496,7 +552,14 @@ const AdminTradeManagement = () => {
         {loading ? (
           <div className="text-center py-12 text-gray-500">Loading trades...</div>
         ) : filteredTrades.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No trades found</div>
+          <div className="text-center py-12 text-gray-500">
+            <p className="text-lg mb-2">No {accountTypeFilter === 'real' ? 'real' : 'demo'} trades found</p>
+            <p className="text-sm text-gray-600">
+              {accountTypeFilter === 'real' 
+                ? 'No trades from real accounts matching your criteria' 
+                : 'No trades from demo accounts matching your criteria'}
+            </p>
+          </div>
         ) : (
           <>
             {/* Mobile Card View */}

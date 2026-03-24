@@ -27,7 +27,7 @@ router.get('/all', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MANAGEMENT
     const total = await Trade.countDocuments(query)
     const trades = await Trade.find(query)
       .populate('userId', 'firstName lastName email')
-      .populate('tradingAccountId', 'accountId balance')
+      .populate('tradingAccountId', 'accountId balance isDemo')
       .sort({ createdAt: -1 })
       .skip(parseInt(offset))
       .limit(parseInt(limit))
@@ -335,7 +335,7 @@ router.get('/trades', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MANAGEM
 
     const trades = await Trade.find(query)
       .populate('userId', 'firstName email')
-      .populate('tradingAccountId', 'accountId balance')
+      .populate('tradingAccountId', 'accountId balance isDemo')
       .sort({ createdAt: -1 })
       .skip(parseInt(offset))
       .limit(parseInt(limit))
@@ -360,7 +360,7 @@ router.get('/trades/open', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MA
   try {
     const trades = await Trade.find({ status: 'OPEN' })
       .populate('userId', 'firstName email')
-      .populate('tradingAccountId', 'accountId balance leverage')
+      .populate('tradingAccountId', 'accountId balance leverage isDemo')
       .sort({ openedAt: -1 })
 
     res.json({
