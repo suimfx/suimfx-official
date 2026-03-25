@@ -296,8 +296,11 @@ class PropTradingEngine {
     // Get charges for this trade (use default charges for challenge accounts)
     const charges = await Charges.getChargesForTrade(userId, symbol, segment || 'Forex', null)
     
+    console.log(`[Challenge Trade] Symbol: ${symbol}, Segment: ${segment || 'Forex'}, Spread: ${charges.spreadValue} (${charges.spreadType}), Commission: ${charges.commissionValue}`)
+    
     // Calculate execution price with spread
     const openPrice = this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol)
+    console.log(`[Challenge Trade] Side: ${side}, Bid: ${bid}, Ask: ${ask}, OpenPrice with spread: ${openPrice}`)
 
     // Get contract size based on symbol
     const contractSize = this.getContractSize(symbol)
