@@ -16,15 +16,28 @@ class TradeEngine {
     if (symbol === 'XAUUSD') return 100
     if (symbol === 'XAGUSD') return 5000
     // Crypto - 1 unit
-    if (['BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD', 'BCHUSD'].includes(symbol)) return 1
+    if (this._isCrypto(symbol)) return 1
     // Forex - standard 100,000
     return 100000
+  }
+
+  _isCrypto(symbol) {
+    return ['BTCUSD','ETHUSD','LTCUSD','XRPUSD','BCHUSD','BNBUSD','SOLUSD','ADAUSD','DOGEUSD',
+      'DOTUSD','MATICUSD','AVAXUSD','LINKUSD','SHIBUSD','XLMUSD','TRXUSD','UNIUSD','ATOMUSD',
+      'ETCUSD','FILUSD','ICPUSD','VETUSD','NEARUSD','GRTUSD','AAVEUSD','MKRUSD','ALGOUSD',
+      'FTMUSD','SANDUSD','MANAUSD','AXSUSD','THETAUSD','XMRUSD','SNXUSD','EOSUSD','CHZUSD',
+      'PEPEUSD','ARBUSD','OPUSD','SUIUSD','APTUSD','INJUSD','TONUSD','HBARUSD','ENJUSD'].includes(symbol)
+  }
+
+  _isMetal(symbol) {
+    return ['XAUUSD','XAGUSD','XPTUSD','XPDUSD','XAUEUR','XAUAUD','XAUGBP','XAUCHF','XAUJPY',
+      'XAGEUR','XAGAUD','XAGGBP'].includes(symbol)
   }
 
   // Calculate execution price with spread
   // For FIXED spread: value is in PIPS (needs conversion based on symbol)
   // For PERCENTAGE spread: value is percentage of price difference
-  calculateExecutionPrice(side, bid, ask, spreadValue, spreadType, symbol = '') {
+  calculateExecutionPrice(side, bid, ask, spreadValue, spreadType, symbol = '', segment = '') {
     let spread = 0
     
     if (spreadType === 'PERCENTAGE') {
@@ -33,17 +46,17 @@ class TradeEngine {
       // FIXED spread - value is in PIPS, need to convert to price
       // For JPY pairs: 1 pip = 0.01
       // For other forex pairs: 1 pip = 0.0001
-      // For metals (XAUUSD): 1 pip = 0.01
+      // For metals (XAUUSD): value is in cents (50 = $0.50)
       // For crypto: spread is in USD directly
       const isJPYPair = symbol.includes('JPY')
-      const isMetal = ['XAUUSD', 'XAGUSD'].includes(symbol)
-      const isCrypto = ['BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD', 'BCHUSD'].includes(symbol)
+      const isMetal = segment === 'Metals' || this._isMetal(symbol)
+      const isCrypto = segment === 'Crypto' || this._isCrypto(symbol)
       
       if (isCrypto) {
         // Crypto: spread is in USD
         spread = spreadValue
       } else if (isMetal) {
-        // Metals: 1 pip = 0.01 (cents)
+        // Metals: value in cents (50 = $0.50)
         spread = spreadValue * 0.01
       } else if (isJPYPair) {
         // JPY pairs: 1 pip = 0.01
@@ -274,7 +287,7 @@ class TradeEngine {
     console.log(`Charges retrieved: spread=${charges.spreadValue}, commission=${charges.commissionValue}, commissionType=${charges.commissionType}`)
 
     // Calculate execution price with spread
-    const openPrice = this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol)
+    const openPrice = this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol, segment)
 
     // Get contract size based on symbol
     const contractSize = this.getContractSize(symbol)

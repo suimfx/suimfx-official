@@ -218,7 +218,20 @@ class PropTradingEngine {
   // Calculate execution price with spread
   // For FIXED spread: value is in PIPS (needs conversion based on symbol)
   // For PERCENTAGE spread: value is percentage of price difference
-  calculateExecutionPrice(side, bid, ask, spreadValue, spreadType, symbol = '') {
+  _isCrypto(symbol) {
+    return ['BTCUSD','ETHUSD','LTCUSD','XRPUSD','BCHUSD','BNBUSD','SOLUSD','ADAUSD','DOGEUSD',
+      'DOTUSD','MATICUSD','AVAXUSD','LINKUSD','SHIBUSD','XLMUSD','TRXUSD','UNIUSD','ATOMUSD',
+      'ETCUSD','FILUSD','ICPUSD','VETUSD','NEARUSD','GRTUSD','AAVEUSD','MKRUSD','ALGOUSD',
+      'FTMUSD','SANDUSD','MANAUSD','AXSUSD','THETAUSD','XMRUSD','SNXUSD','EOSUSD','CHZUSD',
+      'PEPEUSD','ARBUSD','OPUSD','SUIUSD','APTUSD','INJUSD','TONUSD','HBARUSD','ENJUSD'].includes(symbol)
+  }
+
+  _isMetal(symbol) {
+    return ['XAUUSD','XAGUSD','XPTUSD','XPDUSD','XAUEUR','XAUAUD','XAUGBP','XAUCHF','XAUJPY',
+      'XAGEUR','XAGAUD','XAGGBP'].includes(symbol)
+  }
+
+  calculateExecutionPrice(side, bid, ask, spreadValue, spreadType, symbol = '', segment = '') {
     let spread = 0
     
     if (spreadType === 'PERCENTAGE') {
@@ -226,8 +239,8 @@ class PropTradingEngine {
     } else {
       // FIXED spread - value is in PIPS, need to convert to price
       const isJPYPair = symbol.includes('JPY')
-      const isMetal = ['XAUUSD', 'XAGUSD'].includes(symbol)
-      const isCrypto = ['BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD', 'BCHUSD'].includes(symbol)
+      const isMetal = segment === 'Metals' || this._isMetal(symbol)
+      const isCrypto = segment === 'Crypto' || this._isCrypto(symbol)
       
       if (isCrypto) {
         spread = spreadValue || 0
@@ -299,7 +312,7 @@ class PropTradingEngine {
     console.log(`[Challenge Trade] Symbol: ${symbol}, Segment: ${segment || 'Forex'}, Spread: ${charges.spreadValue} (${charges.spreadType}), Commission: ${charges.commissionValue}`)
     
     // Calculate execution price with spread
-    const openPrice = this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol)
+    const openPrice = this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol, segment || 'Forex')
     console.log(`[Challenge Trade] Side: ${side}, Bid: ${bid}, Ask: ${ask}, OpenPrice with spread: ${openPrice}`)
 
     // Get contract size based on symbol

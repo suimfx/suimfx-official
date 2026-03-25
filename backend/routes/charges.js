@@ -18,51 +18,38 @@ router.get('/spreads', async (req, res) => {
     
     // Priority order: USER > INSTRUMENT > ACCOUNT_TYPE > SEGMENT > GLOBAL
     const priorityOrder = { 'USER': 1, 'INSTRUMENT': 2, 'ACCOUNT_TYPE': 3, 'SEGMENT': 4, 'GLOBAL': 5 }
-    
+
+    const segmentSymbols = {
+      'Forex': ['EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD','NZDUSD','USDCAD','EURGBP','EURJPY',
+        'GBPJPY','EURCHF','EURAUD','EURCAD','GBPAUD','GBPCAD','AUDCAD','AUDJPY','CADJPY','CHFJPY',
+        'NZDJPY','AUDNZD','CADCHF','GBPCHF','GBPNZD','EURNZD','NZDCAD','NZDCHF','AUDCHF'],
+      'Metals': ['XAUUSD','XAGUSD','XPTUSD','XPDUSD','XAUEUR','XAUAUD','XAUGBP','XAUCHF','XAUJPY','XAGEUR'],
+      'Crypto': ['BTCUSD','ETHUSD','LTCUSD','XRPUSD','BCHUSD','BNBUSD','SOLUSD','ADAUSD','DOGEUSD',
+        'DOTUSD','MATICUSD','AVAXUSD','LINKUSD','SHIBUSD','XLMUSD','TRXUSD','UNIUSD','ATOMUSD',
+        'ETCUSD','PEPEUSD','ARBUSD','OPUSD','SUIUSD','APTUSD','INJUSD','TONUSD','HBARUSD'],
+      'Indices': ['US30','US500','NAS100','DAX','CAC40','AUS200','EU50','AEX','CN50'],
+      'Energy': ['USOIL','UKOIL','NGAS','BRENT','WTI']
+    }
+    const allSymbols = Object.values(segmentSymbols).flat()
+
+    const setSpread = (symbol, charge) => {
+      const existing = spreadMap[symbol]
+      if (!existing || priorityOrder[charge.level] < priorityOrder[existing.level]) {
+        spreadMap[symbol] = { spread: charge.spreadValue, spreadType: charge.spreadType, level: charge.level }
+      }
+    }
+
     for (const charge of charges) {
-      // For instrument-specific charges
       if (charge.instrumentSymbol) {
-        const existing = spreadMap[charge.instrumentSymbol]
-        if (!existing || priorityOrder[charge.level] < priorityOrder[existing.level]) {
-          spreadMap[charge.instrumentSymbol] = {
-            spread: charge.spreadValue,
-            spreadType: charge.spreadType,
-            level: charge.level
-          }
-        }
-      }
-      // For segment-level charges, apply to all instruments in that segment
-      else if (charge.segment) {
-        const segmentSymbols = {
-          'Forex': ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD', 'EURGBP', 'EURJPY', 'GBPJPY'],
-          'Metals': ['XAUUSD', 'XAGUSD'],
-          'Crypto': ['BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD', 'BNBUSD', 'SOLUSD', 'ADAUSD', 'DOGEUSD', 'DOTUSD', 'MATICUSD', 'AVAXUSD', 'LINKUSD'],
-          'Indices': ['US30', 'US500', 'NAS100']
-        }
+        // Instrument-specific charge
+        setSpread(charge.instrumentSymbol, charge)
+      } else if (charge.segment) {
+        // Segment-level charge - apply to all instruments in that segment
         const symbols = segmentSymbols[charge.segment] || []
-        for (const symbol of symbols) {
-          const existing = spreadMap[symbol]
-          if (!existing || priorityOrder[charge.level] < priorityOrder[existing.level]) {
-            spreadMap[symbol] = {
-              spread: charge.spreadValue,
-              spreadType: charge.spreadType,
-              level: charge.level
-            }
-          }
-        }
-      }
-      // For global charges, apply to all instruments that don't have specific settings
-      else if (charge.level === 'GLOBAL') {
-        const allSymbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD', 'EURGBP', 'EURJPY', 'GBPJPY', 'XAUUSD', 'XAGUSD', 'BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD']
-        for (const symbol of allSymbols) {
-          if (!spreadMap[symbol]) {
-            spreadMap[symbol] = {
-              spread: charge.spreadValue,
-              spreadType: charge.spreadType,
-              level: charge.level
-            }
-          }
-        }
+        for (const symbol of symbols) setSpread(symbol, charge)
+      } else {
+        // No instrument, no segment = applies to ALL instruments (GLOBAL, ACCOUNT_TYPE global, etc.)
+        for (const symbol of allSymbols) setSpread(symbol, charge)
       }
     }
     
