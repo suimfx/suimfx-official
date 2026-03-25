@@ -327,8 +327,10 @@ router.get('/my-accounts/:userId', async (req, res) => {
       const overallLoss = initialBalance - lowestEquity
       const realTimeOverallDD = overallLoss > 0 ? (overallLoss / initialBalance) * 100 : 0
       
-      // Profit = (currentEquity - initialBalance) / initialBalance * 100
-      const realTimeProfit = ((realTimeEquity - initialBalance) / initialBalance) * 100
+      // Profit = actual trade P&L (totalProfitLoss + floatingPnl) / initialBalance * 100
+      // This ensures profit shows only from actual trades, not admin balance adjustments
+      const actualTradePnl = (account.totalProfitLoss || 0) + floatingPnl
+      const realTimeProfit = (actualTradePnl / initialBalance) * 100
 
       const profitWithdrawal = getProfitWithdrawalMeta(account, account.challengeId)
       
