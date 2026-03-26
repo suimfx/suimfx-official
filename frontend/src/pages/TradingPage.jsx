@@ -2406,11 +2406,9 @@ const TradingPage = () => {
 
     const backendCategory = categoryMap[activeCategory] || activeCategory
 
-    
+    // Show all instruments in the selected category
 
-    // For specific categories (Forex, Metals, etc.), show only popular by default
-
-    return inst.category === backendCategory && inst.popular
+    return inst.category === backendCategory
 
   })
 
