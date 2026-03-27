@@ -143,6 +143,37 @@ const tradeSchema = new mongoose.Schema({
   adminModifiedAt: {
     type: Date,
     default: null
+  },
+
+  // Book Management + Corecen LP
+  bookType: {
+    type: String,
+    enum: ['A', 'B'],
+    default: 'B'
+  },
+  aBookExecuted: {
+    type: Boolean,
+    default: false
+  },
+  aBookOrderId: {
+    type: String,
+    default: null
+  },
+  lpPushed: {
+    type: Boolean,
+    default: false
+  },
+  lpPushedAt: {
+    type: Date,
+    default: null
+  },
+  lpClosedAt: {
+    type: Date,
+    default: null
+  },
+  lpSyncStatus: {
+    type: String,
+    default: null
   }
 }, { timestamps: true })
 

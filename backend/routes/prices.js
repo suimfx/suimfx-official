@@ -4,7 +4,7 @@ dotenv.config()
 
 import express from 'express'
 
-import infowayService from '../services/infowayService.js'
+import lpPriceService from '../services/lpPriceService.js'
 
 
 
@@ -30,11 +30,11 @@ const POPULAR_INSTRUMENTS = {
 
 
 
-// Use Infoway service for categorization
+// Use LP price service for categorization
 
 function categorizeSymbol(symbol) {
 
-  return infowayService.categorizeSymbol(symbol)
+  return lpPriceService.categorizeSymbol(symbol)
 
 }
 
@@ -92,7 +92,7 @@ router.get('/instruments', async (req, res) => {
 
     // Get price cache from Infoway service
 
-    const priceCache = infowayService.getPriceCache()
+    const priceCache = lpPriceService.getPriceCache()
 
     
 
@@ -290,7 +290,7 @@ router.get('/:symbol', async (req, res) => {
 
     const { symbol } = req.params
 
-    const SYMBOL_MAP = infowayService.SYMBOL_MAP
+    const SYMBOL_MAP = lpPriceService.SYMBOL_MAP
 
     
 
@@ -306,7 +306,7 @@ router.get('/:symbol', async (req, res) => {
 
     // Try to get from cache first
 
-    let price = infowayService.getPrice(symbol)
+    let price = lpPriceService.getPrice(symbol)
 
     
 
@@ -314,7 +314,7 @@ router.get('/:symbol', async (req, res) => {
 
     if (!price) {
 
-      price = await infowayService.fetchPriceREST(symbol)
+      price = await lpPriceService.fetchPriceREST(symbol)
 
     }
 
@@ -358,7 +358,7 @@ router.post('/batch', async (req, res) => {
 
     
 
-    const SYMBOL_MAP = infowayService.SYMBOL_MAP
+    const SYMBOL_MAP = lpPriceService.SYMBOL_MAP
 
     const prices = {}
 
@@ -374,7 +374,7 @@ router.post('/batch', async (req, res) => {
 
       
 
-      const cached = infowayService.getPrice(symbol)
+      const cached = lpPriceService.getPrice(symbol)
 
       if (cached) {
 
@@ -394,7 +394,7 @@ router.post('/batch', async (req, res) => {
 
     if (missingSymbols.length > 0) {
 
-      const batchPrices = await infowayService.fetchBatchPricesREST(missingSymbols)
+      const batchPrices = await lpPriceService.fetchBatchPricesREST(missingSymbols)
 
       for (const [symbol, price] of Object.entries(batchPrices)) {
 

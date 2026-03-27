@@ -59,6 +59,7 @@ const ProtectedAdminRoute = ({ children, requiredPermission }) => {
           'overviewDashboard': p.canViewDashboard,
           'userManagement': p.canViewUsers || p.canManageUsers,
           'tradeManagement': p.canViewTrades || p.canManageTrades,
+          'bookManagement': p.canViewTrades || p.canManageTrades,
           'fundManagement': p.canViewDeposits || p.canViewWithdrawals || p.canApproveDeposits || p.canApproveWithdrawals,
           'bankSettings': p.canManagePaymentMethods,
           'ibManagement': p.canViewIB || p.canManageIB,

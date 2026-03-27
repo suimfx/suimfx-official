@@ -1,9 +1,11 @@
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
+import User from '../models/User.js'
 import Charges from '../models/Charges.js'
 import TradeSettings from '../models/TradeSettings.js'
 import AdminLog from '../models/AdminLog.js'
 import ibEngine from './ibEngineNew.js'
+import lpService from './lpService.js'
 
 class TradeEngine {
   constructor() {
@@ -330,6 +332,9 @@ class TradeEngine {
     // Generate trade ID
     const tradeId = await Trade.generateTradeId()
 
+    const userForBook = await User.findById(userId).select('bookType firstName email')
+    const userBookType = userForBook?.bookType || 'B'
+
     // Create trade
     const trade = await Trade.create({
       userId,
@@ -353,7 +358,8 @@ class TradeEngine {
       swap: 0,
       floatingPnl: 0,
       status: orderType === 'MARKET' ? 'OPEN' : 'PENDING',
-      pendingPrice: orderType !== 'MARKET' ? openPrice : null
+      pendingPrice: orderType !== 'MARKET' ? openPrice : null,
+      bookType: userBookType
     })
 
     // Deduct commission from trading account balance when trade opens
@@ -361,6 +367,21 @@ class TradeEngine {
       account.balance -= commission
       if (account.balance < 0) account.balance = 0
       await account.save()
+    }
+
+    if (orderType === 'MARKET' && userBookType === 'A' && lpService.isConfigured() && userForBook) {
+      try {
+        const lpResult = await lpService.pushTradeToCorecen(trade, userForBook)
+        if (lpResult.success) {
+          trade.lpPushed = true
+          trade.lpPushedAt = new Date()
+          await trade.save()
+        } else {
+          console.error(`[TradeEngine] Failed to push A-Book trade to LP: ${lpResult.error || lpResult.message}`)
+        }
+      } catch (lpError) {
+        console.error('[TradeEngine] Error pushing trade to LP:', lpError)
+      }
     }
 
     return trade
@@ -452,6 +473,21 @@ class TradeEngine {
       await ibEngine.processTradeCommission(trade)
     } catch (ibError) {
       console.error('Error processing IB commission:', ibError)
+    }
+
+    if (trade.bookType === 'A' && lpService.isConfigured()) {
+      try {
+        const lpResult = await lpService.closeTradeOnCorecen(trade)
+        if (lpResult.success) {
+          trade.lpClosedAt = new Date()
+          await trade.save().catch(() => {})
+          console.log(`[TradeEngine] A-Book trade ${trade.tradeId} closed on Corecen LP`)
+        } else {
+          console.error(`[TradeEngine] Failed to close A-Book trade on LP: ${lpResult.error}`)
+        }
+      } catch (lpError) {
+        console.error('[TradeEngine] Error closing trade on LP:', lpError)
+      }
     }
 
     // Close follower trades if this is a master trade
@@ -747,6 +783,22 @@ class TradeEngine {
           trade.openPrice = trade.side === 'BUY' ? currentAsk : currentBid
           trade.openedAt = new Date()
           await trade.save()
+
+          if (trade.bookType === 'A' && lpService.isConfigured()) {
+            const u = await User.findById(trade.userId).select('bookType firstName email')
+            if (u) {
+              try {
+                const lpResult = await lpService.pushTradeToCorecen(trade, u)
+                if (lpResult.success) {
+                  trade.lpPushed = true
+                  trade.lpPushedAt = new Date()
+                  await trade.save()
+                }
+              } catch (e) {
+                console.error('[TradeEngine] LP push after pending fill:', e)
+              }
+            }
+          }
 
           executedTrades.push({
             trade,

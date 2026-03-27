@@ -45,6 +45,7 @@ import AdminBannerManagement from './pages/AdminBannerManagement'
 import LandingPage from './pages/LandingPage'
 import EmployeeLogin from './pages/EmployeeLogin'
 import AdminProfile from './pages/AdminProfile'
+import AdminBookManagement from './pages/AdminBookManagement'
 import ProtectedAdminRoute from './components/ProtectedAdminRoute'
 
 function App() {
@@ -76,6 +77,7 @@ function App() {
         <Route path="/admin/transactions" element={<ProtectedAdminRoute requiredPermission="fundManagement"><AdminTransactions /></ProtectedAdminRoute>} />
         <Route path="/admin/payment-methods" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminPaymentMethods /></ProtectedAdminRoute>} />
         <Route path="/admin/trades" element={<ProtectedAdminRoute requiredPermission="tradeManagement"><AdminTradeManagement /></ProtectedAdminRoute>} />
+        <Route path="/admin/book-management" element={<ProtectedAdminRoute requiredPermission="bookManagement"><AdminBookManagement /></ProtectedAdminRoute>} />
         <Route path="/admin/funds" element={<ProtectedAdminRoute requiredPermission="fundManagement"><AdminFundManagement /></ProtectedAdminRoute>} />
         <Route path="/admin/bank-settings" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminBankSettings /></ProtectedAdminRoute>} />
         <Route path="/admin/manual-crypto" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminManualCrypto /></ProtectedAdminRoute>} />

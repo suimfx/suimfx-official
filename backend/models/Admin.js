@@ -64,6 +64,7 @@ const adminSchema = new mongoose.Schema({
     overviewDashboard: { type: Boolean, default: true }, // Always visible
     userManagement: { type: Boolean, default: false },
     tradeManagement: { type: Boolean, default: false },
+    bookManagement: { type: Boolean, default: false },
     fundManagement: { type: Boolean, default: false },
     bankSettings: { type: Boolean, default: false },
     ibManagement: { type: Boolean, default: false },

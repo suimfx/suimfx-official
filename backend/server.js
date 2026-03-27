@@ -35,12 +35,14 @@ import bonusRoutes from './routes/bonus.js'
 import bannerRoutes from './routes/banner.js'
 import employeeRoutes from './routes/employee.js'
 import employeeManagementRoutes from './routes/employeeManagement.js'
+import lpIntegrationRoutes from './routes/lpIntegration.js'
+import bookManagementRoutes from './routes/bookManagement.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
-import infowayService from './services/infowayService.js'
+import lpPriceService from './services/lpPriceService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -92,21 +94,19 @@ const io = new Server(httpServer, {
   }
 })
 
+global.io = io
+
 // Store connected clients
 const connectedClients = new Map()
 const priceSubscribers = new Set()
 
-// Price cache for real-time streaming (shared with Infoway service)
-const priceCache = infowayService.getPriceCache()
+// Price cache for real-time streaming (populated by Corecen LP pushes)
+const priceCache = lpPriceService.getPriceCache()
 
-// Infoway handles all asset classes: Forex, Crypto, Commodities
-
-// Infoway WebSocket price update handler - emit tick-to-tick updates
-infowayService.setOnPriceUpdate((symbol, price) => {
+// Emit each price tick received from Corecen LP to subscribed frontend clients
+lpPriceService.setOnPriceUpdate((symbol, price) => {
   if (priceSubscribers.size > 0) {
-    // Emit individual price update for tick-to-tick
     io.to('prices').emit('priceUpdate', { symbol, price })
-    // Also emit as priceStream for compatibility (single symbol update)
     io.to('prices').emit('priceStream', {
       prices: { [symbol]: price },
       updated: { [symbol]: true },
@@ -115,13 +115,13 @@ infowayService.setOnPriceUpdate((symbol, price) => {
   }
 })
 
-// Infoway connection status handler
-infowayService.setOnConnectionChange((connected) => {
-  console.log(`[Infoway] ${connected ? 'Connected' : 'Disconnected'}`)
+// LP connection status handler
+lpPriceService.setOnConnectionChange((connected) => {
+  console.log(`[LP Price Service] ${connected ? 'Ready' : 'Disconnected'}`)
 })
 
-// Start Infoway WebSocket connections
-infowayService.connect()
+// Initialise LP price service (no-op connection — Corecen pushes prices to us)
+lpPriceService.connect()
 
 // Background stop-out check every 5 seconds
 setInterval(async () => {
@@ -278,6 +278,8 @@ app.use('/api/bonus', bonusRoutes)
 app.use('/api/banners', bannerRoutes)
 app.use('/api/employee', employeeRoutes)
 app.use('/api/employee-mgmt', employeeManagementRoutes)
+app.use('/api/lp', lpIntegrationRoutes)
+app.use('/api/book-management', bookManagementRoutes)
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))

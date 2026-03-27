@@ -129,6 +129,22 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+
+  // Book Management (A-Book = LP / Corecen, B-Book = internal)
+  bookType: {
+    type: String,
+    enum: ['A', 'B'],
+    default: 'B'
+  },
+  bookChangedAt: {
+    type: Date,
+    default: null
+  },
+  bookChangedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
   
   createdAt: {
     type: Date,
