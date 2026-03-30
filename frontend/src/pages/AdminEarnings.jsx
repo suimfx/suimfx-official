@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
 import AdminLayout from '../components/AdminLayout'
-import { 
+import {
   DollarSign,
   TrendingUp,
   Calendar,
-  Users,
   BarChart3,
   RefreshCw,
-  ChevronDown,
-  Download
+  Activity
 } from 'lucide-react'
 import { API_URL } from '../config/api'
 
@@ -18,7 +16,7 @@ const AdminEarnings = () => {
   const [userEarnings, setUserEarnings] = useState([])
   const [symbolEarnings, setSymbolEarnings] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('daily')
   const [dateRange, setDateRange] = useState('30')
 
   useEffect(() => {
@@ -92,6 +90,13 @@ const AdminEarnings = () => {
     }).format(value || 0)
   }
 
+  const Row = ({ label, value, highlightClass }) => (
+    <div className="flex justify-between gap-2">
+      <span className="text-gray-400 shrink-0">{label}</span>
+      <span className={`font-mono text-right text-sm ${highlightClass || 'text-white'}`}>{value}</span>
+    </div>
+  )
+
   const StatCard = ({ title, value, subtitle, icon: Icon, color }) => (
     <div className="bg-dark-800 rounded-xl border border-gray-800 p-4 sm:p-5">
       <div className="flex items-start justify-between">
@@ -110,7 +115,10 @@ const AdminEarnings = () => {
   )
 
   return (
-    <AdminLayout title="Earnings Report" subtitle="Track commission, spread, and swap earnings">
+    <AdminLayout
+      title="Earnings Report"
+      subtitle="Live & prop accounts only — demo trading accounts are excluded. Commission, spread, and swap."
+    >
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-2">
@@ -141,111 +149,86 @@ const AdminEarnings = () => {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-            <StatCard 
-              title="Today" 
-              value={summary?.today?.total} 
-              subtitle={`${summary?.today?.trades || 0} trades`}
+            <StatCard
+              title="Today (total)"
+              value={summary?.today?.total}
+              subtitle={`${summary?.today?.trades || 0} trades · comm+spread+swap`}
               icon={DollarSign}
               color="text-green-500"
             />
-            <StatCard 
-              title="This Week" 
-              value={summary?.thisWeek?.total} 
+            <StatCard
+              title="This Week"
+              value={summary?.thisWeek?.total}
               subtitle={`${summary?.thisWeek?.trades || 0} trades`}
               icon={Calendar}
               color="text-blue-500"
             />
-            <StatCard 
-              title="This Month" 
-              value={summary?.thisMonth?.total} 
+            <StatCard
+              title="This Month"
+              value={summary?.thisMonth?.total}
               subtitle={`${summary?.thisMonth?.trades || 0} trades`}
               icon={TrendingUp}
               color="text-purple-500"
             />
-            <StatCard 
-              title="This Year" 
-              value={summary?.thisYear?.total} 
+            <StatCard
+              title="This Year"
+              value={summary?.thisYear?.total}
               subtitle={`${summary?.thisYear?.trades || 0} trades`}
               icon={BarChart3}
               color="text-orange-500"
             />
-            <StatCard 
-              title="All Time" 
-              value={summary?.allTime?.total} 
+            <StatCard
+              title="All Time"
+              value={summary?.allTime?.total}
               subtitle={`${summary?.allTime?.trades || 0} trades`}
               icon={DollarSign}
               color="text-green-500"
             />
           </div>
 
-          {/* Breakdown Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-            {/* Commission Breakdown */}
+          {/* Component totals — same periods as summary cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
-              <h3 className="text-white font-semibold mb-4">Commission Earnings</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Today</span>
-                  <span className="text-white font-mono">{formatCurrency(summary?.today?.commission)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">This Week</span>
-                  <span className="text-white font-mono">{formatCurrency(summary?.thisWeek?.commission)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">This Month</span>
-                  <span className="text-white font-mono">{formatCurrency(summary?.thisMonth?.commission)}</span>
-                </div>
-                <div className="flex justify-between border-t border-gray-700 pt-3">
-                  <span className="text-gray-400">All Time</span>
-                  <span className="text-green-500 font-mono font-bold">{formatCurrency(summary?.allTime?.commission)}</span>
-                </div>
+              <h3 className="text-white font-semibold mb-4">Commission</h3>
+              <div className="space-y-2">
+                <Row label="Today" value={formatCurrency(summary?.today?.commission)} />
+                <Row label="This week" value={formatCurrency(summary?.thisWeek?.commission)} />
+                <Row label="This month" value={formatCurrency(summary?.thisMonth?.commission)} />
+                <Row label="This year" value={formatCurrency(summary?.thisYear?.commission)} />
+                <Row label="All time" value={formatCurrency(summary?.allTime?.commission)} highlightClass="font-bold text-green-500" />
               </div>
             </div>
-
-            {/* Swap Breakdown */}
             <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
-              <h3 className="text-white font-semibold mb-4">Swap Earnings</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Today</span>
-                  <span className="text-white font-mono">{formatCurrency(summary?.today?.swap)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">This Week</span>
-                  <span className="text-white font-mono">{formatCurrency(summary?.thisWeek?.swap)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">This Month</span>
-                  <span className="text-white font-mono">{formatCurrency(summary?.thisMonth?.swap)}</span>
-                </div>
-                <div className="flex justify-between border-t border-gray-700 pt-3">
-                  <span className="text-gray-400">All Time</span>
-                  <span className="text-blue-500 font-mono font-bold">{formatCurrency(summary?.allTime?.swap)}</span>
-                </div>
+              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <Activity size={18} className="text-amber-500" />
+                Spread
+              </h3>
+              <div className="space-y-2">
+                <Row label="Today" value={formatCurrency(summary?.today?.spread)} />
+                <Row label="This week" value={formatCurrency(summary?.thisWeek?.spread)} />
+                <Row label="This month" value={formatCurrency(summary?.thisMonth?.spread)} />
+                <Row label="This year" value={formatCurrency(summary?.thisYear?.spread)} />
+                <Row label="All time" value={formatCurrency(summary?.allTime?.spread)} highlightClass="font-bold text-amber-500" />
               </div>
             </div>
-
-            {/* Volume Stats */}
             <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
-              <h3 className="text-white font-semibold mb-4">Trading Volume (Lots)</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Today</span>
-                  <span className="text-white font-mono">{(summary?.today?.volume || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">This Week</span>
-                  <span className="text-white font-mono">{(summary?.thisWeek?.volume || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">This Month</span>
-                  <span className="text-white font-mono">{(summary?.thisMonth?.volume || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between border-t border-gray-700 pt-3">
-                  <span className="text-gray-400">All Time</span>
-                  <span className="text-purple-500 font-mono font-bold">{(summary?.allTime?.volume || 0).toFixed(2)}</span>
-                </div>
+              <h3 className="text-white font-semibold mb-4">Swap</h3>
+              <div className="space-y-2">
+                <Row label="Today" value={formatCurrency(summary?.today?.swap)} />
+                <Row label="This week" value={formatCurrency(summary?.thisWeek?.swap)} />
+                <Row label="This month" value={formatCurrency(summary?.thisMonth?.swap)} />
+                <Row label="This year" value={formatCurrency(summary?.thisYear?.swap)} />
+                <Row label="All time" value={formatCurrency(summary?.allTime?.swap)} highlightClass="font-bold text-blue-500" />
+              </div>
+            </div>
+            <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
+              <h3 className="text-white font-semibold mb-4">Volume (lots)</h3>
+              <div className="space-y-2">
+                <Row label="Today" value={(summary?.today?.volume || 0).toFixed(2)} />
+                <Row label="This week" value={(summary?.thisWeek?.volume || 0).toFixed(2)} />
+                <Row label="This month" value={(summary?.thisMonth?.volume || 0).toFixed(2)} />
+                <Row label="This year" value={(summary?.thisYear?.volume || 0).toFixed(2)} />
+                <Row label="All time" value={(summary?.allTime?.volume || 0).toFixed(2)} highlightClass="font-bold text-purple-500" />
               </div>
             </div>
           </div>
@@ -281,6 +264,7 @@ const AdminEarnings = () => {
                     <tr>
                       <th className="text-left text-gray-400 text-xs font-medium px-4 py-3">Date</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Commission</th>
+                      <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Spread</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Swap</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Total</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Trades</th>
@@ -290,13 +274,14 @@ const AdminEarnings = () => {
                   <tbody>
                     {dailyEarnings.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center text-gray-500 py-8">No data for selected period</td>
+                        <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
                       dailyEarnings.map((day, idx) => (
                         <tr key={idx} className="border-t border-gray-800 hover:bg-dark-700">
                           <td className="px-4 py-3 text-white text-sm">{day.date}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(day.commission)}</td>
+                          <td className="px-4 py-3 text-right text-amber-200/90 font-mono text-sm">{formatCurrency(day.spread)}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(day.swap)}</td>
                           <td className="px-4 py-3 text-right text-green-500 font-mono text-sm font-semibold">{formatCurrency(day.total)}</td>
                           <td className="px-4 py-3 text-right text-gray-400 text-sm">{day.trades}</td>
@@ -319,6 +304,7 @@ const AdminEarnings = () => {
                     <tr>
                       <th className="text-left text-gray-400 text-xs font-medium px-4 py-3">User</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Commission</th>
+                      <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Spread</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Swap</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Total</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Trades</th>
@@ -328,7 +314,7 @@ const AdminEarnings = () => {
                   <tbody>
                     {userEarnings.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center text-gray-500 py-8">No data for selected period</td>
+                        <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
                       userEarnings.map((user, idx) => (
@@ -340,6 +326,7 @@ const AdminEarnings = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(user.commission)}</td>
+                          <td className="px-4 py-3 text-right text-amber-200/90 font-mono text-sm">{formatCurrency(user.spread)}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(user.swap)}</td>
                           <td className="px-4 py-3 text-right text-green-500 font-mono text-sm font-semibold">{formatCurrency(user.total)}</td>
                           <td className="px-4 py-3 text-right text-gray-400 text-sm">{user.trades}</td>
@@ -362,6 +349,7 @@ const AdminEarnings = () => {
                     <tr>
                       <th className="text-left text-gray-400 text-xs font-medium px-4 py-3">Symbol</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Commission</th>
+                      <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Spread</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Swap</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Total</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Trades</th>
@@ -371,13 +359,14 @@ const AdminEarnings = () => {
                   <tbody>
                     {symbolEarnings.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center text-gray-500 py-8">No data for selected period</td>
+                        <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
                       symbolEarnings.map((sym, idx) => (
                         <tr key={idx} className="border-t border-gray-800 hover:bg-dark-700">
                           <td className="px-4 py-3 text-white text-sm font-medium">{sym.symbol}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(sym.commission)}</td>
+                          <td className="px-4 py-3 text-right text-amber-200/90 font-mono text-sm">{formatCurrency(sym.spread)}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(sym.swap)}</td>
                           <td className="px-4 py-3 text-right text-green-500 font-mono text-sm font-semibold">{formatCurrency(sym.total)}</td>
                           <td className="px-4 py-3 text-right text-gray-400 text-sm">{sym.trades}</td>
