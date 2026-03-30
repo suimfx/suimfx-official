@@ -6,9 +6,13 @@ import {
   Calendar,
   BarChart3,
   RefreshCw,
-  Activity
+  Activity,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+
+const PAGE_SIZE = 10
 
 const AdminEarnings = () => {
   const [summary, setSummary] = useState(null)
@@ -18,10 +22,29 @@ const AdminEarnings = () => {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('daily')
   const [dateRange, setDateRange] = useState('30')
+  const [dailyPage, setDailyPage] = useState(1)
+  const [userPage, setUserPage] = useState(1)
+  const [symbolPage, setSymbolPage] = useState(1)
 
   useEffect(() => {
     fetchAllData()
   }, [dateRange])
+
+  useEffect(() => {
+    setDailyPage(1)
+    setUserPage(1)
+    setSymbolPage(1)
+  }, [dateRange])
+
+  useEffect(() => {
+    const clamp = (len, setPage) => {
+      const tp = len === 0 ? 1 : Math.max(1, Math.ceil(len / PAGE_SIZE))
+      setPage((p) => Math.min(p, tp))
+    }
+    clamp(dailyEarnings.length, setDailyPage)
+    clamp(userEarnings.length, setUserPage)
+    clamp(symbolEarnings.length, setSymbolPage)
+  }, [dailyEarnings, userEarnings, symbolEarnings])
 
   const fetchAllData = async () => {
     setLoading(true)
@@ -96,6 +119,62 @@ const AdminEarnings = () => {
       <span className={`font-mono text-right text-sm ${highlightClass || 'text-white'}`}>{value}</span>
     </div>
   )
+
+  const getPageSlice = (items, page) => {
+    const total = items.length
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE) || 1)
+    const safePage = Math.min(Math.max(1, page), totalPages)
+    const start = (safePage - 1) * PAGE_SIZE
+    return {
+      rows: items.slice(start, start + PAGE_SIZE),
+      totalPages,
+      safePage,
+      from: total === 0 ? 0 : start + 1,
+      to: Math.min(start + PAGE_SIZE, total)
+    }
+  }
+
+  const PaginationFooter = ({ page, setPage, totalItems }) => {
+    const tp =
+      totalItems === 0 ? 1 : Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
+    const sp = Math.min(Math.max(1, page), tp)
+    const start = (sp - 1) * PAGE_SIZE
+    const fromN = totalItems === 0 ? 0 : start + 1
+    const toN = Math.min(start + PAGE_SIZE, totalItems)
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-800 bg-dark-700/50">
+        <p className="text-gray-500 text-xs sm:text-sm">
+          {totalItems === 0
+            ? 'No data'
+            : `Showing ${fromN}–${toN} of ${totalItems}`}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={sp <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="p-2 rounded-lg bg-dark-800 border border-gray-700 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-dark-700"
+            aria-label="Previous page"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span className="text-gray-400 text-sm tabular-nums min-w-[7rem] text-center">
+            Page {sp} of {tp}
+          </span>
+          <button
+            type="button"
+            disabled={sp >= tp}
+            onClick={() => setPage((p) => Math.min(tp, p + 1))}
+            className="p-2 rounded-lg bg-dark-800 border border-gray-700 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-dark-700"
+            aria-label="Next page"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const StatCard = ({ title, value, subtitle, icon: Icon, color }) => (
     <div className="bg-dark-800 rounded-xl border border-gray-800 p-4 sm:p-5">
@@ -277,8 +356,8 @@ const AdminEarnings = () => {
                         <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
-                      dailyEarnings.map((day, idx) => (
-                        <tr key={idx} className="border-t border-gray-800 hover:bg-dark-700">
+                      getPageSlice(dailyEarnings, dailyPage).rows.map((day, idx) => (
+                        <tr key={day.date || idx} className="border-t border-gray-800 hover:bg-dark-700">
                           <td className="px-4 py-3 text-white text-sm">{day.date}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(day.commission)}</td>
                           <td className="px-4 py-3 text-right text-amber-200/90 font-mono text-sm">{formatCurrency(day.spread)}</td>
@@ -292,6 +371,11 @@ const AdminEarnings = () => {
                   </tbody>
                 </table>
               </div>
+              <PaginationFooter
+                page={dailyPage}
+                setPage={setDailyPage}
+                totalItems={dailyEarnings.length}
+              />
             </div>
           )}
 
@@ -317,8 +401,8 @@ const AdminEarnings = () => {
                         <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
-                      userEarnings.map((user, idx) => (
-                        <tr key={idx} className="border-t border-gray-800 hover:bg-dark-700">
+                      getPageSlice(userEarnings, userPage).rows.map((user, idx) => (
+                        <tr key={user.userId || idx} className="border-t border-gray-800 hover:bg-dark-700">
                           <td className="px-4 py-3">
                             <div>
                               <p className="text-white text-sm font-medium">{user.userName || 'Unknown'}</p>
@@ -337,6 +421,11 @@ const AdminEarnings = () => {
                   </tbody>
                 </table>
               </div>
+              <PaginationFooter
+                page={userPage}
+                setPage={setUserPage}
+                totalItems={userEarnings.length}
+              />
             </div>
           )}
 
@@ -362,8 +451,8 @@ const AdminEarnings = () => {
                         <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
-                      symbolEarnings.map((sym, idx) => (
-                        <tr key={idx} className="border-t border-gray-800 hover:bg-dark-700">
+                      getPageSlice(symbolEarnings, symbolPage).rows.map((sym, idx) => (
+                        <tr key={sym.symbol || idx} className="border-t border-gray-800 hover:bg-dark-700">
                           <td className="px-4 py-3 text-white text-sm font-medium">{sym.symbol}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(sym.commission)}</td>
                           <td className="px-4 py-3 text-right text-amber-200/90 font-mono text-sm">{formatCurrency(sym.spread)}</td>
@@ -377,6 +466,11 @@ const AdminEarnings = () => {
                   </tbody>
                 </table>
               </div>
+              <PaginationFooter
+                page={symbolPage}
+                setPage={setSymbolPage}
+                totalItems={symbolEarnings.length}
+              />
             </div>
           )}
         </>
