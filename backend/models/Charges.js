@@ -29,6 +29,14 @@ const chargesSchema = new mongoose.Schema({
     default: null
   },
   
+  // Admin who created this charge (for multi-tenant filtering)
+  // null = Super Admin's global charge
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
+  
   // ============ SPREAD SETTINGS ============
   // Spread is added to the price (BUY gets higher price, SELL gets lower price)
   // For Forex: Value in PIPS (e.g., 1.5 = 1.5 pips = 0.00015 for EURUSD, 0.015 for USDJPY)

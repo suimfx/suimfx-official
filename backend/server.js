@@ -29,12 +29,15 @@ import supportRoutes from './routes/support.js'
 import kycRoutes from './routes/kyc.js'
 import themeRoutes from './routes/theme.js'
 import adminManagementRoutes from './routes/adminManagement.js'
+import impersonationRoutes from './routes/impersonation.js'
 import uploadRoutes from './routes/upload.js'
 import emailTemplatesRoutes from './routes/emailTemplates.js'
 import bonusRoutes from './routes/bonus.js'
 import bannerRoutes from './routes/banner.js'
 import employeeRoutes from './routes/employee.js'
 import employeeManagementRoutes from './routes/employeeManagement.js'
+import lpIntegrationRoutes from './routes/lpIntegration.js'
+import bookManagementRoutes from './routes/bookManagement.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
@@ -91,6 +94,8 @@ const io = new Server(httpServer, {
     credentials: true
   }
 })
+
+global.io = io
 
 // Store connected clients
 const connectedClients = new Map()
@@ -272,12 +277,15 @@ app.use('/api/support', supportRoutes)
 app.use('/api/kyc', kycRoutes)
 app.use('/api/theme', themeRoutes)
 app.use('/api/admin-mgmt', adminManagementRoutes)
+app.use('/api/impersonate', impersonationRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/email-templates', emailTemplatesRoutes)
 app.use('/api/bonus', bonusRoutes)
 app.use('/api/banners', bannerRoutes)
 app.use('/api/employee', employeeRoutes)
 app.use('/api/employee-mgmt', employeeManagementRoutes)
+app.use('/api/lp', lpIntegrationRoutes)
+app.use('/api/book-management', bookManagementRoutes)
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))

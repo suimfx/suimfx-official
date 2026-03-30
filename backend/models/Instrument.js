@@ -55,7 +55,15 @@ const instrumentSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
-  }
+  },
+  // Optional: synced from Corecen LP bulk upsert
+  assetClass: { type: String, default: null },
+  bookType: { type: String, default: null },
+  markupBps: { type: Number, default: 0 },
+  commissionPerLot: { type: Number, default: null },
+  marginPercent: { type: Number, default: null },
+  precision: { type: Number, default: null },
+  source: { type: String, default: null }
 }, { timestamps: true })
 
 export default mongoose.model('Instrument', instrumentSchema)

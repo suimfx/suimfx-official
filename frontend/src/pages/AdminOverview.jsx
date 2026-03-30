@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import AdminLayout from '../components/AdminLayout'
 import { 
   Users,
@@ -6,13 +7,33 @@ import {
   Wallet,
   CreditCard,
   RefreshCw,
-  Calendar
+  Calendar,
+  BookOpen,
+  ChevronRight
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+
+function canAccessBookManagement() {
+  try {
+    const raw = localStorage.getItem('adminUser')
+    if (!raw) return false
+    const u = JSON.parse(raw)
+    if (u.role === 'SUPER_ADMIN') return true
+    if (u.sidebarPermissions?.bookManagement === true) return true
+    const p = u.permissions
+    if (p && (p.canViewTrades || p.canManageTrades)) return true
+    return false
+  } catch {
+    return false
+  }
+}
 
 const AdminOverview = () => {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [bookLoading, setBookLoading] = useState(false)
+  const [bookStats, setBookStats] = useState(null)
+  const [lpConnected, setLpConnected] = useState(null)
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeToday: 0,
@@ -74,6 +95,38 @@ const AdminOverview = () => {
     setLoading(false)
   }
 
+  const fetchBookLpSummary = async () => {
+    if (!canAccessBookManagement()) return
+    const token = localStorage.getItem('adminToken')
+    if (!token) return
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
+    setBookLoading(true)
+    try {
+      const [st, lp] = await Promise.all([
+        fetch(`${API_URL}/book-management/stats`, { headers }),
+        fetch(`${API_URL}/book-management/lp-status`, { headers })
+      ])
+      if (st.ok) {
+        const j = await st.json()
+        if (j.success && j.stats) setBookStats(j.stats)
+      }
+      if (lp.ok) {
+        const j = await lp.json()
+        setLpConnected(j.connected === true)
+      }
+    } catch (e) {
+      console.error('Book/LP overview fetch:', e)
+    }
+    setBookLoading(false)
+  }
+
+  useEffect(() => {
+    fetchBookLpSummary()
+  }, [])
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -133,7 +186,7 @@ const AdminOverview = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-white font-semibold">Recent Users</h2>
             <button 
-              onClick={fetchData}
+              onClick={() => { fetchData(); fetchBookLpSummary() }}
               className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
             >
               <RefreshCw size={16} className={`text-gray-400 ${loading ? 'animate-spin' : ''}`} />
@@ -210,6 +263,57 @@ const AdminOverview = () => {
           </div>
         </div>
       </div>
+
+      {canAccessBookManagement() && (
+        <div className="mt-6 bg-dark-800 rounded-xl p-5 border border-gray-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 bg-accent-green/15 rounded-lg flex items-center justify-center shrink-0">
+                <BookOpen size={22} className="text-accent-green" />
+              </div>
+              <div>
+                <h2 className="text-white font-semibold text-lg">A-Book &amp; Liquidity (Corecen)</h2>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  LP / A-Book routing is configured under Book Management. Here is a quick snapshot.
+                </p>
+                {bookLoading ? (
+                  <p className="text-gray-500 text-sm mt-2 flex items-center gap-2">
+                    <RefreshCw size={14} className="animate-spin" /> Loading…
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-x-6 gap-y-2 mt-3 text-sm">
+                    <span className="text-gray-400">
+                      LP:{' '}
+                      <span className={lpConnected ? 'text-green-400 font-medium' : 'text-amber-400 font-medium'}>
+                        {lpConnected === null ? '—' : lpConnected ? 'Connected' : 'Not connected'}
+                      </span>
+                    </span>
+                    <span className="text-gray-400">
+                      A-Book users:{' '}
+                      <span className="text-white font-medium">{bookStats?.aBook?.users ?? '—'}</span>
+                    </span>
+                    <span className="text-gray-400">
+                      B-Book users:{' '}
+                      <span className="text-white font-medium">{bookStats?.bBook?.users ?? '—'}</span>
+                    </span>
+                    <span className="text-gray-400">
+                      A-Book open trades:{' '}
+                      <span className="text-white font-medium">{bookStats?.aBook?.openTrades ?? '—'}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <Link
+              to="/admin/book-management"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-accent-green/20 hover:bg-accent-green/30 text-accent-green border border-accent-green/40 text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              Open Book Management
+              <ChevronRight size={18} />
+            </Link>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   )
 }

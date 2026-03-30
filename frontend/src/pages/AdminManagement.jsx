@@ -54,6 +54,7 @@ const AdminManagement = () => {
     { key: 'overviewDashboard', label: 'Overview Dashboard' },
     { key: 'userManagement', label: 'User Management' },
     { key: 'tradeManagement', label: 'Trade Management' },
+    { key: 'bookManagement', label: 'Book Management' },
     { key: 'fundManagement', label: 'Fund Management' },
     { key: 'bankSettings', label: 'Bank Settings' },
     { key: 'ibManagement', label: 'IB Management' },

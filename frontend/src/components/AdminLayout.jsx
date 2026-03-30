@@ -25,7 +25,8 @@ import {
   Gift,
   Image,
   User,
-  Bitcoin
+  Bitcoin,
+  BookOpen
 } from 'lucide-react'
 import logoImage from '../assets/suimfxLogo.png'
 
@@ -50,6 +51,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
     { name: 'Overview Dashboard', icon: LayoutDashboard, path: '/admin/dashboard', sidebarKey: 'overviewDashboard' },
     { name: 'User Management', icon: Users, path: '/admin/users', sidebarKey: 'userManagement' },
     { name: 'Trade Management', icon: TrendingUp, path: '/admin/trades', sidebarKey: 'tradeManagement' },
+    { name: 'Book Management', icon: BookOpen, path: '/admin/book-management', sidebarKey: 'bookManagement' },
     { name: 'Fund Management', icon: Wallet, path: '/admin/funds', sidebarKey: 'fundManagement' },
     { name: 'Bank Settings', icon: Building2, path: '/admin/bank-settings', sidebarKey: 'bankSettings' },
     { name: 'Manual crypto', icon: Bitcoin, path: '/admin/manual-crypto', sidebarKey: 'bankSettings' },
@@ -93,6 +95,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
       const permissionMap = {
         'userManagement': p.canViewUsers || p.canManageUsers,
         'tradeManagement': p.canViewTrades || p.canManageTrades,
+        'bookManagement': p.canViewTrades || p.canManageTrades,
         'fundManagement': p.canViewDeposits || p.canViewWithdrawals || p.canApproveDeposits || p.canApproveWithdrawals,
         'bankSettings': p.canManagePaymentMethods,
         'ibManagement': p.canViewIB || p.canManageIB,
