@@ -5,6 +5,7 @@ import Admin from '../models/Admin.js'
 import AdminWallet from '../models/AdminWallet.js'
 import AdminWalletTransaction from '../models/AdminWalletTransaction.js'
 import User from '../models/User.js'
+import { generateReferralCode } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
@@ -274,7 +275,9 @@ router.post('/admins', async (req, res) => {
       password,
       firstName,
       lastName,
-      phone
+      phone,
+      commissionRate,
+      customDomain
     } = req.body
 
     // Validate required fields
@@ -319,6 +322,14 @@ router.post('/admins', async (req, res) => {
 
     // Generate unique urlSlug from email
     const generatedSlug = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Date.now().toString(36)
+    
+    // Generate unique referral code
+    let referralCode = generateReferralCode()
+    let codeExists = await Admin.findOne({ referralCode })
+    while (codeExists) {
+      referralCode = generateReferralCode()
+      codeExists = await Admin.findOne({ referralCode })
+    }
 
     // Create admin
     const admin = new Admin({
@@ -328,6 +339,9 @@ router.post('/admins', async (req, res) => {
       lastName,
       phone: phone || '',
       urlSlug: generatedSlug,
+      referralCode,
+      commissionRate: commissionRate || 0,
+      customDomain: customDomain || null,
       role: 'ADMIN',
       sidebarPermissions: finalSidebarPermissions
     })
@@ -343,12 +357,15 @@ router.post('/admins', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Employee created successfully',
+      message: 'Admin created successfully',
       admin: {
         _id: admin._id,
         email: admin.email,
         firstName: admin.firstName,
         lastName: admin.lastName,
+        referralCode: admin.referralCode,
+        commissionRate: admin.commissionRate,
+        customDomain: admin.customDomain,
         sidebarPermissions: admin.sidebarPermissions
       }
     })
@@ -364,7 +381,9 @@ router.put('/admins/:id', async (req, res) => {
       firstName,
       lastName,
       phone,
-      status
+      status,
+      commissionRate,
+      customDomain
     } = req.body
 
     const admin = await Admin.findById(req.params.id)
@@ -377,6 +396,8 @@ router.put('/admins/:id', async (req, res) => {
     if (lastName) admin.lastName = lastName
     if (phone !== undefined) admin.phone = phone
     if (status) admin.status = status
+    if (commissionRate !== undefined) admin.commissionRate = commissionRate
+    if (customDomain !== undefined) admin.customDomain = customDomain
 
     await admin.save()
 

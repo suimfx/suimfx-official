@@ -40,6 +40,28 @@ const adminSchema = new mongoose.Schema({
     lowercase: true
   },
   
+  // Referral code for user signup (e.g., ?ref=JOHN123)
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    uppercase: true
+  },
+  
+  // Custom domain for this admin (optional)
+  customDomain: {
+    type: String,
+    default: null
+  },
+  
+  // Commission rate: % Super Admin takes from this admin's profit
+  commissionRate: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  
   // Company/Brand Info for this admin
   brandName: {
     type: String,
