@@ -186,10 +186,10 @@ const AdminEarnings = () => {
             />
           </div>
 
-          {/* Component totals — same periods as summary cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Breakdown: commission, spread, swap, volume — same periods */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
-              <h3 className="text-white font-semibold mb-4">Commission</h3>
+              <h3 className="text-white font-semibold mb-4">Commission Earnings</h3>
               <div className="space-y-2">
                 <Row label="Today" value={formatCurrency(summary?.today?.commission)} />
                 <Row label="This week" value={formatCurrency(summary?.thisWeek?.commission)} />
@@ -198,10 +198,10 @@ const AdminEarnings = () => {
                 <Row label="All time" value={formatCurrency(summary?.allTime?.commission)} highlightClass="font-bold text-green-500" />
               </div>
             </div>
-            <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
+            <div className="bg-dark-800 rounded-xl border border-gray-800 p-5 ring-1 ring-amber-500/20">
               <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <Activity size={18} className="text-amber-500" />
-                Spread
+                <Activity size={18} className="text-amber-500 shrink-0" />
+                Spread Earnings
               </h3>
               <div className="space-y-2">
                 <Row label="Today" value={formatCurrency(summary?.today?.spread)} />
@@ -212,7 +212,7 @@ const AdminEarnings = () => {
               </div>
             </div>
             <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
-              <h3 className="text-white font-semibold mb-4">Swap</h3>
+              <h3 className="text-white font-semibold mb-4">Swap Earnings</h3>
               <div className="space-y-2">
                 <Row label="Today" value={formatCurrency(summary?.today?.swap)} />
                 <Row label="This week" value={formatCurrency(summary?.thisWeek?.swap)} />
@@ -222,7 +222,7 @@ const AdminEarnings = () => {
               </div>
             </div>
             <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
-              <h3 className="text-white font-semibold mb-4">Volume (lots)</h3>
+              <h3 className="text-white font-semibold mb-4">Trading Volume (Lots)</h3>
               <div className="space-y-2">
                 <Row label="Today" value={(summary?.today?.volume || 0).toFixed(2)} />
                 <Row label="This week" value={(summary?.thisWeek?.volume || 0).toFixed(2)} />
