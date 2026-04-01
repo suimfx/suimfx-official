@@ -37,12 +37,13 @@ import {
   FileCheck
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
-import { API_URL } from '../config/api'
-import logoImage from '../assets/suimfxLogo.png'
+import { API_URL, API_BASE_URL } from '../config/api'
+import suimfxLogo from '../assets/suimfxLogo.png'
 
 const ProfilePage = () => {
   const navigate = useNavigate()
   const { isDarkMode, toggleDarkMode } = useTheme()
+  const [logoImage, setLogoImage] = useState(suimfxLogo)
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -75,6 +76,15 @@ const ProfilePage = () => {
     upiId: ''
   })
   const [bankLoading, setBankLoading] = useState(false)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API_URL}/auth/my-branding`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => { if (data.success && data.branding && data.branding.logo) setLogoImage(`${API_BASE_URL}${data.branding.logo}`) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -267,7 +277,8 @@ const ProfilePage = () => {
 
   const fetchChallengeStatus = async () => {
     try {
-      const res = await fetch(`${API_URL}/prop/status`)
+      const u = JSON.parse(localStorage.getItem('user') || '{}')
+      const res = await fetch(`${API_URL}/prop/status${u.assignedAdmin ? '?adminId=' + u.assignedAdmin : ''}`)
       const data = await res.json()
       if (data.success) {
         setChallengeModeEnabled(data.enabled)

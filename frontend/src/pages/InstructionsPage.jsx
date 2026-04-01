@@ -6,16 +6,32 @@ import {
   ArrowLeft, Home, Sun, Moon
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
-import { API_URL } from '../config/api'
-import logoImage from '../assets/suimfxLogo.png'
+import { API_URL, API_BASE_URL } from '../config/api'
+import suimfxLogo from '../assets/suimfxLogo.png'
 
 const InstructionsPage = () => {
   const navigate = useNavigate()
   const { isDarkMode, toggleDarkMode } = useTheme()
+  const [logoImage, setLogoImage] = useState(suimfxLogo)
+  const [brandName, setBrandName] = useState('Suimfx')
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [expandedSection, setExpandedSection] = useState('getting-started')
   const [challengeModeEnabled, setChallengeModeEnabled] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API_URL}/auth/my-branding`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => { 
+        if (data.success && data.branding) {
+          if (data.branding.logo) setLogoImage(`${API_BASE_URL}${data.branding.logo}`)
+          if (data.branding.brandName) setBrandName(data.branding.brandName)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -29,7 +45,8 @@ const InstructionsPage = () => {
 
   const fetchChallengeStatus = async () => {
     try {
-      const res = await fetch(`${API_URL}/prop/status`)
+      const u = JSON.parse(localStorage.getItem('user') || '{}')
+      const res = await fetch(`${API_URL}/prop/status${u.assignedAdmin ? '?adminId=' + u.assignedAdmin : ''}`)
       const data = await res.json()
       if (data.success) setChallengeModeEnabled(data.enabled)
     } catch (error) {}
@@ -197,7 +214,7 @@ const InstructionsPage = () => {
                   <BookOpen size={isMobile ? 20 : 28} className="text-accent-green" />
                 </div>
                 <div>
-                  <h2 className={`font-bold text-white ${isMobile ? 'text-base' : 'text-xl'}`}>Welcome to Suimfx</h2>
+                  <h2 className={`font-bold text-white ${isMobile ? 'text-base' : 'text-xl'}`}>Welcome to {brandName}</h2>
                   <p className={`text-gray-400 ${isMobile ? 'text-xs' : ''}`}>Learn how to use our platform</p>
                 </div>
               </div>

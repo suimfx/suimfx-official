@@ -197,6 +197,14 @@ router.post('/prices', validateLpRequest, (req, res) => {
 
     lpPriceService.updatePrices([{ symbol, bid, ask, spread, timestamp }])
 
+    if (global.io) {
+      global.io.to('prices').emit('priceStream', {
+        prices: Object.fromEntries(lpPriceCache),
+        updated: { [symbol]: { bid, ask, time: now } },
+        timestamp: now
+      })
+    }
+
     res.json({ success: true, symbol })
   } catch (error) {
     console.error('LP price error:', error)

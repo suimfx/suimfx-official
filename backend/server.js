@@ -104,7 +104,6 @@ const priceSubscribers = new Set()
 // Price cache for real-time streaming (populated by Corecen LP pushes)
 const priceCache = lpPriceService.getPriceCache()
 
-// Emit each price tick received from Corecen LP to subscribed frontend clients
 lpPriceService.setOnPriceUpdate((symbol, price) => {
   if (priceSubscribers.size > 0) {
     io.to('prices').emit('priceUpdate', { symbol, price })
@@ -116,13 +115,12 @@ lpPriceService.setOnPriceUpdate((symbol, price) => {
   }
 })
 
-// LP connection status handler
 lpPriceService.setOnConnectionChange((connected) => {
   console.log(`[LP Price Service] ${connected ? 'Ready' : 'Disconnected'}`)
 })
 
-// Initialise LP price service (no-op connection — Corecen pushes prices to us)
 lpPriceService.connect()
+console.log('[Market data] Corecen LP → POST /api/lp/prices/batch')
 
 // Background stop-out check every 5 seconds
 setInterval(async () => {
@@ -248,6 +246,19 @@ mongoose.connect(process.env.MONGODB_URI)
       await Transaction.syncIndexes()
     } catch (e) {
       console.warn('[MongoDB] Transaction.syncIndexes:', e.message)
+    }
+    // One-time migration: ensure all ADMINs have bankSettings enabled
+    try {
+      const Admin = (await import('./models/Admin.js')).default
+      const result = await Admin.updateMany(
+        { role: 'ADMIN', 'sidebarPermissions.bankSettings': { $ne: true } },
+        { $set: { 'sidebarPermissions.bankSettings': true } }
+      )
+      if (result.modifiedCount > 0) {
+        console.log(`[Migration] Enabled bankSettings for ${result.modifiedCount} existing admin(s)`)
+      }
+    } catch (e) {
+      console.warn('[Migration] bankSettings:', e.message)
     }
   })
   .catch((err) => console.error('MongoDB connection error:', err))

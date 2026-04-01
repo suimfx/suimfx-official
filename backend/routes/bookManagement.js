@@ -6,6 +6,8 @@ import TradingAccount from '../models/TradingAccount.js'
 import lpService from '../services/lpService.js'
 import dotenv from 'dotenv'
 import { verifyAdminToken, requireSidebarPermission, PERMISSIONS } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
+import { getAllLpPrices } from './lpIntegration.js'
 
 dotenv.config()
 
@@ -56,11 +58,26 @@ router.get('/users', async (req, res) => {
 
     let query = {}
 
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    if (req.admin.role === 'ADMIN') {
+      query.assignedAdmin = req.admin._id
+    } else {
+      query.$or = [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }]
+    }
+
     if (search) {
-      query.$or = [
+      const searchFilter = [
         { firstName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } }
       ]
+      if (query.$or) {
+        // Combine admin filter $or with search $or using $and
+        const adminFilter = query.$or
+        delete query.$or
+        query.$and = [{ $or: adminFilter }, { $or: searchFilter }]
+      } else {
+        query.$or = searchFilter
+      }
     }
 
     if (bookType && ['A', 'B'].includes(bookType)) {
@@ -123,6 +140,11 @@ router.put('/users/:userId/book-type', async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
 
+    // Admin can only switch their assigned users
+    if (req.admin.role === 'ADMIN' && user.assignedAdmin?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
     const previousBookType = user.bookType
 
     user.bookType = bookType
@@ -183,19 +205,37 @@ router.put('/users/bulk-book-type', async (req, res) => {
 // Get book statistics
 router.get('/stats', async (req, res) => {
   try {
-    const aBookUsers = await User.countDocuments({ bookType: 'A' })
-    const bBookUsers = await User.countDocuments({ bookType: 'B' })
+    let userQuery = {}
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    if (req.admin.role === 'ADMIN') {
+      userQuery.assignedAdmin = req.admin._id
+    } else {
+      userQuery.$or = [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }]
+    }
+    const userIds = await getAdminUserIds(req.admin)
+    
+    const aBookUsers = await User.countDocuments({ ...userQuery, bookType: 'A' })
+    const bBookUsers = await User.countDocuments({ ...userQuery, bookType: 'B' })
 
-    const aBookTrades = await Trade.countDocuments({ bookType: 'A', status: 'OPEN' })
-    const bBookTrades = await Trade.countDocuments({ bookType: 'B', status: 'OPEN' })
+    const aBookTradeQuery = { bookType: 'A', status: 'OPEN' }
+    const bBookTradeQuery = { bookType: 'B', status: 'OPEN' }
+    
+    if (userIds && userIds.length > 0) {
+      aBookTradeQuery.userId = { $in: userIds }
+      bBookTradeQuery.userId = { $in: userIds }
+    }
+    
+    const aBookTrades = await Trade.countDocuments(aBookTradeQuery)
+    const bBookTrades = await Trade.countDocuments(bBookTradeQuery)
 
     const aBookVolume = await Trade.aggregate([
-      { $match: { bookType: 'A', status: 'OPEN' } },
+      { $match: aBookTradeQuery },
       { $group: { _id: null, total: { $sum: '$quantity' } } }
     ])
 
     const bBookVolume = await Trade.aggregate([
-      { $match: { bookType: 'B', status: 'OPEN' } },
+      { $match: bBookTradeQuery },
       { $group: { _id: null, total: { $sum: '$quantity' } } }
     ])
 
@@ -227,6 +267,10 @@ router.get('/a-book/positions', async (req, res) => {
 
     let query = { bookType: 'A', status: 'OPEN' }
     if (symbol) query.symbol = symbol
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const posUserIds = await getAdminUserIds(req.admin)
+    if (posUserIds) query.userId = { $in: posUserIds }
 
     const skip = (parseInt(page) - 1) * parseInt(limit)
 
@@ -273,9 +317,13 @@ router.get('/a-book/positions', async (req, res) => {
 router.get('/a-book/history', async (req, res) => {
   try {
     const { page = 1, limit = 100, symbol, dateFrom, dateTo } = req.query
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const histUserIds = await getAdminUserIds(req.admin)
 
-    let query = { bookType: 'A', status: 'CLOSED' }
+    let query = { bookType: 'A', status: { $in: ['CLOSED', 'CANCELLED'] } }
     if (symbol) query.symbol = symbol
+    if (histUserIds) query.userId = { $in: histUserIds }
     if (dateFrom || dateTo) {
       query.closedAt = {}
       if (dateFrom) query.closedAt.$gte = new Date(dateFrom)
@@ -295,7 +343,7 @@ router.get('/a-book/history', async (req, res) => {
         .lean(),
       Trade.countDocuments(query),
       Trade.aggregate([
-        { $match: { bookType: 'A', status: 'CLOSED' } },
+        { $match: { bookType: 'A', status: { $in: ['CLOSED', 'CANCELLED'] } } },
         { $group: {
           _id: null,
           totalPnl: { $sum: '$realizedPnl' },
@@ -330,14 +378,12 @@ router.get('/a-book/trades', async (req, res) => {
     const { status = 'OPEN', page = 1, limit = 50, symbol } = req.query
 
     let query = { bookType: 'A' }
-
-    if (status && status !== 'ALL') {
-      query.status = status
-    }
-
-    if (symbol) {
-      query.symbol = symbol
-    }
+    if (status !== 'all') query.status = status
+    if (symbol) query.symbol = symbol
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const aTradeUserIds = await getAdminUserIds(req.admin)
+    if (aTradeUserIds) query.userId = { $in: aTradeUserIds }
 
     const skip = (parseInt(page) - 1) * parseInt(limit)
 
@@ -387,14 +433,12 @@ router.get('/b-book/trades', async (req, res) => {
     const { status = 'OPEN', page = 1, limit = 50, symbol } = req.query
 
     let query = { bookType: 'B' }
-
-    if (status && status !== 'ALL') {
-      query.status = status
-    }
-
-    if (symbol) {
-      query.symbol = symbol
-    }
+    if (status !== 'all') query.status = status
+    if (symbol) query.symbol = symbol
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const bTradeUserIds = await getAdminUserIds(req.admin)
+    if (bTradeUserIds) query.userId = { $in: bTradeUserIds }
 
     const skip = (parseInt(page) - 1) * parseInt(limit)
 
@@ -451,18 +495,21 @@ router.get('/lp-status', async (req, res) => {
         signal: AbortSignal.timeout(3000)
       })
 
+      const tickCount = getAllLpPrices().size
       if (response.ok) {
         res.json({
           success: true,
           connected: true,
-          message: 'LP is connected and responding',
-          lpUrl: settings.lpApiUrl
+          message: 'Corecen LP is reachable. Market ticks on this server: POST /api/lp/prices/batch.',
+          lpUrl: settings.lpApiUrl,
+          suimfxCachedSymbols: tickCount
         })
       } else {
         res.json({
           success: true,
           connected: false,
-          message: `LP returned status ${response.status}`
+          message: `LP returned status ${response.status}`,
+          suimfxCachedSymbols: tickCount
         })
       }
     } catch (fetchError) {
@@ -473,7 +520,8 @@ router.get('/lp-status', async (req, res) => {
           ? 'LP server is not running'
           : fetchError.name === 'TimeoutError'
             ? 'LP connection timed out'
-            : fetchError.message
+            : fetchError.message,
+        suimfxCachedSymbols: getAllLpPrices().size
       })
     }
   } catch (error) {

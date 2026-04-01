@@ -10,6 +10,7 @@ import UserBonus from '../models/UserBonus.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 import EmailSettings from '../models/EmailSettings.js'
 import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
@@ -322,7 +323,14 @@ router.get('/transactions/:userId', async (req, res) => {
 // GET /api/wallet/transactions/all - Get all transactions (admin)
 router.get('/admin/transactions', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
   try {
-    const transactions = await Transaction.find()
+    let query = {}
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) query.userId = { $in: userIds }
+    // SUPER_ADMIN sees all transactions
+    
+    const transactions = await Transaction.find(query)
       .populate('userId', 'firstName lastName email')
       .sort({ createdAt: -1 })
     res.json({ transactions })
@@ -338,6 +346,16 @@ router.put('/admin/approve/:id', verifyAdminToken, requireEmployeePermission(PER
     
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' })
+    }
+
+    // Each admin can only approve their own users' transactions
+    const txUser = await User.findById(transaction.userId)
+    if (req.admin.role === 'ADMIN') {
+      if (!txUser || txUser.assignedAdmin?.toString() !== req.admin._id.toString()) {
+        return res.status(403).json({ message: 'You do not have permission to approve this transaction' })
+      }
+    } else if (!txUser || txUser.assignedAdmin) {
+      return res.status(403).json({ message: 'You do not have permission to approve this transaction' })
     }
 
     if (transaction.status !== 'Pending') {
@@ -431,6 +449,16 @@ router.put('/admin/reject/:id', verifyAdminToken, requireEmployeePermission(PERM
       return res.status(404).json({ message: 'Transaction not found' })
     }
 
+    // Each admin can only reject their own users' transactions
+    const txUser1 = await User.findById(transaction.userId)
+    if (req.admin.role === 'ADMIN') {
+      if (!txUser1 || txUser1.assignedAdmin?.toString() !== req.admin._id.toString()) {
+        return res.status(403).json({ message: 'You do not have permission to reject this transaction' })
+      }
+    } else if (!txUser1 || txUser1.assignedAdmin) {
+      return res.status(403).json({ message: 'You do not have permission to reject this transaction' })
+    }
+
     if (transaction.status !== 'Pending') {
       return res.status(400).json({ message: 'Transaction already processed' })
     }
@@ -465,6 +493,16 @@ router.put('/transaction/:id/approve', verifyAdminToken, requireEmployeePermissi
     
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' })
+    }
+
+    // Each admin can only approve their own users' transactions
+    const txUser2 = await User.findById(transaction.userId)
+    if (req.admin.role === 'ADMIN') {
+      if (!txUser2 || txUser2.assignedAdmin?.toString() !== req.admin._id.toString()) {
+        return res.status(403).json({ message: 'You do not have permission to approve this transaction' })
+      }
+    } else if (!txUser2 || txUser2.assignedAdmin) {
+      return res.status(403).json({ message: 'You do not have permission to approve this transaction' })
     }
 
     if (transaction.status !== 'Pending') {
@@ -558,6 +596,16 @@ router.put('/transaction/:id/reject', verifyAdminToken, requireEmployeePermissio
     
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' })
+    }
+
+    // Each admin can only reject their own users' transactions
+    const txUser3 = await User.findById(transaction.userId)
+    if (req.admin.role === 'ADMIN') {
+      if (!txUser3 || txUser3.assignedAdmin?.toString() !== req.admin._id.toString()) {
+        return res.status(403).json({ message: 'You do not have permission to reject this transaction' })
+      }
+    } else if (!txUser3 || txUser3.assignedAdmin) {
+      return res.status(403).json({ message: 'You do not have permission to reject this transaction' })
     }
 
     if (transaction.status !== 'Pending') {

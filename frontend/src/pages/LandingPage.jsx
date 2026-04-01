@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import suimfxLogo from '../assets/suimfxLogo.png'
+import { useBranding } from '../context/BrandingContext'
 import { 
   CheckCircle2, Users, TrendingUp, Shield, Zap, Globe, BarChart3,
   Menu, X, Download, ArrowRight, Star, Clock, Headphones, Award,
@@ -9,6 +10,7 @@ import {
 
 // ============ NAVBAR COMPONENT ============
 const Navbar = () => {
+  const { branding } = useBranding()
   const [isScrolled, setIsScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -38,7 +40,7 @@ const Navbar = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 md:h-20">
             <a href="/" className="flex items-center gap-2">
-              <img src={suimfxLogo} alt="Suimfx" className="h-20 md:h-24 w-auto" />
+              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Suimfx'} className="h-20 md:h-24 w-auto" />
             </a>
 
             <div className="hidden md:flex items-center gap-8">
@@ -439,13 +441,14 @@ const FAQSection = () => {
 
 // ============ FOOTER COMPONENT ============
 const Footer = () => {
+  const { branding } = useBranding()
   return (
     <footer className="bg-slate-950 border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <a href="/" className="inline-block mb-4">
-              <img src={suimfxLogo} alt="Suimfx" className="h-24 w-auto" />
+              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Suimfx'} className="h-24 w-auto" />
             </a>
             <p className="text-slate-400 text-sm mb-4">
               Your trusted partner for forex, stocks, and crypto trading.

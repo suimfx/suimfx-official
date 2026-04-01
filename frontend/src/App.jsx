@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import RegisterReferral from './pages/RegisterReferral'
 import Dashboard from './pages/Dashboard'
 import MobileTradingApp from './pages/MobileTradingApp'
 import Account from './pages/Account'
@@ -48,14 +49,17 @@ import AdminProfile from './pages/AdminProfile'
 import AdminBookManagement from './pages/AdminBookManagement'
 import SuperAdminManagement from './pages/SuperAdminManagement'
 import ProtectedAdminRoute from './components/ProtectedAdminRoute'
+import { BrandingProvider } from './context/BrandingContext'
 
 function App() {
   return (
+    <BrandingProvider>
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Navigate to="/user/login" replace />} />
         <Route path="/signup" element={<Navigate to="/user/signup" replace />} />
+        <Route path="/register" element={<RegisterReferral />} />
         <Route path="/user/signup" element={<Signup />} />
         <Route path="/user/login" element={<Login />} />
         <Route path="/user/forgot-password" element={<ForgotPassword />} />
@@ -99,12 +103,14 @@ function App() {
         <Route path="/admin/banners" element={<ProtectedAdminRoute requiredPermission="bonusManagement"><AdminBannerManagement /></ProtectedAdminRoute>} />
         <Route path="/admin/profile" element={<ProtectedAdminRoute><AdminProfile /></ProtectedAdminRoute>} />
         <Route path="/admin/login" element={<EmployeeLogin />} />
+        <Route path="/subadmin/login" element={<EmployeeLogin />} />
         <Route path="/buy-challenge" element={<BuyChallengePage />} />
         <Route path="/challenge-dashboard" element={<ChallengeDashboardPage />} />
         <Route path="/:slug/login" element={<BrandedLogin />} />
         <Route path="/:slug/signup" element={<BrandedSignup />} />
       </Routes>
     </Router>
+    </BrandingProvider>
   )
 }
 

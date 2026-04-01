@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { login } from '../api/auth'
+import { API_BASE_URL } from '../config/api'
 import suimfxLogo from '../assets/suimfxLogo.png'
+import { useBranding } from '../context/BrandingContext'
 
 const Login = () => {
   const navigate = useNavigate()
+  const { branding } = useBranding()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -33,9 +36,15 @@ const Login = () => {
     setError('')
     
     try {
-      const response = await login(formData)
+      const adminSlug = localStorage.getItem('adminSlug') || undefined
+      const response = await login({ ...formData, adminSlug })
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
+      // Store admin branding for sidebar logo
+      if (response.user.adminBranding && response.user.adminBranding.logo) {
+        localStorage.setItem('adminLogoUrl', `${API_BASE_URL}${response.user.adminBranding.logo}`)
+        localStorage.setItem('adminBrandName', response.user.adminBranding.brandName || '')
+      }
       if (isMobile) {
         navigate('/mobile')
       } else {
@@ -64,7 +73,7 @@ const Login = () => {
           {/* Logo */}
           <div className="flex justify-center mb-8">
             <Link to="/">
-              <img src={suimfxLogo} alt="Suimfx" className="h-24 w-auto" />
+              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Suimfx'} className="h-24 w-auto" />
             </Link>
           </div>
 

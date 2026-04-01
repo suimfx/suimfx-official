@@ -7,6 +7,11 @@ import {
 import { API_URL } from '../config/api'
 
 export default function AdminPropTrading() {
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('adminToken')
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+  }
+
   const [activeTab, setActiveTab] = useState('dashboard')
   const [settings, setSettings] = useState(null)
   const [challenges, setChallenges] = useState([])
@@ -35,7 +40,7 @@ export default function AdminPropTrading() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch(`${API_URL}/prop/admin/settings`)
+      const res = await fetch(`${API_URL}/prop/admin/settings`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.success) setSettings(data.settings)
     } catch (error) {
@@ -45,7 +50,7 @@ export default function AdminPropTrading() {
 
   const fetchChallenges = async () => {
     try {
-      const res = await fetch(`${API_URL}/prop/admin/challenges`)
+      const res = await fetch(`${API_URL}/prop/admin/challenges`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.success) setChallenges(data.challenges || [])
     } catch (error) {
@@ -55,7 +60,7 @@ export default function AdminPropTrading() {
 
   const fetchAccounts = async () => {
     try {
-      const res = await fetch(`${API_URL}/prop/admin/accounts?limit=100`)
+      const res = await fetch(`${API_URL}/prop/admin/accounts?limit=100`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.success) setAccounts(data.accounts || [])
     } catch (error) {
@@ -65,7 +70,7 @@ export default function AdminPropTrading() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch(`${API_URL}/prop/admin/dashboard`)
+      const res = await fetch(`${API_URL}/prop/admin/dashboard`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.success) setStats(data.stats)
     } catch (error) {
@@ -77,9 +82,10 @@ export default function AdminPropTrading() {
     try {
       const res = await fetch(`${API_URL}/prop/admin/settings`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          challengeModeEnabled: !settings?.challengeModeEnabled
+          ...settings,
+          challengeModeEnabled: !settings.challengeModeEnabled
         })
       })
       const data = await res.json()
@@ -97,7 +103,7 @@ export default function AdminPropTrading() {
     try {
       const res = await fetch(`${API_URL}/prop/admin/force-pass/${accountId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ adminId: 'admin' })
       })
       const data = await res.json()
@@ -117,7 +123,7 @@ export default function AdminPropTrading() {
     try {
       const res = await fetch(`${API_URL}/prop/admin/force-fail/${accountId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ adminId: 'admin', reason })
       })
       const data = await res.json()
@@ -137,7 +143,7 @@ export default function AdminPropTrading() {
     try {
       const res = await fetch(`${API_URL}/prop/admin/extend-time/${accountId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ adminId: 'admin', days: parseInt(days) })
       })
       const data = await res.json()
@@ -155,7 +161,7 @@ export default function AdminPropTrading() {
     try {
       const res = await fetch(`${API_URL}/prop/admin/reset/${accountId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ adminId: 'admin' })
       })
       const data = await res.json()
@@ -607,9 +613,10 @@ function ChallengeModal({ challenge, onClose, onSave }) {
         : `${API_URL}/prop/admin/challenges`
       const method = challenge ? 'PUT' : 'POST'
 
+      const token = localStorage.getItem('adminToken')
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(form)
       })
       const data = await res.json()

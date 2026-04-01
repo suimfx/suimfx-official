@@ -4,6 +4,7 @@ import { Mail, ChevronDown, Search, Eye, EyeOff, RefreshCw, ArrowLeft, User, Pho
 import { signup } from '../api/auth'
 import { API_URL } from '../config/api'
 import suimfxLogo from '../assets/suimfxLogo.png'
+import { useBranding } from '../context/BrandingContext'
 
 const countries = [
   { code: '+1', name: 'United States', flag: '🇺🇸' },
@@ -43,6 +44,7 @@ const countries = [
 
 const Signup = () => {
   const navigate = useNavigate()
+  const { branding } = useBranding()
   const [searchParams] = useSearchParams()
   const referralCode = searchParams.get('ref')
   const [activeTab, setActiveTab] = useState('signup')
@@ -224,10 +226,12 @@ const Signup = () => {
       }
 
       // Create account (OTP verified or not required)
+      const adminSlug = localStorage.getItem('adminSlug') || undefined
       const signupData = {
         ...formData,
         referralCode: referralCode || undefined,
-        otpVerified: otpVerified
+        otpVerified: otpVerified,
+        adminSlug
       }
       
       const response = await signup(signupData)
@@ -312,7 +316,7 @@ const Signup = () => {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <Link to="/">
-              <img src={suimfxLogo} alt="Suimfx" className="h-24 w-auto" />
+              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Suimfx'} className="h-24 w-auto" />
             </Link>
           </div>
 

@@ -46,6 +46,7 @@ export const verifyAdminToken = async (req, res, next) => {
         return res.status(403).json({ success: false, message: 'Account is suspended' })
       }
       req.user = admin
+      req.admin = admin // Set req.admin for route access
       req.userType = admin.role // 'SUPER_ADMIN' or 'ADMIN'
       req.sidebarPermissions = admin.sidebarPermissions
       return next()

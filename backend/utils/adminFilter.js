@@ -2,13 +2,16 @@ import User from '../models/User.js'
 
 /**
  * Get list of user IDs that belong to an admin
- * Returns null for Super Admin (no filter needed)
+ * SUPER_ADMIN: returns only unassigned users (not belonging to any Admin)
+ * ADMIN: returns only their assigned users
  */
 export const getAdminUserIds = async (admin) => {
   if (!admin) return null
   
   if (admin.role === 'SUPER_ADMIN') {
-    return null // No filter - Super Admin sees all
+    // Super Admin sees only unassigned users (complete data isolation)
+    const users = await User.find({ $or: [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }] }).select('_id')
+    return users.map(u => u._id)
   }
   
   // Admin role - get their users only
@@ -21,15 +24,13 @@ export const getAdminUserIds = async (admin) => {
  * Modifies query object to filter by admin's users
  */
 export const applyAdminFilter = async (query, admin, userIdField = 'userId') => {
-  if (!admin || admin.role === 'SUPER_ADMIN') {
-    return query // No changes for Super Admin
-  }
+  if (!admin) return query
   
   const userIds = await getAdminUserIds(admin)
   if (userIds && userIds.length > 0) {
     query[userIdField] = { $in: userIds }
   } else {
-    // Admin has no users yet - return empty result
+    // No users - return empty result
     query[userIdField] = { $in: [] }
   }
   
@@ -42,12 +43,13 @@ export const applyAdminFilter = async (query, admin, userIdField = 'userId') => 
 export const canAccessUser = async (admin, userId) => {
   if (!admin) return false
   
-  if (admin.role === 'SUPER_ADMIN') {
-    return true // Super Admin can access any user
-  }
-  
   const user = await User.findById(userId)
   if (!user) return false
+  
+  if (admin.role === 'SUPER_ADMIN') {
+    // Super Admin can only access unassigned users
+    return !user.assignedAdmin
+  }
   
   return user.assignedAdmin?.toString() === admin._id.toString()
 }

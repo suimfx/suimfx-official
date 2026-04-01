@@ -1,13 +1,27 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import AccountType from '../models/AccountType.js'
 import Charges from '../models/Charges.js'
+import User from '../models/User.js'
+import { verifyAdminToken } from '../middleware/rbac.js'
 
 const router = express.Router()
 
 // GET /api/account-types - Get all active account types (for users)
 router.get('/', async (req, res) => {
   try {
-    const accountTypes = await AccountType.find({ isActive: true }).sort({ createdAt: -1 })
+    const { userId } = req.query
+    let atQuery = { isActive: true }
+    
+    // Filter by user's assigned admin
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      const user = await User.findById(userId)
+      if (user && user.assignedAdmin) {
+        atQuery.adminId = user.assignedAdmin
+      }
+    }
+    
+    const accountTypes = await AccountType.find(atQuery).sort({ createdAt: -1 })
     
     // Fetch actual spread and commission from Charges for each account type
     const accountTypesWithCharges = await Promise.all(accountTypes.map(async (at) => {
@@ -58,9 +72,10 @@ router.get('/', async (req, res) => {
 })
 
 // GET /api/account-types/all - Get all account types (for admin)
-router.get('/all', async (req, res) => {
+router.get('/all', verifyAdminToken, async (req, res) => {
   try {
-    const accountTypes = await AccountType.find().sort({ createdAt: -1 })
+    // Each admin sees only their own account types
+    const accountTypes = await AccountType.find({ adminId: req.admin._id }).sort({ createdAt: -1 })
     res.json({ accountTypes })
   } catch (error) {
     res.status(500).json({ message: 'Error fetching account types', error: error.message })
@@ -68,7 +83,7 @@ router.get('/all', async (req, res) => {
 })
 
 // POST /api/account-types - Create account type (admin)
-router.post('/', async (req, res) => {
+router.post('/', verifyAdminToken, async (req, res) => {
   try {
     const { name, description, minDeposit, leverage, exposureLimit, minSpread, commission, isDemo, demoBalance } = req.body
     const accountType = new AccountType({
@@ -80,7 +95,8 @@ router.post('/', async (req, res) => {
       minSpread: minSpread || 0,
       commission: commission || 0,
       isDemo: isDemo || false,
-      demoBalance: isDemo ? (demoBalance || 10000) : 0
+      demoBalance: isDemo ? (demoBalance || 10000) : 0,
+      adminId: req.admin._id
     })
     await accountType.save()
     res.status(201).json({ message: 'Account type created', accountType })
@@ -90,17 +106,19 @@ router.post('/', async (req, res) => {
 })
 
 // PUT /api/account-types/:id - Update account type (admin)
-router.put('/:id', async (req, res) => {
+router.put('/:id', verifyAdminToken, async (req, res) => {
   try {
+    const existing = await AccountType.findById(req.params.id)
+    if (!existing) return res.status(404).json({ message: 'Account type not found' })
+    if (existing.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ message: 'Access denied' })
+    }
     const { name, description, minDeposit, leverage, exposureLimit, minSpread, commission, isActive, isDemo, demoBalance } = req.body
     const accountType = await AccountType.findByIdAndUpdate(
       req.params.id,
       { name, description, minDeposit, leverage, exposureLimit, minSpread, commission, isActive, isDemo, demoBalance },
       { new: true }
     )
-    if (!accountType) {
-      return res.status(404).json({ message: 'Account type not found' })
-    }
     res.json({ message: 'Account type updated', accountType })
   } catch (error) {
     res.status(500).json({ message: 'Error updating account type', error: error.message })
@@ -108,12 +126,14 @@ router.put('/:id', async (req, res) => {
 })
 
 // DELETE /api/account-types/:id - Delete account type (admin)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyAdminToken, async (req, res) => {
   try {
-    const accountType = await AccountType.findByIdAndDelete(req.params.id)
-    if (!accountType) {
-      return res.status(404).json({ message: 'Account type not found' })
+    const existing = await AccountType.findById(req.params.id)
+    if (!existing) return res.status(404).json({ message: 'Account type not found' })
+    if (existing.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ message: 'Access denied' })
     }
+    await AccountType.findByIdAndDelete(req.params.id)
     res.json({ message: 'Account type deleted' })
   } catch (error) {
     res.status(500).json({ message: 'Error deleting account type', error: error.message })

@@ -127,6 +127,10 @@ class IBEngine {
 
     user.referredBy = referralCode
     user.parentIBId = referringIB._id
+    // Inherit the IB's assigned admin so referred user belongs to the same admin
+    if (referringIB.assignedAdmin && !user.assignedAdmin) {
+      user.assignedAdmin = referringIB.assignedAdmin
+    }
     await user.save()
 
     return { user, referringIB }

@@ -13,9 +13,12 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Key
+  Key,
+  Upload,
+  Globe,
+  Image
 } from 'lucide-react'
-import { API_URL } from '../config/api'
+import { API_URL, API_BASE_URL } from '../config/api'
 
 const AdminProfile = () => {
   const [admin, setAdmin] = useState(null)
@@ -23,12 +26,19 @@ const AdminProfile = () => {
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [copiedLogin, setCopiedLogin] = useState(false)
+  const [copiedDomain, setCopiedDomain] = useState(false)
+  const [copiedDomainLogin, setCopiedDomainLogin] = useState(false)
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     phone: '',
-    brandName: ''
+    brandName: '',
+    customDomain: ''
   })
+  const [logoFile, setLogoFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState(null)
+  const [logoUploading, setLogoUploading] = useState(false)
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -49,10 +59,38 @@ const AdminProfile = () => {
         firstName: parsed.firstName || '',
         lastName: parsed.lastName || '',
         phone: parsed.phone || '',
-        brandName: parsed.brandName || ''
+        brandName: parsed.brandName || '',
+        customDomain: parsed.customDomain || ''
       })
+      if (parsed.logo) setLogoPreview(`${API_BASE_URL}${parsed.logo}`)
     }
+    fetchFullProfile()
   }, [])
+
+  const fetchFullProfile = async () => {
+    try {
+      const token = localStorage.getItem('adminToken')
+      const res = await fetch(`${API_URL}/admin-mgmt/my-profile`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success && data.admin) {
+        const a = data.admin
+        setAdmin(prev => ({ ...prev, ...a }))
+        setFormData({
+          firstName: a.firstName || '',
+          lastName: a.lastName || '',
+          phone: a.phone || '',
+          brandName: a.brandName || '',
+          customDomain: a.customDomain || ''
+        })
+        if (a.logo) setLogoPreview(`${API_BASE_URL}${a.logo}`)
+        localStorage.setItem('adminUser', JSON.stringify({ ...JSON.parse(localStorage.getItem('adminUser') || '{}'), ...a }))
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err)
+    }
+  }
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -83,7 +121,9 @@ const AdminProfile = () => {
           firstName: formData.firstName, 
           lastName: formData.lastName, 
           phone: formData.phone,
-          brandName: formData.brandName
+          brandName: formData.brandName,
+          customDomain: formData.customDomain,
+          ...(data.admin || {})
         }
         localStorage.setItem('adminUser', JSON.stringify(updatedAdmin))
         setAdmin(updatedAdmin)
@@ -98,11 +138,52 @@ const AdminProfile = () => {
     setLoading(false)
   }
 
-  const copyReferralLink = () => {
-    const link = `${window.location.origin}/${admin?.urlSlug}/signup`
+  const copyLink = (link, setter) => {
     navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setter(true)
+    setTimeout(() => setter(false), 2000)
+  }
+
+  const handleLogoUpload = async () => {
+    if (!logoFile) return
+    setLogoUploading(true)
+    try {
+      const token = localStorage.getItem('adminToken')
+      const fd = new FormData()
+      fd.append('logo', logoFile)
+      const res = await fetch(`${API_URL}/admin-mgmt/upload-logo`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd
+      })
+      const data = await res.json()
+      if (data.success) {
+        setLogoPreview(`${API_BASE_URL}${data.logo}`)
+        const updatedAdmin = { ...admin, logo: data.logo }
+        setAdmin(updatedAdmin)
+        localStorage.setItem('adminUser', JSON.stringify(updatedAdmin))
+        setLogoFile(null)
+        setSuccess('Logo uploaded successfully!')
+        setTimeout(() => setSuccess(''), 3000)
+      } else {
+        setError(data.message || 'Failed to upload logo')
+      }
+    } catch (err) {
+      setError('Failed to upload logo')
+    }
+    setLogoUploading(false)
+  }
+
+  const handleLogoSelect = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError('Logo must be less than 2MB')
+        return
+      }
+      setLogoFile(file)
+      setLogoPreview(URL.createObjectURL(file))
+    }
   }
 
   const handleChangePassword = async (e) => {
@@ -170,13 +251,17 @@ const AdminProfile = () => {
         {/* Left Column - Profile Card */}
         <div className="lg:col-span-1">
           <div className="bg-dark-800 rounded-xl border border-gray-800 p-6">
-            {/* Avatar */}
+            {/* Avatar / Logo */}
             <div className="flex flex-col items-center">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-3xl font-bold mb-4">
-                {getInitials()}
-              </div>
+              {logoPreview ? (
+                <img src={logoPreview} alt="Logo" className="w-24 h-24 rounded-full object-cover border-2 border-gray-700 mb-4" />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-3xl font-bold mb-4">
+                  {getInitials()}
+                </div>
+              )}
               <h2 className="text-xl font-semibold text-white">
-                {admin?.firstName} {admin?.lastName}
+                {admin?.brandName || `${admin?.firstName} ${admin?.lastName}`}
               </h2>
               <p className="text-gray-400 text-sm">{admin?.email}</p>
               <span className={`mt-3 px-3 py-1 rounded-full text-xs font-medium ${
@@ -184,7 +269,7 @@ const AdminProfile = () => {
                   ? 'bg-purple-500/20 text-purple-400' 
                   : 'bg-blue-500/20 text-blue-400'
               }`}>
-                {admin?.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Employee'}
+                {admin?.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
               </span>
             </div>
 
@@ -199,6 +284,12 @@ const AdminProfile = () => {
                   <span>{admin.brandName}</span>
                 </div>
               )}
+              {admin?.customDomain && (
+                <div className="flex items-center gap-3 text-gray-400">
+                  <Globe size={18} />
+                  <span>{admin.customDomain}</span>
+                </div>
+              )}
               {admin?.urlSlug && (
                 <div className="flex items-center gap-3 text-gray-400">
                   <Link size={18} />
@@ -211,37 +302,73 @@ const AdminProfile = () => {
               </div>
             </div>
 
-            {/* User Referral Link - Only for Super Admin */}
-            {admin?.role === 'SUPER_ADMIN' && admin?.urlSlug && (
+            {/* User Links Section */}
+            {admin?.urlSlug && (
               <>
                 <div className="border-t border-gray-700 my-6"></div>
-                <div className="bg-dark-700 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-blue-400 mb-2">
-                    <Link size={16} />
-                    <span className="font-medium">User Referral Link</span>
+                <div className="space-y-4">
+                  {/* Slug-based Links */}
+                  <div className="bg-dark-700 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-blue-400 mb-1">
+                      <Link size={16} />
+                      <span className="font-medium">Branded Links</span>
+                    </div>
+                    <p className="text-gray-500 text-xs mb-3">
+                      Share these links with users to register/login under your brand
+                    </p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 text-xs w-14 shrink-0">Signup</span>
+                        <input type="text" readOnly value={`${window.location.origin}/${admin.urlSlug}/signup`} className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate" />
+                        <button onClick={() => copyLink(`${window.location.origin}/${admin.urlSlug}/signup`, setCopied)} className={`px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${copied ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                          {copied ? <Check size={14} /> : <Copy size={14} />}
+                          {copied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 text-xs w-14 shrink-0">Login</span>
+                        <input type="text" readOnly value={`${window.location.origin}/${admin.urlSlug}/login`} className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate" />
+                        <button onClick={() => copyLink(`${window.location.origin}/${admin.urlSlug}/login`, setCopiedLogin)} className={`px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${copiedLogin ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                          {copiedLogin ? <Check size={14} /> : <Copy size={14} />}
+                          {copiedLogin ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-gray-500 text-xs mb-3">
-                    Share this link with users to register under your brand
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={`${window.location.origin}/${admin?.urlSlug}/signup`}
-                      className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate"
-                    />
-                    <button
-                      onClick={copyReferralLink}
-                      className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors ${
-                        copied 
-                          ? 'bg-green-500 text-white' 
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                      }`}
-                    >
-                      {copied ? <Check size={16} /> : <Copy size={16} />}
-                      {copied ? 'Copied!' : 'Copy'}
-                    </button>
-                  </div>
+
+                  {/* Custom Domain Links */}
+                  {admin?.customDomain && (
+                    <div className="bg-dark-700 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-emerald-400 mb-1">
+                        <Globe size={16} />
+                        <span className="font-medium">Custom Domain Links</span>
+                      </div>
+                      <p className="text-gray-500 text-xs mb-3">
+                        Users can access your platform directly via your custom domain
+                      </p>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 text-xs w-14 shrink-0">Signup</span>
+                          <input type="text" readOnly value={`https://${admin.customDomain}/user/signup`} className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate" />
+                          <button onClick={() => copyLink(`https://${admin.customDomain}/user/signup`, setCopiedDomain)} className={`px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${copiedDomain ? 'bg-green-500 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                            {copiedDomain ? <Check size={14} /> : <Copy size={14} />}
+                            {copiedDomain ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 text-xs w-14 shrink-0">Login</span>
+                          <input type="text" readOnly value={`https://${admin.customDomain}/user/login`} className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate" />
+                          <button onClick={() => copyLink(`https://${admin.customDomain}/user/login`, setCopiedDomainLogin)} className={`px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${copiedDomainLogin ? 'bg-green-500 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                            {copiedDomainLogin ? <Check size={14} /> : <Copy size={14} />}
+                            {copiedDomainLogin ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-yellow-500/70 text-xs mt-3 flex items-center gap-1">
+                        ⚠️ Make sure your domain DNS is pointed to the server and SSL is configured
+                      </p>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -318,9 +445,54 @@ const AdminProfile = () => {
                 </div>
               </div>
 
-              {/* Brand Name - Only for Super Admin */}
-              {admin?.role === 'SUPER_ADMIN' && (
-                <div>
+              {/* Branding Section */}
+              <div className="border-t border-gray-700 pt-5 mt-2">
+                <h4 className="text-white font-medium mb-4 flex items-center gap-2">
+                  <Image size={18} className="text-purple-400" /> Branding Settings
+                </h4>
+
+                {/* Logo Upload */}
+                <div className="mb-4">
+                  <label className="block text-sm text-gray-400 mb-2">Logo</label>
+                  <div className="flex items-center gap-4">
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Logo" className="w-16 h-16 rounded-lg object-cover border border-gray-600" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-dark-700 border border-gray-600 flex items-center justify-center text-gray-500">
+                        <Image size={24} />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoSelect}
+                        className="hidden"
+                        id="logo-upload"
+                      />
+                      <label
+                        htmlFor="logo-upload"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-dark-700 border border-gray-600 rounded-lg text-sm text-gray-300 hover:border-blue-500 cursor-pointer transition-colors"
+                      >
+                        <Upload size={16} /> Choose Logo
+                      </label>
+                      {logoFile && (
+                        <button
+                          type="button"
+                          onClick={handleLogoUpload}
+                          disabled={logoUploading}
+                          className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          {logoUploading ? 'Uploading...' : 'Upload'}
+                        </button>
+                      )}
+                      <p className="text-gray-600 text-xs mt-1">Max 2MB. JPG, PNG, SVG, WebP</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Brand Name */}
+                <div className="mb-4">
                   <label className="block text-sm text-gray-400 mb-2">Brand Name</label>
                   <div className="relative">
                     <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -333,7 +505,23 @@ const AdminProfile = () => {
                     />
                   </div>
                 </div>
-              )}
+
+                {/* Custom Domain */}
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Custom Domain</label>
+                  <div className="relative">
+                    <Globe size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type="text"
+                      value={formData.customDomain}
+                      onChange={(e) => setFormData({ ...formData, customDomain: e.target.value })}
+                      className="w-full bg-dark-700 border border-gray-600 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:border-blue-500"
+                      placeholder="e.g. trading.yourdomain.com"
+                    />
+                  </div>
+                  <p className="text-gray-600 text-xs mt-1">Point your domain's DNS CNAME to this server, then enter it here</p>
+                </div>
+              </div>
 
               {/* Error/Success Messages */}
               {error && (

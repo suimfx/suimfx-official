@@ -1,10 +1,12 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import jwt from 'jsonwebtoken'
 import ManualCryptoWallet from '../models/ManualCryptoWallet.js'
 import Transaction from '../models/Transaction.js'
 import Wallet from '../models/Wallet.js'
 import User from '../models/User.js'
 import { verifyAdminToken, requireSidebarPermission, PERMISSIONS } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
@@ -35,7 +37,18 @@ const adminBankSettings = [
 // --- Public ---
 router.get('/wallets', async (req, res) => {
   try {
-    const wallets = await ManualCryptoWallet.getActiveWallets()
+    const { userId } = req.query
+    let walletQuery = { isActive: true }
+    
+    // Filter by user's assigned admin
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      const user = await User.findById(userId)
+      if (user && user.assignedAdmin) {
+        walletQuery.adminId = user.assignedAdmin
+      }
+    }
+    
+    const wallets = await ManualCryptoWallet.find(walletQuery).sort({ currency: 1, network: 1 })
     res.json({
       success: true,
       wallets: wallets.map((w) => ({
@@ -205,7 +218,8 @@ router.get('/my-deposits', verifyUserToken, async (req, res) => {
 // --- Admin ---
 router.get('/admin/wallets', ...adminBankSettings, async (req, res) => {
   try {
-    const wallets = await ManualCryptoWallet.find().sort({ createdAt: -1 })
+    // Each admin sees only their own wallets
+    const wallets = await ManualCryptoWallet.find({ adminId: req.admin._id }).sort({ createdAt: -1 })
     res.json({ success: true, wallets })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
@@ -253,7 +267,8 @@ router.post('/admin/wallets', ...adminBankSettings, async (req, res) => {
       instructions:
         instructions ||
         'Send the total amount (deposit + fee) to the address. Then submit your transaction hash below.',
-      isActive: true
+      isActive: true,
+      adminId: req.admin._id
     })
 
     res.json({ success: true, message: 'Wallet created', wallet })
@@ -308,6 +323,11 @@ router.get('/admin/pending-deposits', ...adminBankSettings, async (req, res) => 
     const { status = 'Pending' } = req.query
     const query = { paymentMethod: 'Manual Crypto' }
     if (status !== 'all') query.status = status
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const mcUserIds = await getAdminUserIds(req.admin)
+    if (mcUserIds) query.userId = { $in: mcUserIds }
+    // SUPER_ADMIN sees all deposits
 
     const deposits = await Transaction.find(query)
       .populate('userId', 'firstName lastName email phone')

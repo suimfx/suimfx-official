@@ -11,6 +11,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+import { getAdminHeaders } from '../utils/adminApi'
 
 const PAGE_SIZE = 10
 
@@ -59,7 +60,7 @@ const AdminEarnings = () => {
 
   const fetchSummary = async () => {
     try {
-      const res = await fetch(`${API_URL}/earnings/summary`)
+      const res = await fetch(`${API_URL}/earnings/summary`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setSummary(data.earnings)
@@ -71,7 +72,7 @@ const AdminEarnings = () => {
 
   const fetchDailyEarnings = async () => {
     try {
-      const res = await fetch(`${API_URL}/earnings/daily?days=${dateRange}`)
+      const res = await fetch(`${API_URL}/earnings/daily?days=${dateRange}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setDailyEarnings(data.earnings || [])
@@ -83,7 +84,7 @@ const AdminEarnings = () => {
 
   const fetchUserEarnings = async () => {
     try {
-      const res = await fetch(`${API_URL}/earnings/by-user?days=${dateRange}`)
+      const res = await fetch(`${API_URL}/earnings/by-user?days=${dateRange}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setUserEarnings(data.earnings || [])
@@ -95,7 +96,7 @@ const AdminEarnings = () => {
 
   const fetchSymbolEarnings = async () => {
     try {
-      const res = await fetch(`${API_URL}/earnings/by-symbol?days=${dateRange}`)
+      const res = await fetch(`${API_URL}/earnings/by-symbol?days=${dateRange}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setSymbolEarnings(data.earnings || [])

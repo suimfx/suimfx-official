@@ -1,16 +1,22 @@
 import express from 'express'
 import Charges from '../models/Charges.js'
 import AccountType from '../models/AccountType.js'
+import { verifyAdminToken } from '../middleware/rbac.js'
 
 const router = express.Router()
 
 // GET /api/charges/spreads - Get spreads for all instruments (for display in trading UI)
 router.get('/spreads', async (req, res) => {
   try {
-    const { userId, accountTypeId } = req.query
+    const { userId, accountTypeId, adminId } = req.query
     
-    // Get all charges that have spread values
-    const charges = await Charges.find({ isActive: true, spreadValue: { $gt: 0 } })
+    // Filter by adminId: use admin-specific charges + fallback to global (adminId: null)
+    let spreadQuery = { isActive: true, spreadValue: { $gt: 0 } }
+    if (adminId) {
+      spreadQuery.$or = [{ adminId: adminId }, { adminId: null }, { adminId: { $exists: false } }]
+    }
+    
+    const charges = await Charges.find(spreadQuery)
       .sort({ level: 1 })
     
     // Build a map of symbol -> spread (respecting hierarchy)
@@ -34,8 +40,13 @@ router.get('/spreads', async (req, res) => {
 
     const setSpread = (symbol, charge) => {
       const existing = spreadMap[symbol]
-      if (!existing || priorityOrder[charge.level] < priorityOrder[existing.level]) {
-        spreadMap[symbol] = { spread: charge.spreadValue, spreadType: charge.spreadType, level: charge.level }
+      if (!existing) {
+        spreadMap[symbol] = { spread: charge.spreadValue, spreadType: charge.spreadType, level: charge.level, hasAdmin: !!charge.adminId }
+      } else if (priorityOrder[charge.level] < priorityOrder[existing.level]) {
+        spreadMap[symbol] = { spread: charge.spreadValue, spreadType: charge.spreadType, level: charge.level, hasAdmin: !!charge.adminId }
+      } else if (priorityOrder[charge.level] === priorityOrder[existing.level] && !!charge.adminId && !existing.hasAdmin) {
+        // Same level but admin-specific overrides global
+        spreadMap[symbol] = { spread: charge.spreadValue, spreadType: charge.spreadType, level: charge.level, hasAdmin: true }
       }
     }
 
@@ -61,14 +72,19 @@ router.get('/spreads', async (req, res) => {
 })
 
 // GET /api/charges - Get all charges with optional filters
-router.get('/', async (req, res) => {
+router.get('/', verifyAdminToken, async (req, res) => {
   try {
     const { segment, level, instrumentSymbol, userId } = req.query
     
     let query = { isActive: true }
+    
+    // Each admin sees only their own charges
+    query.adminId = req.admin._id
+    
     // Include charges for specific segment OR null segment (applies to all)
     if (segment) {
-      query.$or = [{ segment: segment }, { segment: null }]
+      query.$and = query.$and || []
+      query.$and.push({ $or: [{ segment: segment }, { segment: null }] })
     }
     if (level) query.level = level
     if (instrumentSymbol) query.instrumentSymbol = instrumentSymbol
@@ -98,7 +114,7 @@ router.get('/:id', async (req, res) => {
 })
 
 // POST /api/charges - Create new charge
-router.post('/', async (req, res) => {
+router.post('/', verifyAdminToken, async (req, res) => {
   try {
     const {
       level,
@@ -128,6 +144,7 @@ router.post('/', async (req, res) => {
       instrumentSymbol: instrumentSymbol || null,
       segment: segment || null,
       accountTypeId: accountTypeId || null,
+      adminId: req.admin._id,
       spreadType: spreadType || 'FIXED',
       spreadValue: spreadValue || 0,
       commissionType: commissionType || 'PER_LOT',
@@ -158,7 +175,7 @@ router.post('/', async (req, res) => {
 })
 
 // PUT /api/charges/:id - Update charge
-router.put('/:id', async (req, res) => {
+router.put('/:id', verifyAdminToken, async (req, res) => {
   try {
     const {
       level,
@@ -223,7 +240,7 @@ router.put('/:id', async (req, res) => {
 })
 
 // DELETE /api/charges/:id - Delete charge
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyAdminToken, async (req, res) => {
   try {
     const charge = await Charges.findById(req.params.id)
     if (!charge) {

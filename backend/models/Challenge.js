@@ -1,6 +1,11 @@
 import mongoose from 'mongoose'
 
 const challengeSchema = new mongoose.Schema({
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
   name: {
     type: String,
     required: true

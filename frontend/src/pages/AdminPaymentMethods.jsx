@@ -56,7 +56,10 @@ const AdminPaymentMethods = () => {
   const fetchPaymentMethods = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/payment-methods/all`)
+      const token = localStorage.getItem('adminToken')
+      const res = await fetch(`${API_URL}/payment-methods/all`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
       const data = await res.json()
       setPaymentMethods(data.paymentMethods || [])
     } catch (error) {
@@ -73,9 +76,10 @@ const AdminPaymentMethods = () => {
 
     try {
       const url = editingMethod ? `${API_URL}/payment-methods/${editingMethod._id}` : `${API_URL}/payment-methods`
+      const token = localStorage.getItem('adminToken')
       const res = await fetch(url, {
         method: editingMethod ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(formData)
       })
       
@@ -94,7 +98,8 @@ const AdminPaymentMethods = () => {
   const handleDelete = async (id) => {
     if (!confirm('Delete this payment method?')) return
     try {
-      const res = await fetch(`${API_URL}/payment-methods/${id}`, { method: 'DELETE' })
+      const token = localStorage.getItem('adminToken')
+      const res = await fetch(`${API_URL}/payment-methods/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } })
       if (res.ok) {
         setSuccess('Payment method deleted!')
         fetchPaymentMethods()
@@ -107,9 +112,10 @@ const AdminPaymentMethods = () => {
 
   const handleToggleActive = async (method) => {
     try {
+      const token = localStorage.getItem('adminToken')
       await fetch(`${API_URL}/payment-methods/${method._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ ...method, isActive: !method.isActive })
       })
       fetchPaymentMethods()

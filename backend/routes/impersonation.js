@@ -19,6 +19,9 @@ const verifyAdminToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, getJwtSecret())
     req.admin = await Admin.findById(decoded.adminId)
+    if (!req.admin) {
+      return res.status(401).json({ success: false, message: 'Admin not found' })
+    }
     req.originalAdminId = decoded.originalAdminId || decoded.adminId
     next()
   } catch (error) {
@@ -72,6 +75,11 @@ router.post('/admin/:adminId', verifyAdminToken, async (req, res) => {
         firstName: targetAdmin.firstName,
         lastName: targetAdmin.lastName,
         role: targetAdmin.role,
+        referralCode: targetAdmin.referralCode,
+        urlSlug: targetAdmin.urlSlug,
+        brandName: targetAdmin.brandName,
+        logo: targetAdmin.logo,
+        customDomain: targetAdmin.customDomain,
         sidebarPermissions: targetAdmin.sidebarPermissions,
         isImpersonating: true,
         originalAdminName: `${req.admin.firstName} ${req.admin.lastName}`

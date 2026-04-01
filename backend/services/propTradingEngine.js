@@ -306,8 +306,10 @@ class PropTradingEngine {
       }
     }
 
-    // Get charges for this trade (use default charges for challenge accounts)
-    const charges = await Charges.getChargesForTrade(userId, symbol, segment || 'Forex', null)
+    // Get charges for this trade (filtered by user's assigned admin)
+    const challengeUser = await User.findById(userId).select('assignedAdmin')
+    const challengeAdminId = challengeUser?.assignedAdmin || null
+    const charges = await Charges.getChargesForTrade(userId, symbol, segment || 'Forex', null, challengeAdminId)
     
     console.log(`[Challenge Trade] Symbol: ${symbol}, Segment: ${segment || 'Forex'}, Spread: ${charges.spreadValue} (${charges.spreadType}), Commission: ${charges.commissionValue}`)
     
@@ -1144,3 +1146,4 @@ class PropTradingEngine {
 }
 
 export default new PropTradingEngine()
+

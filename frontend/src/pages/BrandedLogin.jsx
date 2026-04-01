@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { X, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
-import { API_URL } from '../config/api'
+import { API_URL, API_BASE_URL } from '../config/api'
 
 const BrandedLogin = () => {
   const { slug } = useParams()
@@ -123,9 +123,14 @@ const BrandedLogin = () => {
           <X size={16} className="text-gray-400" />
         </button>
 
-        {brandInfo?.brandName && (
+        {(brandInfo?.logo || brandInfo?.brandName) && (
           <div className="text-center mb-6">
-            <h2 className="text-accent-green text-lg font-bold">{brandInfo.brandName}</h2>
+            {brandInfo.logo && (
+              <img src={`${API_BASE_URL}${brandInfo.logo}`} alt={brandInfo.brandName || 'Logo'} className="h-14 mx-auto mb-2 object-contain" />
+            )}
+            {brandInfo.brandName && (
+              <h2 className="text-accent-green text-lg font-bold">{brandInfo.brandName}</h2>
+            )}
           </div>
         )}
 
