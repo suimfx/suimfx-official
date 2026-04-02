@@ -1770,17 +1770,19 @@ const TradingPage = () => {
 
       const ask = livePrice?.ask || instrument.ask
 
-      
+      const hasClientPrices = bid && ask && bid > 0 && ask > 0
 
-      if (!bid || !ask || bid === 0 || ask === 0) {
+      const closePayload = { tradeId }
 
-        setTradeError('Price not available. Please wait for prices to load.')
+      if (hasClientPrices) {
 
-        return
+        closePayload.bid = bid
+
+        closePayload.ask = ask
 
       }
 
-
+      // If no UI prices, server closes using LP snapshot
 
       const res = await fetch(`${API_URL}/trade/close`, {
 
@@ -1788,15 +1790,7 @@ const TradingPage = () => {
 
         headers: { 'Content-Type': 'application/json' },
 
-        body: JSON.stringify({
-
-          tradeId,
-
-          bid,
-
-          ask
-
-        })
+        body: JSON.stringify(closePayload)
 
       })
 

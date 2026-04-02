@@ -242,19 +242,26 @@ const OrderBook = () => {
     if (!confirm(`Close ${trade.side} ${trade.quantity} ${trade.symbol} position?`)) return
     
     try {
-      const currentPrice = livePrices[trade.symbol]?.[trade.side === 'BUY' ? 'bid' : 'ask']
-      if (!currentPrice) {
-        alert('Unable to get current price. Please try again.')
-        return
-      }
+      const live = livePrices[trade.symbol]
+      const bid = live?.bid
+      const ask = live?.ask
+      const hasClientPrices = bid != null && ask != null && parseFloat(bid) > 0 && parseFloat(ask) > 0
 
+      const payload = { tradeId: trade._id }
+      if (hasClientPrices) {
+        payload.bid = parseFloat(bid)
+        payload.ask = parseFloat(ask)
+      }
+      // If stream is disconnected, omit bid/ask — API uses LP snapshot on server
+
+      const token = localStorage.getItem('token')
       const res = await fetch(`${API_URL}/trade/close`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tradeId: trade._id,
-          closePrice: currentPrice
-        })
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
       })
       const data = await res.json()
       

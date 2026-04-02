@@ -188,7 +188,7 @@ router.post('/open', async (req, res) => {
 // POST /api/trade/close - Close a trade
 router.post('/close', async (req, res) => {
   try {
-    const { tradeId, bid, ask } = req.body
+    const { tradeId, bid: bodyBid, ask: bodyAsk, closePrice: bodyClose } = req.body
 
     if (!tradeId) {
       return res.status(400).json({ 
@@ -197,22 +197,45 @@ router.post('/close', async (req, res) => {
       })
     }
 
-    // Check if market data is available
-    if (!bid || !ask || parseFloat(bid) <= 0 || parseFloat(ask) <= 0 || isNaN(parseFloat(bid)) || isNaN(parseFloat(ask))) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Market is closed or no price data available. Cannot close trade.',
-        code: 'MARKET_CLOSED'
-      })
-    }
-
-    // Get trade first to check if it's a challenge or master trade
     const tradeToClose = await Trade.findById(tradeId)
     
     if (!tradeToClose) {
       return res.status(404).json({ 
         success: false, 
         message: 'Trade not found' 
+      })
+    }
+
+    let bid = bodyBid != null && bodyBid !== '' ? parseFloat(bodyBid) : NaN
+    let ask = bodyAsk != null && bodyAsk !== '' ? parseFloat(bodyAsk) : NaN
+    let pricesOk = Number.isFinite(bid) && Number.isFinite(ask) && bid > 0 && ask > 0
+
+    // Legacy clients (e.g. old OrderBook) sent only closePrice
+    if (!pricesOk && bodyClose != null && bodyClose !== '') {
+      const cp = parseFloat(bodyClose)
+      if (Number.isFinite(cp) && cp > 0) {
+        bid = cp
+        ask = cp
+        pricesOk = true
+      }
+    }
+
+    // WebSocket flaky: use LP snapshot for this symbol when client prices missing/invalid
+    if (!pricesOk) {
+      const fresh = await getFreshPrice(tradeToClose.symbol)
+      if (fresh && fresh.bid > 0 && fresh.ask > 0) {
+        bid = fresh.bid
+        ask = fresh.ask
+        pricesOk = true
+        console.log(`[trade/close] LP fallback bid/ask for ${tradeToClose.symbol}`)
+      }
+    }
+
+    if (!pricesOk) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Market is closed or no price data available. Cannot close trade.',
+        code: 'MARKET_CLOSED'
       })
     }
 

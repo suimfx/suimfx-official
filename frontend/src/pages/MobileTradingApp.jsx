@@ -798,19 +798,19 @@ const MobileTradingApp = () => {
 
     const prices = livePrices[trade.symbol] || {}
 
+    const hasClientPrices = prices.bid && prices.ask && prices.bid > 0 && prices.ask > 0
 
+    const closeBody = { tradeId: tradeId }
 
-    // Check if market data is available
+    if (hasClientPrices) {
 
-    if (!prices.bid || !prices.ask || prices.bid <= 0 || prices.ask <= 0) {
+      closeBody.bid = prices.bid
 
-      showNotification('Market is closed or no price data. Cannot close trade.', 'error')
-
-      return
+      closeBody.ask = prices.ask
 
     }
 
-
+    // No client prices: server uses LP snapshot (same as OrderBook)
 
     try {
 
@@ -820,15 +820,7 @@ const MobileTradingApp = () => {
 
         headers: { 'Content-Type': 'application/json' },
 
-        body: JSON.stringify({
-
-          tradeId: tradeId,
-
-          bid: prices.bid,
-
-          ask: prices.ask
-
-        })
+        body: JSON.stringify(closeBody)
 
       })
 
