@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { API_URL, API_BASE_URL } from '../config/api'
 import defaultLogo from '../assets/suimfxLogo.png'
+import { buildWlSessionHash, originForCustomDomain } from '../utils/wlSessionHandoff'
 
 const BrandingContext = createContext()
 
@@ -58,14 +59,17 @@ async function fetchMyBrandingAsUser () {
 }
 
 function applyFavicon (href) {
-  let link = document.querySelector('link[rel="icon"]')
-  if (!link) {
-    link = document.createElement('link')
-    link.rel = 'icon'
-    link.type = 'image/png'
-    document.head.appendChild(link)
-  }
-  link.href = href
+  const rels = ['icon', 'shortcut icon']
+  rels.forEach((rel) => {
+    let link = document.querySelector(`link[rel="${rel}"]`)
+    if (!link) {
+      link = document.createElement('link')
+      link.rel = rel
+      link.type = 'image/png'
+      document.head.appendChild(link)
+    }
+    link.href = href
+  })
 }
 
 export const BrandingProvider = ({ children }) => {
@@ -139,14 +143,21 @@ export const BrandingProvider = ({ children }) => {
     if (!cd) return
     if (normalizeHost(hostname) === normalizeHost(cd)) return
 
-    const url = `${window.location.protocol}//${cd}${window.location.pathname}${window.location.search}${window.location.hash}`
+    const targetOrigin = originForCustomDomain(cd)
+    if (!targetOrigin) return
+
+    const wl = buildWlSessionHash()
+    const url = `${targetOrigin}${window.location.pathname}${window.location.search}${wl}`
     window.location.replace(url)
   }, [brandingLoaded, branding])
 
   useEffect(() => {
     if (!brandingLoaded) return
-    if (branding?.brandName) {
-      document.title = branding.brandName
+    const name = (branding?.brandName || '').trim()
+    if (name) {
+      document.title = name
+    } else if (branding && (branding.logo || branding.customDomain)) {
+      document.title = 'Dashboard'
     } else {
       document.title = DEFAULT_TITLE
     }

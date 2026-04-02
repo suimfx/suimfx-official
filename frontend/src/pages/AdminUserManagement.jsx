@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import AdminLayout from '../components/AdminLayout'
 import { API_URL } from '../config/api'
 import { getAdminHeaders } from '../utils/adminApi'
+import { buildWlSessionHash, originForCustomDomain } from '../utils/wlSessionHandoff'
 import { 
   Search,
   Mail,
@@ -506,11 +507,21 @@ const AdminUserManagement = () => {
       
       if (response.ok) {
         const data = await response.json()
-        // Store user data and token, then redirect
+        // Store user data and token, then open user dashboard on admin custom domain when set (same as post-login flow)
         localStorage.setItem('token', data.token)
         localStorage.setItem('user', JSON.stringify(data.user))
-        // Open in new tab
-        window.open('/dashboard', '_blank')
+        const admin = JSON.parse(localStorage.getItem('adminUser') || '{}')
+        const cd = (admin.customDomain || '').trim()
+        const base = cd ? originForCustomDomain(cd) : ''
+        const targetBase = base || window.location.origin
+        let userDash = `${targetBase}/dashboard`
+        try {
+          const cross = new URL(targetBase).origin !== window.location.origin
+          if (cross) userDash += buildWlSessionHash()
+        } catch {
+          userDash = `${window.location.origin}/dashboard`
+        }
+        window.open(userDash, '_blank')
         setMessage({ type: 'success', text: 'Logged in as user - opening in new tab' })
       } else {
         const data = await response.json()
