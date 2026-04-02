@@ -2,36 +2,24 @@ import express from 'express'
 import Bonus from '../models/Bonus.js'
 import UserBonus from '../models/UserBonus.js'
 import User from '../models/User.js'
-import jwt from 'jsonwebtoken'
-
-// Get JWT_SECRET dynamically to ensure env is loaded
-const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
-
-// Simple auth middleware
-const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  
-  if (!token) {
-    return res.status(401).json({ success: false, message: 'No token provided' })
-  }
-
-  try {
-    const decoded = jwt.verify(token, getJwtSecret())
-    req.admin = decoded
-    next()
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' })
-  }
-}
+import { verifyAdminToken } from '../middleware/rbac.js'
+import {
+  getBonusOwnerAdminId,
+  bonusTemplateListFilter,
+  canMutateBonusTemplate,
+  findBonusesForUserDeposit,
+  selectApplicableBonus,
+  userBonusMongoFilter
+} from '../utils/bonusScope.js'
 
 const router = express.Router()
 
-// Get all bonuses
-router.get('/', async (req, res) => {
+// Get bonus templates for logged-in admin (scoped)
+router.get('/', verifyAdminToken, async (req, res) => {
   try {
     const { page = 1, limit = 10, status, type } = req.query
-    const query = {}
-    
+    const scope = bonusTemplateListFilter(req)
+    const query = { ...scope }
     if (status) query.status = status
     if (type) query.type = type
 
@@ -59,14 +47,18 @@ router.get('/', async (req, res) => {
   }
 })
 
-// Create new bonus
-router.post('/', async (req, res) => {
+// Create new bonus (owned by current admin)
+router.post('/', verifyAdminToken, async (req, res) => {
   try {
-    const bonusData = {
-      ...req.body
+    const ownerId = getBonusOwnerAdminId(req)
+    if (!ownerId) {
+      return res.status(403).json({ success: false, message: 'Cannot determine admin for bonus ownership' })
     }
-
-    const bonus = new Bonus(bonusData)
+    const { createdBy: _strip, ...rest } = req.body
+    const bonus = new Bonus({
+      ...rest,
+      createdBy: ownerId
+    })
     await bonus.save()
 
     const populatedBonus = await Bonus.findById(bonus._id).populate('createdBy', 'firstName lastName')
@@ -82,18 +74,22 @@ router.post('/', async (req, res) => {
   }
 })
 
-// Update bonus
-router.put('/:id', async (req, res) => {
+// Update bonus (only owner; legacy null only SUPER_ADMIN)
+router.put('/:id', verifyAdminToken, async (req, res) => {
   try {
-    const bonus = await Bonus.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    ).populate('createdBy', 'firstName lastName')
-
-    if (!bonus) {
+    const existing = await Bonus.findById(req.params.id)
+    if (!existing) {
       return res.status(404).json({ success: false, message: 'Bonus not found' })
     }
+    if (!canMutateBonusTemplate(existing, req)) {
+      return res.status(403).json({ success: false, message: 'You can only edit bonuses for your own account' })
+    }
+    const { createdBy: _strip, ...body } = req.body
+    const bonus = await Bonus.findByIdAndUpdate(
+      req.params.id,
+      body,
+      { new: true, runValidators: true }
+    ).populate('createdBy', 'firstName lastName')
 
     res.json({
       success: true,
@@ -107,15 +103,17 @@ router.put('/:id', async (req, res) => {
 })
 
 // Delete bonus
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyAdminToken, async (req, res) => {
   try {
-    const bonus = await Bonus.findByIdAndDelete(req.params.id)
-    
-    if (!bonus) {
+    const existing = await Bonus.findById(req.params.id)
+    if (!existing) {
       return res.status(404).json({ success: false, message: 'Bonus not found' })
     }
+    if (!canMutateBonusTemplate(existing, req)) {
+      return res.status(403).json({ success: false, message: 'You can only delete bonuses for your own account' })
+    }
 
-    // Also delete all user bonuses associated with this bonus
+    await Bonus.findByIdAndDelete(req.params.id)
     await UserBonus.deleteMany({ bonusId: req.params.id })
 
     res.json({
@@ -128,12 +126,12 @@ router.delete('/:id', async (req, res) => {
   }
 })
 
-// Get user bonuses
-router.get('/user-bonuses', async (req, res) => {
+// Get user bonuses (scoped to admin's users, except super admin = all)
+router.get('/user-bonuses', verifyAdminToken, async (req, res) => {
   try {
     const { page = 1, limit = 10, status, userId } = req.query
-    const query = {}
-    
+    const scope = await userBonusMongoFilter(req)
+    const query = { ...scope }
     if (status) query.status = status
     if (userId) query.userId = userId
 
@@ -163,52 +161,27 @@ router.get('/user-bonuses', async (req, res) => {
   }
 })
 
-// Calculate bonus for deposit
+// Public: used by user wallet UI — bonuses for that user's assigned admin only
 router.post('/calculate-bonus', async (req, res) => {
   try {
     const { userId, depositAmount, isFirstDeposit } = req.body
-
-    // Find all bonuses
-    const bonuses = await Bonus.find({}).sort({ createdAt: -1 })
-
-    let applicableBonus = null
-    let bonusAmount = 0
-
-    // Find the best applicable bonus
-    for (const bonus of bonuses) {
-      // Check if bonus is active
-      if (bonus.status !== 'ACTIVE') continue
-      
-      // Check bonus type matches first deposit status
-      if (isFirstDeposit && bonus.type !== 'FIRST_DEPOSIT') continue
-      if (!isFirstDeposit && bonus.type === 'FIRST_DEPOSIT') continue
-      
-      if (depositAmount >= bonus.minDeposit) {
-        if (bonus.usageLimit && bonus.usedCount >= bonus.usageLimit) continue
-
-        let calculatedBonus = 0
-        if (bonus.bonusType === 'PERCENTAGE') {
-          calculatedBonus = depositAmount * (bonus.bonusValue / 100)
-          if (bonus.maxBonus && calculatedBonus > bonus.maxBonus) {
-            calculatedBonus = bonus.maxBonus
-          }
-        } else {
-          calculatedBonus = bonus.bonusValue
-        }
-
-        if (calculatedBonus > bonusAmount) {
-          bonusAmount = calculatedBonus
-          applicableBonus = bonus
-        }
-      }
+    if (!userId || depositAmount == null) {
+      return res.status(400).json({ success: false, message: 'userId and depositAmount required' })
     }
+
+    const bonuses = await findBonusesForUserDeposit(userId)
+    const { bonusAmount, applicableBonus } = selectApplicableBonus(
+      bonuses,
+      Number(depositAmount),
+      !!isFirstDeposit
+    )
 
     res.json({
       success: true,
       data: {
         bonusAmount,
         bonus: applicableBonus,
-        totalAmount: depositAmount + bonusAmount
+        totalAmount: Number(depositAmount) + bonusAmount
       }
     })
   } catch (error) {
@@ -217,16 +190,19 @@ router.post('/calculate-bonus', async (req, res) => {
   }
 })
 
-// POST /api/bonus/create-default-bonuses - Create default bonuses
-router.post('/create-default-bonuses', async (req, res) => {
+// Default templates for this admin only
+router.post('/create-default-bonuses', verifyAdminToken, async (req, res) => {
   try {
-    // Check if bonuses already exist
-    const existingBonuses = await Bonus.countDocuments()
-    if (existingBonuses > 0) {
-      return res.json({ success: true, message: 'Default bonuses already exist' })
+    const ownerId = getBonusOwnerAdminId(req)
+    if (!ownerId) {
+      return res.status(403).json({ success: false, message: 'Cannot determine admin' })
     }
 
-    // Create default bonuses
+    const existingMine = await Bonus.countDocuments({ createdBy: ownerId })
+    if (existingMine > 0) {
+      return res.json({ success: true, message: 'Default bonuses already exist for your account' })
+    }
+
     const defaultBonuses = [
       {
         name: 'First Deposit Bonus',
@@ -239,7 +215,8 @@ router.post('/create-default-bonuses', async (req, res) => {
         duration: 30,
         status: 'ACTIVE',
         description: '100% bonus on your first deposit up to $500',
-        terms: '30x wagering requirement applies. Bonus expires after 30 days.'
+        terms: '30x wagering requirement applies. Bonus expires after 30 days.',
+        createdBy: ownerId
       },
       {
         name: 'Regular Deposit Bonus',
@@ -252,7 +229,8 @@ router.post('/create-default-bonuses', async (req, res) => {
         duration: 30,
         status: 'ACTIVE',
         description: '50% bonus on regular deposits up to $200',
-        terms: '25x wagering requirement applies. Bonus expires after 30 days.'
+        terms: '25x wagering requirement applies. Bonus expires after 30 days.',
+        createdBy: ownerId
       },
       {
         name: 'Reload Bonus',
@@ -265,7 +243,8 @@ router.post('/create-default-bonuses', async (req, res) => {
         duration: 14,
         status: 'ACTIVE',
         description: '$25 fixed bonus on deposits of $100 or more',
-        terms: '20x wagering requirement applies. Bonus expires after 14 days.'
+        terms: '20x wagering requirement applies. Bonus expires after 14 days.',
+        createdBy: ownerId
       }
     ]
 
@@ -282,8 +261,7 @@ router.post('/create-default-bonuses', async (req, res) => {
   }
 })
 
-// Activate bonus for user
-router.post('/activate-bonus', async (req, res) => {
+router.post('/activate-bonus', verifyAdminToken, async (req, res) => {
   try {
     const { userId, bonusId, depositId, bonusAmount } = req.body
 
@@ -291,8 +269,21 @@ router.post('/activate-bonus', async (req, res) => {
     if (!bonus) {
       return res.status(404).json({ success: false, message: 'Bonus not found' })
     }
+    if (!canMutateBonusTemplate(bonus, req)) {
+      return res.status(403).json({ success: false, message: 'You cannot activate this bonus template' })
+    }
 
-    // Create user bonus
+    const user = await User.findById(userId).select('assignedAdmin')
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+    if (req.userType !== 'SUPER_ADMIN') {
+      const ownerId = getBonusOwnerAdminId(req)
+      if (!user.assignedAdmin || String(user.assignedAdmin) !== String(ownerId)) {
+        return res.status(403).json({ success: false, message: 'User is not assigned to your admin account' })
+      }
+    }
+
     const userBonus = new UserBonus({
       userId,
       bonusId,
@@ -307,8 +298,6 @@ router.post('/activate-bonus', async (req, res) => {
     })
 
     await userBonus.save()
-
-    // Update bonus usage count
     await Bonus.findByIdAndUpdate(bonusId, { $inc: { usedCount: 1 } })
 
     const populatedUserBonus = await UserBonus.findById(userBonus._id)

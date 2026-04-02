@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import AdminLayout from '../components/AdminLayout'
 import { Plus, Edit2, Trash2, Gift, DollarSign, Percent, Calendar, Users, TrendingUp, FileText, Eye, EyeOff } from 'lucide-react'
 import { API_URL } from '../config/api'
+import { getAdminHeaders } from '../utils/adminApi'
 
 const AdminBonusManagement = () => {
   const [bonuses, setBonuses] = useState([])
@@ -34,7 +35,7 @@ const AdminBonusManagement = () => {
 
   const fetchBonuses = async () => {
     try {
-      const res = await fetch(`${API_URL}/bonus`)
+      const res = await fetch(`${API_URL}/bonus`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setBonuses(data.data)
@@ -46,7 +47,7 @@ const AdminBonusManagement = () => {
 
   const fetchUserBonuses = async () => {
     try {
-      const res = await fetch(`${API_URL}/bonus/user-bonuses`)
+      const res = await fetch(`${API_URL}/bonus/user-bonuses`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setUserBonuses(data.data)
@@ -66,9 +67,7 @@ const AdminBonusManagement = () => {
 
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify(formData)
       })
 
@@ -111,7 +110,8 @@ const AdminBonusManagement = () => {
 
     try {
       const res = await fetch(`${API_URL}/bonus/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAdminHeaders()
       })
 
       const data = await res.json()

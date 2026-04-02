@@ -83,5 +83,6 @@ const bonusSchema = new mongoose.Schema({
 // Index for efficient queries
 bonusSchema.index({ type: 1, status: 1 })
 bonusSchema.index({ status: 1 })
+bonusSchema.index({ createdBy: 1, status: 1 })
 
 export default mongoose.model('Bonus', bonusSchema)

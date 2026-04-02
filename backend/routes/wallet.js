@@ -7,6 +7,7 @@ import AdminWallet from '../models/AdminWallet.js'
 import AdminWalletTransaction from '../models/AdminWalletTransaction.js'
 import Bonus from '../models/Bonus.js'
 import UserBonus from '../models/UserBonus.js'
+import { findBonusesForUserDeposit, selectApplicableBonus } from '../utils/bonusScope.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 import EmailSettings from '../models/EmailSettings.js'
 import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
@@ -53,40 +54,13 @@ router.post('/deposit', async (req, res) => {
     let applicableBonus = null
 
     try {
-      // Get all bonuses (simplified query like in bonus routes)
-      const bonuses = await Bonus.find({}).sort({ createdAt: -1 })
+      const bonuses = await findBonusesForUserDeposit(userId)
       console.log('Deposit bonus calculation - found', bonuses.length, 'bonuses, isFirstDeposit:', isFirstDeposit)
-
-      // Find the best applicable bonus
-      for (const bonus of bonuses) {
-        // Check if bonus is active
-        if (bonus.status !== 'ACTIVE') continue
-        
-        // Check bonus type matches first deposit status
-        if (isFirstDeposit && bonus.type !== 'FIRST_DEPOSIT') continue
-        if (!isFirstDeposit && bonus.type === 'FIRST_DEPOSIT') continue
-        
-        if (amount >= bonus.minDeposit) {
-          if (bonus.usageLimit && bonus.usedCount >= bonus.usageLimit) {
-            continue // Skip if usage limit reached
-          }
-
-          let calculatedBonus = 0
-          if (bonus.bonusType === 'PERCENTAGE') {
-            calculatedBonus = amount * (bonus.bonusValue / 100)
-            if (bonus.maxBonus && calculatedBonus > bonus.maxBonus) {
-              calculatedBonus = bonus.maxBonus
-            }
-          } else {
-            calculatedBonus = bonus.bonusValue
-          }
-
-          if (calculatedBonus > bonusAmount) {
-            bonusAmount = calculatedBonus
-            applicableBonus = bonus
-            console.log('Found applicable bonus:', bonus.name, 'bonusAmount:', calculatedBonus)
-          }
-        }
+      const picked = selectApplicableBonus(bonuses, amount, isFirstDeposit)
+      bonusAmount = picked.bonusAmount
+      applicableBonus = picked.applicableBonus
+      if (applicableBonus) {
+        console.log('Found applicable bonus:', applicableBonus.name, 'bonusAmount:', bonusAmount)
       }
     } catch (bonusError) {
       console.error('Bonus calculation error:', bonusError)
