@@ -1042,8 +1042,12 @@ router.get('/branding', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Domain parameter required' })
     }
 
-    const admin = await Admin.findOne({ 
-      customDomain: domain.toLowerCase(),
+    const raw = domain.toLowerCase().trim()
+    const base = raw.replace(/^www\./, '')
+    const domainVariants = [...new Set([raw, base, `www.${base}`])]
+
+    const admin = await Admin.findOne({
+      customDomain: { $in: domainVariants },
       status: 'ACTIVE'
     }).select('brandName logo urlSlug customDomain _id')
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import suimfxLogo from '../assets/suimfxLogo.png'
 import { useBranding } from '../context/BrandingContext'
+import { isPlatformHost, isLocalDevHost, isWhiteLabelLandingPage } from '../utils/whiteLabelHost'
+import WhiteLabelLandingRouter from './landings/WhiteLabelLandingRouter'
 import { 
   CheckCircle2, Users, TrendingUp, Shield, Zap, Globe, BarChart3,
   Menu, X, Download, ArrowRight, Star, Clock, Headphones, Award,
@@ -501,6 +502,32 @@ const Footer = () => {
 
 // ============ MAIN LANDING PAGE COMPONENT ============
 const LandingPage = () => {
+  const { branding, brandingLoaded } = useBranding()
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+
+  if (!brandingLoaded) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 text-sm">
+        Loading…
+      </div>
+    )
+  }
+
+  if (!isPlatformHost(hostname) && !isLocalDevHost(hostname) && !branding?.adminSlug) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-8 text-center">
+        <h1 className="text-xl font-semibold mb-2">This domain is not connected</h1>
+        <p className="text-slate-400 max-w-md text-sm">
+          No active broker branding was found for this address. Ask your broker to connect this domain in the admin panel, or check DNS points to the correct server.
+        </p>
+      </div>
+    )
+  }
+
+  if (isWhiteLabelLandingPage(branding, hostname)) {
+    return <WhiteLabelLandingRouter branding={branding} />
+  }
+
   return (
     <main className="relative min-h-screen bg-slate-950 text-white">
       <Navbar />
