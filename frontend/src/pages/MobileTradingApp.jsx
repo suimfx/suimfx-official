@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
-import { 
+import {
 
   Home, BarChart2, TrendingUp, LineChart, MoreHorizontal,
 
@@ -94,7 +94,7 @@ const MobileTradingApp = () => {
 
   const wsRef = useRef(null)
 
-  
+
 
   // Modify trade modal states
 
@@ -108,7 +108,7 @@ const MobileTradingApp = () => {
 
   const [isModifying, setIsModifying] = useState(false)
 
-  
+
 
   // iOS-style notification states
 
@@ -212,7 +212,7 @@ const MobileTradingApp = () => {
 
     fetchAccounts(userData._id)
 
-    
+
 
     // Initial price fetch
 
@@ -260,7 +260,7 @@ const MobileTradingApp = () => {
 
   // Get all symbols from loaded instruments for price fetching
 
-  const allSymbols = instruments.length > 0 
+  const allSymbols = instruments.length > 0
 
     ? instruments.map(i => i.symbol)
 
@@ -278,7 +278,7 @@ const MobileTradingApp = () => {
 
       if (!prices || Object.keys(prices).length === 0) return
 
-      
+
 
       // Merge prices to prevent losing existing data
 
@@ -300,7 +300,7 @@ const MobileTradingApp = () => {
 
       })
 
-      
+
 
       // Update instruments with live prices (only if price is valid)
 
@@ -324,7 +324,7 @@ const MobileTradingApp = () => {
 
       }))
 
-      
+
 
       // Check pending orders and SL/TP in background
 
@@ -336,13 +336,13 @@ const MobileTradingApp = () => {
 
     })
 
-    
+
 
     // Fallback: also fetch via HTTP for initial load
 
     fetchLivePrices()
 
-    
+
 
     return () => unsubscribe()
 
@@ -358,7 +358,7 @@ const MobileTradingApp = () => {
 
       const allPrices = await priceService.getAllPrices(allSymbols)
 
-      
+
 
       if (Object.keys(allPrices).length > 0) {
 
@@ -366,7 +366,7 @@ const MobileTradingApp = () => {
 
         setLivePrices(allPrices)
 
-        
+
 
         // Update instruments with live prices
 
@@ -390,7 +390,7 @@ const MobileTradingApp = () => {
 
         }))
 
-        
+
 
         // Check pending orders and SL/TP in background
 
@@ -406,7 +406,7 @@ const MobileTradingApp = () => {
 
   }
 
-  
+
 
   // Check pending orders and SL/TP execution
 
@@ -414,7 +414,7 @@ const MobileTradingApp = () => {
 
     if (!selectedAccount) return
 
-    
+
 
     try {
 
@@ -432,7 +432,7 @@ const MobileTradingApp = () => {
 
       const pendingData = await pendingRes.json()
 
-      
+
 
       if (pendingData.success && pendingData.executedCount > 0) {
 
@@ -448,7 +448,7 @@ const MobileTradingApp = () => {
 
       }
 
-      
+
 
       // Check SL/TP for open trades
 
@@ -464,7 +464,7 @@ const MobileTradingApp = () => {
 
       const sltpData = await sltpRes.json()
 
-      
+
 
       if (sltpData.success && sltpData.closedCount > 0) {
 
@@ -530,7 +530,7 @@ const MobileTradingApp = () => {
 
       }
 
-    } catch (e) {}
+    } catch (e) { }
 
     setLoading(false)
 
@@ -550,7 +550,7 @@ const MobileTradingApp = () => {
 
       if (data.success) setOpenTrades(data.trades || [])
 
-    } catch (e) {}
+    } catch (e) { }
 
   }
 
@@ -568,7 +568,7 @@ const MobileTradingApp = () => {
 
       if (data.success) setPendingOrders(data.orders || [])
 
-    } catch (e) {}
+    } catch (e) { }
 
   }
 
@@ -586,7 +586,7 @@ const MobileTradingApp = () => {
 
       if (data.success) setTradeHistory(data.trades || [])
 
-    } catch (e) {}
+    } catch (e) { }
 
   }
 
@@ -606,7 +606,7 @@ const MobileTradingApp = () => {
 
       if (data.success) setAccountSummary(data.summary)
 
-    } catch (e) {}
+    } catch (e) { }
 
   }
 
@@ -630,13 +630,13 @@ const MobileTradingApp = () => {
 
     setShowOrderPanel(true)
 
-    
+
 
     // When clicking from search, mark instrument as "added" so it shows in its category
 
     if (searchTerm.length > 0 && !instrument.popular) {
 
-      setInstruments(prevInsts => prevInsts.map(i => 
+      setInstruments(prevInsts => prevInsts.map(i =>
 
         i.symbol === instrument.symbol ? { ...i, popular: true } : i
 
@@ -644,7 +644,7 @@ const MobileTradingApp = () => {
 
     }
 
-    
+
 
     // Clear search after selection
 
@@ -664,7 +664,7 @@ const MobileTradingApp = () => {
 
     const prices = livePrices[selectedInstrument.symbol] || {}
 
-    
+
 
     // Check if market data is available
 
@@ -798,7 +798,7 @@ const MobileTradingApp = () => {
 
     const prices = livePrices[trade.symbol] || {}
 
-    
+
 
     // Check if market data is available
 
@@ -918,7 +918,7 @@ const MobileTradingApp = () => {
 
       const currentPrice = instruments.find(i => i.symbol === tradeSymbol)
 
-      
+
 
       const res = await fetch(`${API_URL}/trade/modify`, {
 
@@ -1016,9 +1016,9 @@ const MobileTradingApp = () => {
 
     const matchesSearch = inst.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
 
-                         inst.name.toLowerCase().includes(searchTerm.toLowerCase())
+      inst.name.toLowerCase().includes(searchTerm.toLowerCase())
 
-    
+
 
     // When searching, show all matching instruments
 
@@ -1028,7 +1028,7 @@ const MobileTradingApp = () => {
 
     }
 
-    
+
 
     // When viewing Starred, show all starred instruments
 
@@ -1038,7 +1038,7 @@ const MobileTradingApp = () => {
 
     }
 
-    
+
 
     // When viewing "All", show ALL instruments
 
@@ -1048,7 +1048,7 @@ const MobileTradingApp = () => {
 
     }
 
-    
+
 
     // Map frontend category names to backend category names
 
@@ -1056,7 +1056,7 @@ const MobileTradingApp = () => {
 
     const backendCategory = categoryMap[activeCategory] || activeCategory
 
-    
+
 
     // For specific categories, show only popular by default
 
@@ -1118,13 +1118,13 @@ const MobileTradingApp = () => {
 
   // Only calculate if we have valid prices
 
-  const hasValidPrices = Object.keys(livePrices).length > 0 && 
+  const hasValidPrices = Object.keys(livePrices).length > 0 &&
 
     openTrades.some(t => livePrices[t.symbol]?.bid > 0)
 
-  
 
-  const totalFloatingPnl = hasValidPrices 
+
+  const totalFloatingPnl = hasValidPrices
 
     ? openTrades.reduce((sum, trade) => sum + calculatePnl(trade), 0)
 
@@ -1132,7 +1132,7 @@ const MobileTradingApp = () => {
 
   const totalUsedMargin = openTrades.reduce((sum, trade) => sum + (trade.marginUsed || 0), 0)
 
-  
+
 
   // Real-time equity calculation
 
@@ -1146,7 +1146,7 @@ const MobileTradingApp = () => {
 
   const [showAccountSelector, setShowAccountSelector] = useState(false)
 
-  
+
 
   const renderHome = () => (
 
@@ -1192,7 +1192,7 @@ const MobileTradingApp = () => {
 
           {/* Account Header with Switch */}
 
-          <div 
+          <div
 
             className="flex items-center justify-between mb-3 cursor-pointer"
 
@@ -1222,7 +1222,7 @@ const MobileTradingApp = () => {
 
           </div>
 
-          
+
 
           {/* Account Selector Dropdown */}
 
@@ -1242,11 +1242,9 @@ const MobileTradingApp = () => {
 
                     onClick={() => { setSelectedAccount(acc); setShowAccountSelector(false) }}
 
-                    className={`w-full flex items-center justify-between p-2 rounded-lg ${
+                    className={`w-full flex items-center justify-between p-2 rounded-lg ${selectedAccount._id === acc._id ? 'bg-accent-green/20 border border-accent-green/50' : 'bg-dark-700'
 
-                      selectedAccount._id === acc._id ? 'bg-accent-green/20 border border-accent-green/50' : 'bg-dark-700'
-
-                    }`}
+                      }`}
 
                   >
 
@@ -1264,7 +1262,7 @@ const MobileTradingApp = () => {
 
           )}
 
-          
+
 
           {/* Balance & Equity */}
 
@@ -1292,13 +1290,13 @@ const MobileTradingApp = () => {
 
           </div>
 
-          
+
 
           {/* Deposit/Withdraw Buttons */}
 
           <div className="flex gap-2 mt-3">
 
-            <button 
+            <button
 
               onClick={() => navigate('/wallet')}
 
@@ -1312,7 +1310,7 @@ const MobileTradingApp = () => {
 
             </button>
 
-            <button 
+            <button
 
               onClick={() => navigate('/wallet')}
 
@@ -1578,11 +1576,9 @@ const MobileTradingApp = () => {
 
               onClick={() => setActiveCategory(cat)}
 
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap ${
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap ${activeCategory === cat ? 'bg-accent-green text-black' : 'bg-dark-700 text-gray-400'
 
-                activeCategory === cat ? 'bg-accent-green text-black' : 'bg-dark-700 text-gray-400'
-
-              }`}
+                }`}
 
             >
 
@@ -1624,7 +1620,7 @@ const MobileTradingApp = () => {
 
                     e.stopPropagation()
 
-                    setInstruments(prev => prev.map(i => 
+                    setInstruments(prev => prev.map(i =>
 
                       i.symbol === inst.symbol ? { ...i, starred: !i.starred } : i
 
@@ -1802,17 +1798,15 @@ const MobileTradingApp = () => {
 
             onClick={() => setTradeTab(tab)}
 
-            className={`flex-1 py-3 text-sm font-medium ${
+            className={`flex-1 py-3 text-sm font-medium ${tradeTab === tab ? 'text-accent-green border-b-2 border-accent-green' : 'text-gray-500'
 
-              tradeTab === tab ? 'text-accent-green border-b-2 border-accent-green' : 'text-gray-500'
-
-            }`}
+              }`}
 
           >
 
             {tab === 'positions' ? `Positions (${openTrades.length})` :
 
-             tab === 'pending' ? `Pending (${pendingOrders.length})` : 'History'}
+              tab === 'pending' ? `Pending (${pendingOrders.length})` : 'History'}
 
           </button>
 
@@ -1858,7 +1852,7 @@ const MobileTradingApp = () => {
 
                     {/* Slim View - Always visible */}
 
-                    <div 
+                    <div
 
                       className="flex items-center justify-between px-4 py-3 cursor-pointer"
 
@@ -1874,11 +1868,9 @@ const MobileTradingApp = () => {
 
                             <span className="text-white font-medium text-sm">{trade.symbol}</span>
 
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] ${trade.side === 'BUY' ? 'bg-blue-500/20 text-blue-500' : 'bg-red-500/20 text-red-500'
 
-                              trade.side === 'BUY' ? 'bg-blue-500/20 text-blue-500' : 'bg-red-500/20 text-red-500'
-
-                            }`}>
+                              }`}>
 
                               {trade.side}
 
@@ -1924,7 +1916,7 @@ const MobileTradingApp = () => {
 
                     </div>
 
-                    
+
 
                     {/* Expanded Details */}
 
@@ -2072,99 +2064,98 @@ const MobileTradingApp = () => {
 
                 return (
 
-                <div key={order._id} className="p-4 bg-dark-900">
+                  <div key={order._id} className="p-4 bg-dark-900">
 
-                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2">
 
-                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
 
-                      <span className="text-white font-medium">{order.symbol}</span>
+                        <span className="text-white font-medium">{order.symbol}</span>
 
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${order.side === 'BUY' ? 'bg-blue-500/20 text-blue-500' : 'bg-red-500/20 text-red-500'
 
-                        order.side === 'BUY' ? 'bg-blue-500/20 text-blue-500' : 'bg-red-500/20 text-red-500'
+                          }`}>
 
-                      }`}>
+                          {order.orderType}
 
-                        {order.orderType}
+                        </span>
 
-                      </span>
+                      </div>
+
+                      <span className="text-yellow-500 text-xs font-medium">PENDING</span>
 
                     </div>
 
-                    <span className="text-yellow-500 text-xs font-medium">PENDING</span>
+                    <div className="grid grid-cols-3 gap-2 text-xs mb-3">
+
+                      <div>
+
+                        <p className="text-gray-500">Entry Price</p>
+
+                        <p className="text-white">{order.pendingPrice?.toFixed(5)}</p>
+
+                      </div>
+
+                      <div>
+
+                        <p className="text-gray-500">Current</p>
+
+                        <p className="text-white">{currentPrice?.toFixed(5) || '-'}</p>
+
+                      </div>
+
+                      <div>
+
+                        <p className="text-gray-500">Volume</p>
+
+                        <p className="text-white">{order.quantity} lots</p>
+
+                      </div>
+
+                      <div>
+
+                        <p className="text-gray-500">Stop Loss</p>
+
+                        <p className={order.sl || order.stopLoss ? 'text-red-500' : 'text-gray-600'}>{(order.sl || order.stopLoss)?.toFixed(5) || 'Not set'}</p>
+
+                      </div>
+
+                      <div>
+
+                        <p className="text-gray-500">Take Profit</p>
+
+                        <p className={order.tp || order.takeProfit ? 'text-green-500' : 'text-gray-600'}>{(order.tp || order.takeProfit)?.toFixed(5) || 'Not set'}</p>
+
+                      </div>
+
+                      <div>
+
+                        <p className="text-gray-500">Created</p>
+
+                        <p className="text-white">{new Date(order.createdAt).toLocaleDateString()}</p>
+
+                      </div>
+
+                    </div>
+
+                    <button
+
+                      onClick={() => cancelPendingOrder(order._id)}
+
+                      className="w-full py-2 bg-red-500/20 text-red-500 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+
+                    >
+
+                      <Trash2 size={14} />
+
+                      Cancel Order
+
+                    </button>
 
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs mb-3">
-
-                    <div>
-
-                      <p className="text-gray-500">Entry Price</p>
-
-                      <p className="text-white">{order.pendingPrice?.toFixed(5)}</p>
-
-                    </div>
-
-                    <div>
-
-                      <p className="text-gray-500">Current</p>
-
-                      <p className="text-white">{currentPrice?.toFixed(5) || '-'}</p>
-
-                    </div>
-
-                    <div>
-
-                      <p className="text-gray-500">Volume</p>
-
-                      <p className="text-white">{order.quantity} lots</p>
-
-                    </div>
-
-                    <div>
-
-                      <p className="text-gray-500">Stop Loss</p>
-
-                      <p className={order.sl || order.stopLoss ? 'text-red-500' : 'text-gray-600'}>{(order.sl || order.stopLoss)?.toFixed(5) || 'Not set'}</p>
-
-                    </div>
-
-                    <div>
-
-                      <p className="text-gray-500">Take Profit</p>
-
-                      <p className={order.tp || order.takeProfit ? 'text-green-500' : 'text-gray-600'}>{(order.tp || order.takeProfit)?.toFixed(5) || 'Not set'}</p>
-
-                    </div>
-
-                    <div>
-
-                      <p className="text-gray-500">Created</p>
-
-                      <p className="text-white">{new Date(order.createdAt).toLocaleDateString()}</p>
-
-                    </div>
-
-                  </div>
-
-                  <button
-
-                    onClick={() => cancelPendingOrder(order._id)}
-
-                    className="w-full py-2 bg-red-500/20 text-red-500 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
-
-                  >
-
-                    <Trash2 size={14} />
-
-                    Cancel Order
-
-                  </button>
-
-                </div>
-
-              )})}
+                )
+              })}
 
             </div>
 
@@ -2296,7 +2287,7 @@ const MobileTradingApp = () => {
 
     if (cryptoMap[symbol]) return cryptoMap[symbol]
 
-    
+
 
     // Forex & Metals - use OANDA
 
@@ -2330,397 +2321,395 @@ const MobileTradingApp = () => {
 
     const spreadMultiplier = isForex ? 10000 : 1
 
-    
+
 
     return (
 
-    <div className="flex flex-col h-screen">
+      <div className="flex flex-col h-screen">
 
-      {/* Chart Tabs - Minimal height */}
+        {/* Chart Tabs - Minimal height */}
 
-      <div className="flex items-center bg-dark-800 border-b border-gray-800 overflow-x-auto shrink-0" style={{ height: '40px' }}>
+        <div className="flex items-center bg-dark-800 border-b border-gray-800 overflow-x-auto shrink-0" style={{ height: '40px' }}>
 
-        {chartTabs.map(tab => (
-
-          <button
-
-            key={tab.symbol}
-
-            onClick={() => setActiveChartTab(tab.symbol)}
-
-            className={`flex items-center gap-2 px-3 py-2 text-xs whitespace-nowrap border-r border-gray-800 ${
-
-              activeChartTab === tab.symbol ? 'bg-dark-700 text-white' : 'text-gray-500'
-
-            }`}
-
-          >
-
-            {tab.symbol}
-
-            {chartTabs.length > 1 && (
-
-              <X
-
-                size={12}
-
-                onClick={(e) => {
-
-                  e.stopPropagation()
-
-                  setChartTabs(prev => prev.filter(t => t.symbol !== tab.symbol))
-
-                  if (activeChartTab === tab.symbol && chartTabs.length > 1) {
-
-                    setActiveChartTab(chartTabs[0].symbol)
-
-                  }
-
-                }}
-
-                className="hover:text-red-500"
-
-              />
-
-            )}
-
-          </button>
-
-        ))}
-
-        <button
-
-          onClick={() => setActiveTab('market')}
-
-          className="px-3 py-2 text-gray-500 hover:text-white"
-
-        >
-
-          <Plus size={16} />
-
-        </button>
-
-      </div>
-
-
-
-      {/* Full Screen TradingView Chart */}
-
-      <div className="flex-1 bg-[#0d0d0d] relative min-h-0" ref={chartContainerRef}>
-
-        <iframe
-
-          key={activeChartTab}
-
-          src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_mobile&symbol=${encodeURIComponent(getSymbolForTradingView(activeChartTab))}&interval=5&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=0d0d0d&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=["left_toolbar","header_widget","drawing_templates"]&disabled_features=["hide_left_toolbar_by_default"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=0`}
-
-          style={{ width: '100%', height: '100%', border: 'none' }}
-
-          allowFullScreen
-
-          title="TradingView Chart"
-
-        />
-
-      </div>
-
-
-
-      {/* Compact Buy/Sell Bar - Fixed at bottom above nav */}
-
-      <div 
-
-        className="bg-dark-800 border-t border-gray-800 shrink-0" 
-
-        style={{ paddingBottom: '64px' }}
-
-      >
-
-        {/* Swipe indicator - tap to open full panel */}
-
-        <div 
-
-          className="flex justify-center pt-2 pb-1 cursor-pointer"
-
-          onClick={() => {
-
-            const inst = instruments.find(i => i.symbol === activeChartTab) || { symbol: activeChartTab, category: 'Forex' }
-
-            setSelectedInstrument(inst)
-
-            setShowOrderPanel(true)
-
-          }}
-
-        >
-
-          <div className="w-10 h-1 bg-gray-600 rounded-full" />
-
-        </div>
-
-        
-
-        <div className="flex items-center justify-between px-3 py-1">
-
-          <div className="text-center">
-
-            <p className="text-gray-500 text-[10px]">Bid</p>
-
-            <p className="text-red-500 font-semibold text-sm">{getPrice(activeChartTab).bid?.toFixed(decimals) || '-'}</p>
-
-          </div>
-
-          
-
-          {/* Lot Size Selector */}
-
-          <div className="flex items-center gap-2">
+          {chartTabs.map(tab => (
 
             <button
 
-              onClick={() => setVolume(prev => Math.max(0.01, parseFloat(prev) - 0.01).toFixed(2))}
+              key={tab.symbol}
 
-              className="w-7 h-7 bg-dark-700 rounded-lg flex items-center justify-center"
+              onClick={() => setActiveChartTab(tab.symbol)}
+
+              className={`flex items-center gap-2 px-3 py-2 text-xs whitespace-nowrap border-r border-gray-800 ${activeChartTab === tab.symbol ? 'bg-dark-700 text-white' : 'text-gray-500'
+
+                }`}
 
             >
 
-              <Minus size={14} className="text-white" />
+              {tab.symbol}
+
+              {chartTabs.length > 1 && (
+
+                <X
+
+                  size={12}
+
+                  onClick={(e) => {
+
+                    e.stopPropagation()
+
+                    setChartTabs(prev => prev.filter(t => t.symbol !== tab.symbol))
+
+                    if (activeChartTab === tab.symbol && chartTabs.length > 1) {
+
+                      setActiveChartTab(chartTabs[0].symbol)
+
+                    }
+
+                  }}
+
+                  className="hover:text-red-500"
+
+                />
+
+              )}
 
             </button>
 
-            <div className="text-center min-w-[60px]">
+          ))}
 
-              <p className="text-gray-500 text-[10px]">Lot Size</p>
+          <button
 
-              <p className="text-white font-semibold text-sm">{volume}</p>
+            onClick={() => setActiveTab('market')}
+
+            className="px-3 py-2 text-gray-500 hover:text-white"
+
+          >
+
+            <Plus size={16} />
+
+          </button>
+
+        </div>
+
+
+
+        {/* Full Screen TradingView Chart */}
+
+        <div className="flex-1 bg-[#0d0d0d] relative min-h-0" ref={chartContainerRef}>
+
+          <iframe
+
+            key={activeChartTab}
+
+            src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_mobile&symbol=${encodeURIComponent(getSymbolForTradingView(activeChartTab))}&interval=5&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=0d0d0d&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=["left_toolbar","header_widget","drawing_templates"]&disabled_features=["hide_left_toolbar_by_default"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=0`}
+
+            style={{ width: '100%', height: '100%', border: 'none' }}
+
+            allowFullScreen
+
+            title="TradingView Chart"
+
+          />
+
+        </div>
+
+
+
+        {/* Compact Buy/Sell Bar - Fixed at bottom above nav */}
+
+        <div
+
+          className="bg-dark-800 border-t border-gray-800 shrink-0"
+
+          style={{ paddingBottom: '64px' }}
+
+        >
+
+          {/* Swipe indicator - tap to open full panel */}
+
+          <div
+
+            className="flex justify-center pt-2 pb-1 cursor-pointer"
+
+            onClick={() => {
+
+              const inst = instruments.find(i => i.symbol === activeChartTab) || { symbol: activeChartTab, category: 'Forex' }
+
+              setSelectedInstrument(inst)
+
+              setShowOrderPanel(true)
+
+            }}
+
+          >
+
+            <div className="w-10 h-1 bg-gray-600 rounded-full" />
+
+          </div>
+
+
+
+          <div className="flex items-center justify-between px-3 py-1">
+
+            <div className="text-center">
+
+              <p className="text-gray-500 text-[10px]">Bid</p>
+
+              <p className="text-red-500 font-semibold text-sm">{getPrice(activeChartTab).bid?.toFixed(decimals) || '-'}</p>
 
             </div>
 
+
+
+            {/* Lot Size Selector */}
+
+            <div className="flex items-center gap-2">
+
+              <button
+
+                onClick={() => setVolume(prev => Math.max(0.01, parseFloat(prev) - 0.01).toFixed(2))}
+
+                className="w-7 h-7 bg-dark-700 rounded-lg flex items-center justify-center"
+
+              >
+
+                <Minus size={14} className="text-white" />
+
+              </button>
+
+              <div className="text-center min-w-[60px]">
+
+                <p className="text-gray-500 text-[10px]">Lot Size</p>
+
+                <p className="text-white font-semibold text-sm">{volume}</p>
+
+              </div>
+
+              <button
+
+                onClick={() => setVolume(prev => (parseFloat(prev) + 0.01).toFixed(2))}
+
+                className="w-7 h-7 bg-dark-700 rounded-lg flex items-center justify-center"
+
+              >
+
+                <Plus size={14} className="text-white" />
+
+              </button>
+
+            </div>
+
+
+
+            <div className="text-center">
+
+              <p className="text-gray-500 text-[10px]">Ask</p>
+
+              <p className="text-green-500 font-semibold text-sm">{getPrice(activeChartTab).ask?.toFixed(decimals) || '-'}</p>
+
+            </div>
+
+          </div>
+
+
+
+          <div className="flex gap-2 px-3 pb-2">
+
             <button
 
-              onClick={() => setVolume(prev => (parseFloat(prev) + 0.01).toFixed(2))}
+              onClick={async () => {
 
-              className="w-7 h-7 bg-dark-700 rounded-lg flex items-center justify-center"
+                if (!selectedAccount || !user) {
+
+                  showNotification('Please select an account first', 'error')
+
+                  return
+
+                }
+
+                const price = getPrice(activeChartTab)
+
+                if (!price.bid || !price.ask) {
+
+                  showNotification('No price data available', 'error')
+
+                  return
+
+                }
+
+                setIsExecuting(true)
+
+                try {
+
+                  const res = await fetch(`${API_URL}/trade/open`, {
+
+                    method: 'POST',
+
+                    headers: { 'Content-Type': 'application/json' },
+
+                    body: JSON.stringify({
+
+                      userId: user._id,
+
+                      tradingAccountId: selectedAccount._id,
+
+                      symbol: activeChartTab,
+
+                      segment: instruments.find(i => i.symbol === activeChartTab)?.category || 'Forex',
+
+                      side: 'SELL',
+
+                      orderType: 'MARKET',
+
+                      quantity: parseFloat(volume),
+
+                      bid: price.bid,
+
+                      ask: price.ask,
+
+                      leverage: leverage
+
+                    })
+
+                  })
+
+                  const data = await res.json()
+
+                  if (data.success) {
+
+                    fetchOpenTrades()
+
+                    fetchAccountSummary()
+
+                    showNotification('Sell order executed!', 'success')
+
+                  } else {
+
+                    showNotification(data.message || 'Order failed', 'error')
+
+                  }
+
+                } catch (err) {
+
+                  showNotification('Order failed', 'error')
+
+                }
+
+                setIsExecuting(false)
+
+              }}
+
+              disabled={isExecuting || !selectedAccount}
+
+              className="flex-1 py-3 bg-red-500 text-white font-semibold rounded-xl disabled:opacity-50"
 
             >
 
-              <Plus size={14} className="text-white" />
+              SELL
+
+            </button>
+
+            <button
+
+              onClick={async () => {
+
+                if (!selectedAccount || !user) {
+
+                  showNotification('Please select an account first', 'error')
+
+                  return
+
+                }
+
+                const price = getPrice(activeChartTab)
+
+                if (!price.bid || !price.ask) {
+
+                  showNotification('No price data available', 'error')
+
+                  return
+
+                }
+
+                setIsExecuting(true)
+
+                try {
+
+                  const res = await fetch(`${API_URL}/trade/open`, {
+
+                    method: 'POST',
+
+                    headers: { 'Content-Type': 'application/json' },
+
+                    body: JSON.stringify({
+
+                      userId: user._id,
+
+                      tradingAccountId: selectedAccount._id,
+
+                      symbol: activeChartTab,
+
+                      segment: instruments.find(i => i.symbol === activeChartTab)?.category || 'Forex',
+
+                      side: 'BUY',
+
+                      orderType: 'MARKET',
+
+                      quantity: parseFloat(volume),
+
+                      bid: price.bid,
+
+                      ask: price.ask,
+
+                      leverage: leverage
+
+                    })
+
+                  })
+
+                  const data = await res.json()
+
+                  if (data.success) {
+
+                    fetchOpenTrades()
+
+                    fetchAccountSummary()
+
+                    showNotification('Buy order executed!', 'success')
+
+                  } else {
+
+                    showNotification(data.message || 'Order failed', 'error')
+
+                  }
+
+                } catch (err) {
+
+                  showNotification('Order failed', 'error')
+
+                }
+
+                setIsExecuting(false)
+
+              }}
+
+              disabled={isExecuting || !selectedAccount}
+
+              className="flex-1 py-3 bg-blue-500 text-white font-semibold rounded-xl disabled:opacity-50"
+
+            >
+
+              BUY
 
             </button>
 
           </div>
 
-          
-
-          <div className="text-center">
-
-            <p className="text-gray-500 text-[10px]">Ask</p>
-
-            <p className="text-green-500 font-semibold text-sm">{getPrice(activeChartTab).ask?.toFixed(decimals) || '-'}</p>
-
-          </div>
-
-        </div>
-
-        
-
-        <div className="flex gap-2 px-3 pb-2">
-
-          <button
-
-            onClick={async () => {
-
-              if (!selectedAccount || !user) {
-
-                showNotification('Please select an account first', 'error')
-
-                return
-
-              }
-
-              const price = getPrice(activeChartTab)
-
-              if (!price.bid || !price.ask) {
-
-                showNotification('No price data available', 'error')
-
-                return
-
-              }
-
-              setIsExecuting(true)
-
-              try {
-
-                const res = await fetch(`${API_URL}/trade/open`, {
-
-                  method: 'POST',
-
-                  headers: { 'Content-Type': 'application/json' },
-
-                  body: JSON.stringify({
-
-                    userId: user._id,
-
-                    tradingAccountId: selectedAccount._id,
-
-                    symbol: activeChartTab,
-
-                    segment: instruments.find(i => i.symbol === activeChartTab)?.category || 'Forex',
-
-                    side: 'SELL',
-
-                    orderType: 'MARKET',
-
-                    quantity: parseFloat(volume),
-
-                    bid: price.bid,
-
-                    ask: price.ask,
-
-                    leverage: leverage
-
-                  })
-
-                })
-
-                const data = await res.json()
-
-                if (data.success) {
-
-                  fetchOpenTrades()
-
-                  fetchAccountSummary()
-
-                  showNotification('Sell order executed!', 'success')
-
-                } else {
-
-                  showNotification(data.message || 'Order failed', 'error')
-
-                }
-
-              } catch (err) {
-
-                showNotification('Order failed', 'error')
-
-              }
-
-              setIsExecuting(false)
-
-            }}
-
-            disabled={isExecuting || !selectedAccount}
-
-            className="flex-1 py-3 bg-red-500 text-white font-semibold rounded-xl disabled:opacity-50"
-
-          >
-
-            SELL
-
-          </button>
-
-          <button
-
-            onClick={async () => {
-
-              if (!selectedAccount || !user) {
-
-                showNotification('Please select an account first', 'error')
-
-                return
-
-              }
-
-              const price = getPrice(activeChartTab)
-
-              if (!price.bid || !price.ask) {
-
-                showNotification('No price data available', 'error')
-
-                return
-
-              }
-
-              setIsExecuting(true)
-
-              try {
-
-                const res = await fetch(`${API_URL}/trade/open`, {
-
-                  method: 'POST',
-
-                  headers: { 'Content-Type': 'application/json' },
-
-                  body: JSON.stringify({
-
-                    userId: user._id,
-
-                    tradingAccountId: selectedAccount._id,
-
-                    symbol: activeChartTab,
-
-                    segment: instruments.find(i => i.symbol === activeChartTab)?.category || 'Forex',
-
-                    side: 'BUY',
-
-                    orderType: 'MARKET',
-
-                    quantity: parseFloat(volume),
-
-                    bid: price.bid,
-
-                    ask: price.ask,
-
-                    leverage: leverage
-
-                  })
-
-                })
-
-                const data = await res.json()
-
-                if (data.success) {
-
-                  fetchOpenTrades()
-
-                  fetchAccountSummary()
-
-                  showNotification('Buy order executed!', 'success')
-
-                } else {
-
-                  showNotification(data.message || 'Order failed', 'error')
-
-                }
-
-              } catch (err) {
-
-                showNotification('Order failed', 'error')
-
-              }
-
-              setIsExecuting(false)
-
-            }}
-
-            disabled={isExecuting || !selectedAccount}
-
-            className="flex-1 py-3 bg-blue-500 text-white font-semibold rounded-xl disabled:opacity-50"
-
-          >
-
-            BUY
-
-          </button>
-
         </div>
 
       </div>
 
-    </div>
-
-  )
+    )
 
   }
 
@@ -2800,11 +2789,9 @@ const MobileTradingApp = () => {
 
               }}
 
-              className={`flex flex-col items-center justify-center flex-1 h-full ${
+              className={`flex flex-col items-center justify-center flex-1 h-full ${activeTab === item.id ? 'text-accent-green' : 'text-gray-500'
 
-                activeTab === item.id ? 'text-accent-green' : 'text-gray-500'
-
-              }`}
+                }`}
 
             >
 
@@ -2838,7 +2825,7 @@ const MobileTradingApp = () => {
 
             </div>
 
-            
+
 
             <div className="px-4 pb-8">
 
@@ -2972,11 +2959,9 @@ const MobileTradingApp = () => {
 
                   onClick={() => setOrderType('market')}
 
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${orderType === 'market' ? 'bg-accent-green text-black' : 'bg-dark-700 text-gray-400'
 
-                    orderType === 'market' ? 'bg-accent-green text-black' : 'bg-dark-700 text-gray-400'
-
-                  }`}
+                    }`}
 
                 >
 
@@ -2988,11 +2973,9 @@ const MobileTradingApp = () => {
 
                   onClick={() => setOrderType('pending')}
 
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${orderType === 'pending' ? 'bg-accent-green text-black' : 'bg-dark-700 text-gray-400'
 
-                    orderType === 'pending' ? 'bg-accent-green text-black' : 'bg-dark-700 text-gray-400'
-
-                  }`}
+                    }`}
 
                 >
 
@@ -3022,13 +3005,11 @@ const MobileTradingApp = () => {
 
                         onClick={() => setPendingOrderType(type)}
 
-                        className={`py-2.5 rounded-lg text-xs font-medium transition-colors ${
+                        className={`py-2.5 rounded-lg text-xs font-medium transition-colors ${pendingOrderType === type
 
-                          pendingOrderType === type
+                            ? type.includes('BUY')
 
-                            ? type.includes('BUY') 
-
-                              ? 'bg-blue-600 text-white' 
+                              ? 'bg-blue-600 text-white'
 
                               : 'bg-red-600 text-white'
 
@@ -3038,7 +3019,7 @@ const MobileTradingApp = () => {
 
                               : 'bg-dark-700 border border-red-500/30 text-red-400'
 
-                        }`}
+                          }`}
 
                       >
 
@@ -3226,15 +3207,13 @@ const MobileTradingApp = () => {
 
                   disabled={isExecuting}
 
-                  className={`w-full py-4 font-semibold rounded-xl disabled:opacity-50 ${
+                  className={`w-full py-4 font-semibold rounded-xl disabled:opacity-50 ${pendingOrderType.includes('BUY')
 
-                    pendingOrderType.includes('BUY') 
-
-                      ? 'bg-blue-600 text-white' 
+                      ? 'bg-blue-600 text-white'
 
                       : 'bg-red-600 text-white'
 
-                  }`}
+                    }`}
 
                 >
 
@@ -3270,7 +3249,7 @@ const MobileTradingApp = () => {
 
             </div>
 
-            
+
 
             <div className="px-4 pb-8">
 
@@ -3286,7 +3265,7 @@ const MobileTradingApp = () => {
 
               </div>
 
-              
+
 
               <div className="space-y-1">
 
@@ -3296,7 +3275,7 @@ const MobileTradingApp = () => {
 
                     key={item.name}
 
-                    onClick={() => { 
+                    onClick={() => {
 
                       if (item.action) {
 
@@ -3308,7 +3287,7 @@ const MobileTradingApp = () => {
 
                       }
 
-                      setShowMoreMenu(false) 
+                      setShowMoreMenu(false)
 
                     }}
 
@@ -3334,7 +3313,7 @@ const MobileTradingApp = () => {
 
                 ))}
 
-                
+
 
                 <button
 
@@ -3386,7 +3365,7 @@ const MobileTradingApp = () => {
 
             </div>
 
-            
+
 
             {/* Header */}
 
@@ -3402,7 +3381,7 @@ const MobileTradingApp = () => {
 
             </div>
 
-            
+
 
             {/* Content */}
 
@@ -3512,25 +3491,21 @@ const MobileTradingApp = () => {
 
           >
 
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl backdrop-blur-xl shadow-lg ${
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl backdrop-blur-xl shadow-lg ${notification.type === 'success'
 
-              notification.type === 'success' 
+                ? 'bg-green-500/90'
 
-                ? 'bg-green-500/90' 
+                : notification.type === 'error'
 
-                : notification.type === 'error' 
-
-                  ? 'bg-red-500/90' 
+                  ? 'bg-red-500/90'
 
                   : 'bg-gray-800/90'
 
-            }`}>
-
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-
-                notification.type === 'success' ? 'bg-white/20' : 'bg-white/20'
-
               }`}>
+
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${notification.type === 'success' ? 'bg-white/20' : 'bg-white/20'
+
+                }`}>
 
                 {notification.type === 'success' ? (
 

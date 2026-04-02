@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { X, Mail, Lock, Eye, EyeOff, User, Phone, AlertCircle } from 'lucide-react'
 import { API_URL, API_BASE_URL } from '../config/api'
+import { useBranding } from '../context/BrandingContext'
 
 const BrandedSignup = () => {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const { refreshBranding } = useBranding()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -20,7 +22,7 @@ const BrandedSignup = () => {
     password: '',
     confirmPassword: ''
   })
-  
+
   useEffect(() => {
     fetchBrandInfo()
   }, [slug])
@@ -89,7 +91,7 @@ const BrandedSignup = () => {
       setLoading(false)
       return
     }
-    
+
     try {
       const response = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
@@ -105,13 +107,14 @@ const BrandedSignup = () => {
         })
       })
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.message || 'Signup failed')
       }
-      
+
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
+      await refreshBranding()
       navigate('/dashboard')
     } catch (err) {
       setError(err.message)
@@ -135,8 +138,8 @@ const BrandedSignup = () => {
           <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
           <h1 className="text-xl font-semibold text-white mb-2">Invalid Link</h1>
           <p className="text-gray-400 mb-6">{brandError}</p>
-          <Link 
-            to="/user/signup" 
+          <Link
+            to="/user/signup"
             className="text-accent-green hover:underline"
           >
             Go to main signup
@@ -150,7 +153,7 @@ const BrandedSignup = () => {
     <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-r from-cyan-500/20 to-transparent rounded-full blur-3xl" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-l from-orange-500/20 via-purple-500/20 to-transparent rounded-full blur-3xl" />
-      
+
       <div className="relative bg-dark-700 rounded-2xl p-8 w-full max-w-md border border-gray-800">
         <button className="absolute top-4 right-4 w-8 h-8 bg-dark-600 rounded-full flex items-center justify-center hover:bg-dark-500 transition-colors">
           <X size={16} className="text-gray-400" />
@@ -285,6 +288,10 @@ const BrandedSignup = () => {
         </p>
       </div>
     </div>
+  )
+}
+
+export default BrandedSignup
   )
 }
 

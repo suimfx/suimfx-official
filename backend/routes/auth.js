@@ -89,7 +89,7 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     const otpRecord = await OTP.findOne({ email, otp, purpose: 'signup' })
-    
+
     if (!otpRecord) {
       return res.status(400).json({ success: false, message: 'Invalid OTP' })
     }
@@ -162,9 +162,9 @@ router.post('/signup', async (req, res) => {
     if (referralCode) {
       // First: Check if referral code belongs to an Admin (white-label)
       if (!assignedAdmin) {
-        const referringAdmin = await Admin.findOne({ 
-          referralCode: referralCode.toUpperCase(), 
-          status: 'ACTIVE' 
+        const referringAdmin = await Admin.findOne({
+          referralCode: referralCode.toUpperCase(),
+          status: 'ACTIVE'
         })
         if (referringAdmin) {
           assignedAdmin = referringAdmin._id
@@ -173,13 +173,13 @@ router.post('/signup', async (req, res) => {
           console.log(`[Signup] User ${email} assigned to Admin ${referringAdmin.firstName} (${referralCode})`)
         }
       }
-      
+
       // Second: Check if referral code belongs to an IB user
       if (!assignedAdmin) {
-        const referringIB = await User.findOne({ 
-          referralCode: referralCode, 
-          isIB: true, 
-          ibStatus: 'ACTIVE' 
+        const referringIB = await User.findOne({
+          referralCode: referralCode,
+          isIB: true,
+          ibStatus: 'ACTIVE'
         })
         if (referringIB) {
           parentIBId = referringIB._id
@@ -262,7 +262,7 @@ router.post('/login', async (req, res) => {
 
     // Check if user is banned
     if (user.isBanned) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: 'Your account has been permanently banned. Please contact support.',
         reason: user.banReason || 'Account banned'
       })
@@ -270,7 +270,7 @@ router.post('/login', async (req, res) => {
 
     // Check if user is blocked
     if (user.isBlocked) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: 'Your account has been temporarily blocked. Please contact support.',
         reason: user.blockReason || 'Account blocked'
       })
@@ -332,14 +332,14 @@ router.get('/me', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     const user = await User.findById(decoded.id).select('-password')
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
 
     // Check if user is banned - force logout
     if (user.isBanned) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: 'Your account has been permanently banned.',
         forceLogout: true,
         reason: user.banReason || 'Account banned'
@@ -348,7 +348,7 @@ router.get('/me', async (req, res) => {
 
     // Check if user is blocked - force logout
     if (user.isBlocked) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: 'Your account has been temporarily blocked.',
         forceLogout: true,
         reason: user.blockReason || 'Account blocked'
@@ -360,7 +360,7 @@ router.get('/me', async (req, res) => {
       const tokenIssuedAt = decoded.iat * 1000 // Convert to milliseconds
       const passwordChangedAt = new Date(user.passwordChangedAt).getTime()
       if (passwordChangedAt > tokenIssuedAt) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           message: 'Your password was changed. Please login again.',
           forceLogout: true
         })
@@ -391,7 +391,7 @@ router.get('/my-branding', async (req, res) => {
       return res.json({ success: true, branding: null })
     }
 
-    const admin = await Admin.findById(user.assignedAdmin).select('brandName logo urlSlug')
+    const admin = await Admin.findById(user.assignedAdmin).select('brandName logo urlSlug customDomain')
     if (!admin) {
       return res.json({ success: true, branding: null })
     }
@@ -401,7 +401,8 @@ router.get('/my-branding', async (req, res) => {
       branding: {
         brandName: admin.brandName || '',
         logo: admin.logo || '',
-        urlSlug: admin.urlSlug || ''
+        urlSlug: admin.urlSlug || '',
+        customDomain: admin.customDomain || null
       }
     })
   } catch (error) {
@@ -444,7 +445,7 @@ router.put('/update-profile', async (req, res) => {
 
     await user.save()
 
-    res.json({ 
+    res.json({
       message: 'Profile updated successfully',
       user: {
         _id: user._id,
@@ -525,8 +526,8 @@ router.post('/forgot-password', async (req, res) => {
           year: new Date().getFullYear().toString()
         })
 
-        res.json({ 
-          success: true, 
+        res.json({
+          success: true,
           message: 'Password reset OTP sent to your email',
           requiresOTP: true
         })
@@ -540,17 +541,17 @@ router.post('/forgot-password', async (req, res) => {
     if (!smtpEnabled) {
       // Create password reset request for admin
       const PasswordResetRequest = (await import('../models/PasswordResetRequest.js')).default
-      
+
       // Check if there's already a pending request
-      const existingRequest = await PasswordResetRequest.findOne({ 
-        userId: user._id, 
-        status: 'Pending' 
+      const existingRequest = await PasswordResetRequest.findOne({
+        userId: user._id,
+        status: 'Pending'
       })
-      
+
       if (existingRequest) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'You already have a pending password reset request. Please wait for admin to process it.' 
+        return res.status(400).json({
+          success: false,
+          message: 'You already have a pending password reset request. Please wait for admin to process it.'
         })
       }
 
@@ -563,8 +564,8 @@ router.post('/forgot-password', async (req, res) => {
 
       console.log(`[Password Reset Request] User: ${user.email}`)
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: 'Password reset request submitted. Admin will send a new password to your email.',
         requiresOTP: false
       })
@@ -616,9 +617,9 @@ router.post('/verify-reset-otp', async (req, res) => {
     // Delete used OTP
     await OTP.deleteOne({ _id: otpRecord._id })
 
-    res.json({ 
-      success: true, 
-      message: 'Password reset successfully. You can now login with your new password.' 
+    res.json({
+      success: true,
+      message: 'Password reset successfully. You can now login with your new password.'
     })
   } catch (error) {
     console.error('Verify reset OTP error:', error)
@@ -656,9 +657,9 @@ router.post('/change-password', async (req, res) => {
     user.passwordChangedAt = new Date()
     await user.save()
 
-    res.json({ 
-      success: true, 
-      message: 'Password changed successfully' 
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
     })
   } catch (error) {
     console.error('Change password error:', error)

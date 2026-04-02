@@ -44,7 +44,7 @@ const countries = [
 
 const Signup = () => {
   const navigate = useNavigate()
-  const { branding } = useBranding()
+  const { branding, refreshBranding } = useBranding()
   const [searchParams] = useSearchParams()
   const referralCode = searchParams.get('ref')
   const [activeTab, setActiveTab] = useState('signup')
@@ -70,7 +70,7 @@ const Signup = () => {
     countryCode: '+91',
     password: ''
   })
-  
+
   // Detect mobile view
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -225,7 +225,7 @@ const Signup = () => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    
+
     try {
       // If OTP is required and not verified, send OTP and show verification screen
       if (otpRequired && !otpVerified) {
@@ -235,7 +235,7 @@ const Signup = () => {
           setLoading(false)
           return
         }
-        
+
         // Send OTP
         const res = await fetch(`${API_URL}/auth/send-otp`, {
           method: 'POST',
@@ -243,7 +243,7 @@ const Signup = () => {
           body: JSON.stringify({ email: formData.email, firstName: formData.firstName })
         })
         const data = await res.json()
-        
+
         if (data.success) {
           setOtpStep(true)
           setOtpSent(true)
@@ -262,11 +262,12 @@ const Signup = () => {
         otpVerified: otpVerified,
         adminSlug
       }
-      
+
       const response = await signup(signupData)
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
-      
+      await refreshBranding()
+
       // Also call register-referral API for backward compatibility
       if (referralCode && response.user?._id) {
         try {
@@ -283,7 +284,7 @@ const Signup = () => {
           console.error('Error registering referral:', refError)
         }
       }
-      
+
       // Redirect to mobile view on mobile devices
       if (isMobile) {
         navigate('/mobile')
@@ -309,11 +310,12 @@ const Signup = () => {
             referralCode: referralCode || undefined,
             otpVerified: true
           }
-          
+
           const response = await signup(signupData)
           localStorage.setItem('token', response.token)
           localStorage.setItem('user', JSON.stringify(response.user))
-          
+          await refreshBranding()
+
           if (isMobile) {
             navigate('/mobile')
           } else {
@@ -327,7 +329,7 @@ const Signup = () => {
       }
       submitForm()
     }
-  }, [otpVerified])
+  }, [otpVerified, refreshBranding, isMobile, navigate])
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -338,7 +340,7 @@ const Signup = () => {
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/10 rounded-full blur-[100px]" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px]" />
       </div>
-      
+
       {/* Signup Card */}
       <div className="relative w-full max-w-md">
         <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-8 shadow-2xl">
@@ -452,7 +454,7 @@ const Signup = () => {
                     <span className="text-slate-400 text-sm">{selectedCountry.code}</span>
                     <ChevronDown size={14} className="text-slate-500" />
                   </button>
-                  
+
                   {/* Country Dropdown */}
                   {showCountryDropdown && (
                     <div className="absolute top-full left-0 mt-1 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 max-h-64 overflow-hidden">
@@ -487,7 +489,7 @@ const Signup = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   <input
                     type="tel"
                     name="phone"
@@ -567,6 +569,10 @@ const Signup = () => {
         </div>
       </div>
     </div>
+  )
+}
+
+export default Signup
   )
 }
 

@@ -8,7 +8,7 @@ import { useBranding } from '../context/BrandingContext'
 
 const Login = () => {
   const navigate = useNavigate()
-  const { branding } = useBranding()
+  const { branding, refreshBranding } = useBranding()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -16,9 +16,9 @@ const Login = () => {
     email: '',
     password: ''
   })
-  
+
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-  
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handleResize)
@@ -63,7 +63,7 @@ const Login = () => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    
+
     try {
       const adminSlug = localStorage.getItem('adminSlug') || undefined
       const response = await login({ ...formData, adminSlug })
@@ -74,6 +74,7 @@ const Login = () => {
         localStorage.setItem('adminLogoUrl', `${API_BASE_URL}${response.user.adminBranding.logo}`)
         localStorage.setItem('adminBrandName', response.user.adminBranding.brandName || '')
       }
+      await refreshBranding()
       if (isMobile) {
         navigate('/mobile')
       } else {
@@ -95,7 +96,7 @@ const Login = () => {
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/10 rounded-full blur-[100px]" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px]" />
       </div>
-      
+
       {/* Login Card */}
       <div className="relative w-full max-w-md">
         <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-8 shadow-2xl">

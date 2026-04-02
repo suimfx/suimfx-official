@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
-  LayoutDashboard, 
+import {
+  LayoutDashboard,
   User,
   Wallet,
   Users,
@@ -48,12 +48,12 @@ const Dashboard = () => {
   const economicCalendarRef = useRef(null)
   const forexHeatmapRef = useRef(null)
   const forexScreenerRef = useRef(null)
-  
+
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
   // Handle responsive view switching
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-  
+
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768
@@ -61,13 +61,13 @@ const Dashboard = () => {
       // Only redirect on initial load if mobile, not on resize
     }
     window.addEventListener('resize', handleResize)
-    
+
     // Initial check - redirect to mobile only on first load
     if (window.innerWidth < 768 && !sessionStorage.getItem('viewChecked')) {
       sessionStorage.setItem('viewChecked', 'true')
       navigate('/mobile')
     }
-    
+
     return () => window.removeEventListener('resize', handleResize)
   }, [navigate])
 
@@ -85,7 +85,7 @@ const Dashboard = () => {
           setBrandName(data.branding.brandName || '')
         }
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   // Check auth status on mount
@@ -95,13 +95,13 @@ const Dashboard = () => {
       navigate('/user/login')
       return
     }
-    
+
     try {
       const res = await fetch(`${API_URL}/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const data = await res.json()
-      
+
       if (data.forceLogout || res.status === 403) {
         alert(data.message || 'Session expired. Please login again.')
         localStorage.removeItem('token')
@@ -123,7 +123,7 @@ const Dashboard = () => {
       fetchUserAccounts()
     }
   }, [user._id])
-  
+
   // Fetch trades after accounts are loaded
   useEffect(() => {
     if (userAccounts.length > 0) {
@@ -170,7 +170,7 @@ const Dashboard = () => {
       let allTrades = []
       let charges = 0
       let pnl = 0
-      
+
       for (const account of userAccounts) {
         // Fetch closed trades for history
         const historyRes = await fetch(`${API_URL}/trade/history/${account._id}`)
@@ -183,7 +183,7 @@ const Dashboard = () => {
             pnl += (trade.realizedPnl || 0)
           })
         }
-        
+
         // Fetch open trades
         const openRes = await fetch(`${API_URL}/trade/open/${account._id}`)
         const openData = await openRes.json()
@@ -191,7 +191,7 @@ const Dashboard = () => {
           allTrades = [...allTrades, ...openData.trades]
         }
       }
-      
+
       setTotalTrades(allTrades.length)
       setTotalCharges(Math.abs(charges))
       setTotalPnl(pnl)
@@ -296,7 +296,7 @@ const Dashboard = () => {
   // Load TradingView widgets - re-render when theme changes
   useEffect(() => {
     const colorTheme = isDarkMode ? "dark" : "light"
-    
+
     // TradingView Timeline Widget (News)
     if (tradingViewRef.current) {
       tradingViewRef.current.innerHTML = ''
@@ -374,7 +374,7 @@ const Dashboard = () => {
   return (
     <div className={`h-screen flex transition-colors duration-300 ${isDarkMode ? 'bg-dark-900' : 'bg-gray-100'}`}>
       {/* Collapsible Sidebar - Fixed */}
-      <aside 
+      <aside
         className={`${sidebarExpanded ? 'w-48' : 'w-16'} ${isDarkMode ? 'bg-dark-900 border-gray-800' : 'bg-white border-gray-200'} border-r flex flex-col h-screen sticky top-0 transition-all duration-300 ease-in-out`}
         onMouseEnter={() => setSidebarExpanded(true)}
         onMouseLeave={() => setSidebarExpanded(false)}
@@ -391,13 +391,12 @@ const Dashboard = () => {
             <button
               key={item.name}
               onClick={() => navigate(item.path)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
-                activeMenu === item.name 
-                  ? 'bg-accent-green text-black' 
-                  : isDarkMode 
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${activeMenu === item.name
+                  ? 'bg-accent-green text-black'
+                  : isDarkMode
                     ? 'text-gray-400 hover:text-white hover:bg-dark-700'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
+                }`}
               title={!sidebarExpanded ? item.name : ''}
             >
               <item.icon size={18} className="flex-shrink-0" />
@@ -409,24 +408,22 @@ const Dashboard = () => {
         {/* Theme Toggle & Logout - Fixed at bottom */}
         <div className={`p-2 border-t shrink-0 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
           {/* Theme Toggle */}
-          <button 
+          <button
             onClick={toggleDarkMode}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
-              isDarkMode 
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${isDarkMode
                 ? 'text-yellow-400 hover:text-yellow-300 hover:bg-dark-700'
                 : 'text-blue-600 hover:text-blue-700 hover:bg-gray-100'
-            }`}
+              }`}
             title={!sidebarExpanded ? (isDarkMode ? 'Light Mode' : 'Dark Mode') : ''}
           >
             {isDarkMode ? <Sun size={18} className="flex-shrink-0" /> : <Moon size={18} className="flex-shrink-0" />}
             {sidebarExpanded && <span className="text-sm font-medium whitespace-nowrap">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>}
           </button>
-          
-          <button 
+
+          <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors rounded-lg ${
-              isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors rounded-lg ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+              }`}
             title={!sidebarExpanded ? 'Log Out' : ''}
           >
             <LogOut size={18} className="flex-shrink-0" />

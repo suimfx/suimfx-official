@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { X, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { API_URL, API_BASE_URL } from '../config/api'
+import { useBranding } from '../context/BrandingContext'
 
 const BrandedLogin = () => {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const { refreshBranding } = useBranding()
   const [activeTab, setActiveTab] = useState('signin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -17,9 +19,9 @@ const BrandedLogin = () => {
     email: '',
     password: ''
   })
-  
+
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-  
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handleResize)
@@ -88,7 +90,7 @@ const BrandedLogin = () => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    
+
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
@@ -99,14 +101,15 @@ const BrandedLogin = () => {
         })
       })
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.message || 'Login failed')
       }
-      
+
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
-      
+      await refreshBranding()
+
       if (isMobile) {
         navigate('/mobile')
       } else {
@@ -134,8 +137,8 @@ const BrandedLogin = () => {
           <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
           <h1 className="text-xl font-semibold text-white mb-2">Invalid Link</h1>
           <p className="text-gray-400 mb-6">{brandError}</p>
-          <Link 
-            to="/user/login" 
+          <Link
+            to="/user/login"
             className="text-accent-green hover:underline"
           >
             Go to main login
@@ -149,7 +152,7 @@ const BrandedLogin = () => {
     <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-r from-cyan-500/20 to-transparent rounded-full blur-3xl" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-l from-orange-500/20 via-purple-500/20 to-transparent rounded-full blur-3xl" />
-      
+
       <div className="relative bg-dark-700 rounded-2xl p-8 w-full max-w-md border border-gray-800">
         <button className="absolute top-4 right-4 w-8 h-8 bg-dark-600 rounded-full flex items-center justify-center hover:bg-dark-500 transition-colors">
           <X size={16} className="text-gray-400" />
@@ -175,9 +178,8 @@ const BrandedLogin = () => {
           </Link>
           <button
             onClick={() => setActiveTab('signin')}
-            className={`px-6 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeTab === 'signin' ? 'bg-dark-500 text-white' : 'text-gray-400 hover:text-white'
-            }`}
+            className={`px-6 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === 'signin' ? 'bg-dark-500 text-white' : 'text-gray-400 hover:text-white'
+              }`}
           >
             Sign in
           </button>
@@ -242,6 +244,12 @@ const BrandedLogin = () => {
         </p>
       </div>
     </div>
+  )
+}
+
+export default BrandedLogin
+      </div >
+    </div >
   )
 }
 
