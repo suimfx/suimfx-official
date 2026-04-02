@@ -727,36 +727,40 @@ const AdminProfile = () => {
                     </div>
                   </div>
 
-                  {/* Custom Domain Links */}
-                  {admin?.customDomain && (
+                  {/* Custom Domain Links — show hostname from connection wizard, not only after DB customDomain is set */}
+                  {displayHostForUsers && (
                     <div className="bg-dark-700 rounded-lg p-4">
                       <div className="flex items-center gap-2 text-emerald-400 mb-1">
                         <Globe size={16} />
                         <span className="font-medium">Custom Domain Links</span>
                       </div>
                       <p className="text-gray-500 text-xs mb-3">
-                        Users can access your platform directly via your custom domain
+                        {wizardConnected || admin?.customDomain
+                          ? 'Users can access your platform directly via your custom domain'
+                          : 'Share these URLs once DNS is verified and SSL works on your server'}
                       </p>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="text-gray-500 text-xs w-14 shrink-0">Signup</span>
-                          <input type="text" readOnly value={`https://${admin.customDomain}/user/signup`} className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate" />
-                          <button onClick={() => copyLink(`https://${admin.customDomain}/user/signup`, setCopiedDomain)} className={`px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${copiedDomain ? 'bg-green-500 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                          <input type="text" readOnly value={userSignupUrl} className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate" />
+                          <button onClick={() => copyLink(userSignupUrl, setCopiedDomain)} className={`px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${copiedDomain ? 'bg-green-500 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
                             {copiedDomain ? <Check size={14} /> : <Copy size={14} />}
                             {copiedDomain ? 'Copied!' : 'Copy'}
                           </button>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-gray-500 text-xs w-14 shrink-0">Login</span>
-                          <input type="text" readOnly value={`https://${admin.customDomain}/user/login`} className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate" />
-                          <button onClick={() => copyLink(`https://${admin.customDomain}/user/login`, setCopiedDomainLogin)} className={`px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${copiedDomainLogin ? 'bg-green-500 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                          <input type="text" readOnly value={userLoginUrl} className="flex-1 bg-dark-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 truncate" />
+                          <button onClick={() => copyLink(userLoginUrl, setCopiedDomainLogin)} className={`px-3 py-2 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${copiedDomainLogin ? 'bg-green-500 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
                             {copiedDomainLogin ? <Check size={14} /> : <Copy size={14} />}
                             {copiedDomainLogin ? 'Copied!' : 'Copy'}
                           </button>
                         </div>
                       </div>
                       <p className="text-yellow-500/70 text-xs mt-3 flex items-center gap-1">
-                        ⚠️ Make sure your domain DNS is pointed to the server and SSL is configured
+                        ⚠️ {wizardConnected || admin?.customDomain
+                          ? 'DNS should point to your server; use HTTPS after SSL (e.g. Certbot)'
+                          : 'Complete TXT verification + Verify & Connect; then ensure SSL on the server'}
                       </p>
                     </div>
                   )}
