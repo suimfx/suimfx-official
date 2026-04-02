@@ -3,8 +3,13 @@ import mongoose from 'mongoose'
 const accountTypeSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true,
-    unique: true
+    required: true
+  },
+  // Admin who created this account type (null = Super Admin / global)
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
   },
   description: {
     type: String,

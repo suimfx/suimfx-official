@@ -26,9 +26,11 @@ import {
   Image,
   User,
   Bitcoin,
-  BookOpen
+  BookOpen,
+  Globe2
 } from 'lucide-react'
-import logoImage from '../assets/suimfxLogo.png'
+import defaultLogo from '../assets/suimfxLogo.png'
+import { API_BASE_URL } from '../config/api'
 
 const AdminLayout = ({ children, title, subtitle }) => {
   const navigate = useNavigate()
@@ -37,13 +39,21 @@ const AdminLayout = ({ children, title, subtitle }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState({})
   const [admin, setAdmin] = useState(null)
+  const [isImpersonating, setIsImpersonating] = useState(false)
+
+  const [logoImage, setLogoImage] = useState(defaultLogo)
 
   // Get admin data from localStorage
   useEffect(() => {
     const adminUser = localStorage.getItem('adminUser')
     if (adminUser) {
-      setAdmin(JSON.parse(adminUser))
+      const parsed = JSON.parse(adminUser)
+      setAdmin(parsed)
+      if (parsed.logo) {
+        setLogoImage(`${API_BASE_URL}${parsed.logo}`)
+      }
     }
+    setIsImpersonating(localStorage.getItem('isImpersonating') === 'true')
   }, [])
 
   // All menu items with sidebarPermission key
@@ -65,10 +75,12 @@ const AdminLayout = ({ children, title, subtitle }) => {
     { name: 'Email Templates', icon: Mail, path: '/admin/email-templates', sidebarKey: 'emailTemplates' },
     { name: 'Bonus Management', icon: Gift, path: '/admin/bonus-management', sidebarKey: 'bonusManagement' },
     { name: 'Banner Management', icon: Image, path: '/admin/banners', sidebarKey: 'bonusManagement' },
-    { name: 'Admin Management', icon: Shield, path: '/admin/admin-management', sidebarKey: 'employeeManagement' },
+    { name: 'Employee Management', icon: Shield, path: '/admin/admin-management', sidebarKey: 'employeeManagement' },
+    { name: 'Super Admin Management', icon: Shield, path: '/admin/super-admin-management', sidebarKey: 'superAdminManagement' },
     { name: 'KYC Verification', icon: FileCheck, path: '/admin/kyc', sidebarKey: 'kycVerification' },
     { name: 'Support Tickets', icon: HeadphonesIcon, path: '/admin/support', sidebarKey: 'supportTickets' },
     { name: 'My Profile', icon: User, path: '/admin/profile', sidebarKey: 'myProfile' },
+    { name: 'Connect Domain', icon: Globe2, path: '/admin/profile#domain', sidebarKey: 'myProfile' },
   ]
 
   // Check if user has sidebar permission (SUPER_ADMIN has all permissions)
@@ -78,6 +90,11 @@ const AdminLayout = ({ children, title, subtitle }) => {
     // Debug: Log admin data on first check
     if (sidebarKey === 'overviewDashboard') {
       console.log('Admin data:', { role: admin.role, sidebarPermissions: admin.sidebarPermissions })
+    }
+    
+    // Super Admin Management is ONLY for SUPER_ADMIN
+    if (sidebarKey === 'superAdminManagement') {
+      return admin.role === 'SUPER_ADMIN'
     }
     
     if (admin.role === 'SUPER_ADMIN') return true
@@ -129,10 +146,26 @@ const AdminLayout = ({ children, title, subtitle }) => {
     }
   }, [navigate])
 
+  const handleExitImpersonation = () => {
+    const originalToken = localStorage.getItem('originalAdminToken')
+    const originalUser = localStorage.getItem('originalAdminUser')
+    if (originalToken && originalUser) {
+      localStorage.setItem('adminToken', originalToken)
+      localStorage.setItem('adminUser', originalUser)
+      localStorage.removeItem('originalAdminToken')
+      localStorage.removeItem('originalAdminUser')
+      localStorage.removeItem('isImpersonating')
+      window.location.href = '/admin/super-admin-management'
+    }
+  }
+
   const handleLogout = () => {
     const currentAdmin = admin
     localStorage.removeItem('adminToken')
     localStorage.removeItem('adminUser')
+    localStorage.removeItem('originalAdminToken')
+    localStorage.removeItem('originalAdminUser')
+    localStorage.removeItem('isImpersonating')
     // Redirect based on role - ADMIN goes to /admin/login, SUPER_ADMIN goes to /admin
     if (currentAdmin?.role === 'ADMIN') {
       navigate('/admin/login')
@@ -242,11 +275,34 @@ const AdminLayout = ({ children, title, subtitle }) => {
               {subtitle && <p className="text-gray-500 text-sm hidden sm:block">{subtitle}</p>}
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1 bg-red-500/20 text-red-500 rounded-full text-xs sm:text-sm">
-            <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-            <span className="hidden sm:inline">Admin Mode</span>
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm ${
+            admin?.role === 'ADMIN' 
+              ? 'bg-blue-500/20 text-blue-500' 
+              : 'bg-red-500/20 text-red-500'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${
+              admin?.role === 'ADMIN' ? 'bg-blue-500' : 'bg-red-500'
+            }`}></span>
+            <span className="hidden sm:inline">
+              {admin?.role === 'ADMIN' ? 'Admin Mode' : 'Super Admin Mode'}
+            </span>
           </div>
         </header>
+
+        {/* Impersonation Banner */}
+        {isImpersonating && (
+          <div className="bg-yellow-500/20 border-b border-yellow-500/30 px-4 sm:px-6 py-2 flex items-center justify-between">
+            <span className="text-yellow-400 text-sm font-medium">
+              ⚠ You are impersonating <strong>{admin?.firstName} {admin?.lastName}</strong> ({admin?.role})
+            </span>
+            <button
+              onClick={handleExitImpersonation}
+              className="px-3 py-1 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-400 transition-colors"
+            >
+              Exit Impersonation
+            </button>
+          </div>
+        )}
 
         {/* Page Content */}
         <div className="p-4 sm:p-6">

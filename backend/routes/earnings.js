@@ -1,13 +1,21 @@
 import express from 'express'
 import Trade from '../models/Trade.js'
+import User from '../models/User.js'
 import mongoose from 'mongoose'
+import { verifyAdminToken } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
 // GET /api/earnings/summary - Get earnings summary (daily, weekly, monthly)
-router.get('/summary', async (req, res) => {
+router.get('/summary', verifyAdminToken, async (req, res) => {
   try {
     const now = new Date()
+    
+    // Get admin's user IDs for filtering
+    let userFilter = {}
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) userFilter.userId = { $in: userIds }
     
     // Calculate date ranges
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -20,8 +28,14 @@ router.get('/summary', async (req, res) => {
     const aggregateEarnings = async (startDate, endDate = now) => {
       const result = await Trade.aggregate([
         {
+          $addFields: {
+            _tradeDate: { $ifNull: ['$openedAt', '$createdAt'] }
+          }
+        },
+        {
           $match: {
-            openedAt: { $gte: startDate, $lte: endDate },
+            ...userFilter,
+            _tradeDate: { $gte: startDate, $lte: endDate },
             status: { $in: ['OPEN', 'CLOSED'] }
           }
         },
@@ -59,7 +73,7 @@ router.get('/summary', async (req, res) => {
           commission: today.totalCommission,
           spread: today.totalSpread,
           swap: today.totalSwap,
-          total: today.totalCommission + today.totalSwap,
+          total: today.totalCommission + today.totalSpread + today.totalSwap,
           trades: today.tradeCount,
           volume: today.totalVolume
         },
@@ -67,7 +81,7 @@ router.get('/summary', async (req, res) => {
           commission: thisWeek.totalCommission,
           spread: thisWeek.totalSpread,
           swap: thisWeek.totalSwap,
-          total: thisWeek.totalCommission + thisWeek.totalSwap,
+          total: thisWeek.totalCommission + thisWeek.totalSpread + thisWeek.totalSwap,
           trades: thisWeek.tradeCount,
           volume: thisWeek.totalVolume
         },
@@ -75,7 +89,7 @@ router.get('/summary', async (req, res) => {
           commission: thisMonth.totalCommission,
           spread: thisMonth.totalSpread,
           swap: thisMonth.totalSwap,
-          total: thisMonth.totalCommission + thisMonth.totalSwap,
+          total: thisMonth.totalCommission + thisMonth.totalSpread + thisMonth.totalSwap,
           trades: thisMonth.tradeCount,
           volume: thisMonth.totalVolume
         },
@@ -83,7 +97,7 @@ router.get('/summary', async (req, res) => {
           commission: thisYear.totalCommission,
           spread: thisYear.totalSpread,
           swap: thisYear.totalSwap,
-          total: thisYear.totalCommission + thisYear.totalSwap,
+          total: thisYear.totalCommission + thisYear.totalSpread + thisYear.totalSwap,
           trades: thisYear.tradeCount,
           volume: thisYear.totalVolume
         },
@@ -91,7 +105,7 @@ router.get('/summary', async (req, res) => {
           commission: allTime.totalCommission,
           spread: allTime.totalSpread,
           swap: allTime.totalSwap,
-          total: allTime.totalCommission + allTime.totalSwap,
+          total: allTime.totalCommission + allTime.totalSpread + allTime.totalSwap,
           trades: allTime.tradeCount,
           volume: allTime.totalVolume
         }
@@ -104,9 +118,13 @@ router.get('/summary', async (req, res) => {
 })
 
 // GET /api/earnings/daily - Get daily earnings breakdown for a date range
-router.get('/daily', async (req, res) => {
+router.get('/daily', verifyAdminToken, async (req, res) => {
   try {
     const { startDate, endDate, days = 30 } = req.query
+    
+    let userFilter = {}
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) userFilter.userId = { $in: userIds }
     
     let start, end
     if (startDate && endDate) {
@@ -120,17 +138,23 @@ router.get('/daily', async (req, res) => {
 
     const dailyEarnings = await Trade.aggregate([
       {
+        $addFields: {
+          _tradeDate: { $ifNull: ['$openedAt', '$createdAt'] }
+        }
+      },
+      {
         $match: {
-          openedAt: { $gte: start, $lte: end },
+          ...userFilter,
+          _tradeDate: { $gte: start, $lte: end },
           status: { $in: ['OPEN', 'CLOSED'] }
         }
       },
       {
         $group: {
           _id: {
-            year: { $year: '$openedAt' },
-            month: { $month: '$openedAt' },
-            day: { $dayOfMonth: '$openedAt' }
+            year: { $year: '$_tradeDate' },
+            month: { $month: '$_tradeDate' },
+            day: { $dayOfMonth: '$_tradeDate' }
           },
           commission: { $sum: '$commission' },
           spread: { $sum: '$spread' },
@@ -150,7 +174,7 @@ router.get('/daily', async (req, res) => {
       commission: day.commission,
       spread: day.spread,
       swap: day.swap,
-      total: day.commission + day.swap,
+      total: day.commission + day.spread + day.swap,
       trades: day.trades,
       volume: day.volume
     }))
@@ -163,9 +187,13 @@ router.get('/daily', async (req, res) => {
 })
 
 // GET /api/earnings/by-user - Get earnings breakdown by user
-router.get('/by-user', async (req, res) => {
+router.get('/by-user', verifyAdminToken, async (req, res) => {
   try {
     const { startDate, endDate, days = 30 } = req.query
+    
+    let userFilter = {}
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) userFilter.userId = { $in: userIds }
     
     let start, end
     if (startDate && endDate) {
@@ -179,8 +207,14 @@ router.get('/by-user', async (req, res) => {
 
     const userEarnings = await Trade.aggregate([
       {
+        $addFields: {
+          _tradeDate: { $ifNull: ['$openedAt', '$createdAt'] }
+        }
+      },
+      {
         $match: {
-          openedAt: { $gte: start, $lte: end },
+          ...userFilter,
+          _tradeDate: { $gte: start, $lte: end },
           status: { $in: ['OPEN', 'CLOSED'] }
         }
       },
@@ -213,7 +247,7 @@ router.get('/by-user', async (req, res) => {
           commission: 1,
           spread: 1,
           swap: 1,
-          total: { $add: ['$commission', '$swap'] },
+          total: { $add: ['$commission', '$spread', '$swap'] },
           trades: 1,
           volume: 1
         }
@@ -231,9 +265,13 @@ router.get('/by-user', async (req, res) => {
 })
 
 // GET /api/earnings/by-symbol - Get earnings breakdown by symbol
-router.get('/by-symbol', async (req, res) => {
+router.get('/by-symbol', verifyAdminToken, async (req, res) => {
   try {
     const { startDate, endDate, days = 30 } = req.query
+    
+    let userFilter = {}
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) userFilter.userId = { $in: userIds }
     
     let start, end
     if (startDate && endDate) {
@@ -247,8 +285,14 @@ router.get('/by-symbol', async (req, res) => {
 
     const symbolEarnings = await Trade.aggregate([
       {
+        $addFields: {
+          _tradeDate: { $ifNull: ['$openedAt', '$createdAt'] }
+        }
+      },
+      {
         $match: {
-          openedAt: { $gte: start, $lte: end },
+          ...userFilter,
+          _tradeDate: { $gte: start, $lte: end },
           status: { $in: ['OPEN', 'CLOSED'] }
         }
       },
@@ -268,7 +312,7 @@ router.get('/by-symbol', async (req, res) => {
           commission: 1,
           spread: 1,
           swap: 1,
-          total: { $add: ['$commission', '$swap'] },
+          total: { $add: ['$commission', '$spread', '$swap'] },
           trades: 1,
           volume: 1
         }

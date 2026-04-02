@@ -1,6 +1,11 @@
 import mongoose from 'mongoose'
 
 const manualCryptoWalletSchema = new mongoose.Schema({
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
   currency: {
     type: String,
     required: true,

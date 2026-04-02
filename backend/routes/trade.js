@@ -8,6 +8,7 @@ import propTradingEngine from '../services/propTradingEngine.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
 import ibEngine from '../services/ibEngineNew.js'
 import MasterTrader from '../models/MasterTrader.js'
+import User from '../models/User.js'
 import infowayService from '../services/infowayService.js'
 
 // Fetch fresh price from Infoway
@@ -234,12 +235,15 @@ router.post('/close', async (req, res) => {
         ? (closePrice - tradeToClose.openPrice) * tradeToClose.quantity * tradeToClose.contractSize
         : (tradeToClose.openPrice - closePrice) * tradeToClose.quantity * tradeToClose.contractSize
       
-      // Get charges for commission on close
+      // Get charges for commission on close (filtered by user's assigned admin)
+      const closeTradeUser = await User.findById(tradeToClose.userId).select('assignedAdmin')
+      const closeTradeAdminId = closeTradeUser?.assignedAdmin || null
       const charges = await Charges.getChargesForTrade(
         tradeToClose.userId, 
         tradeToClose.symbol, 
         tradeToClose.segment, 
-        null
+        null,
+        closeTradeAdminId
       )
       
       // Calculate commission on close if enabled

@@ -17,6 +17,14 @@ import {
 } from 'lucide-react'
 import { API_URL } from '../config/api'
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('adminToken')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  }
+}
+
 const AdminCopyTrade = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('masters')
@@ -43,7 +51,7 @@ const AdminCopyTrade = () => {
 
   const fetchDashboard = async () => {
     try {
-      const res = await fetch(`${API_URL}/copy/admin/dashboard`)
+      const res = await fetch(`${API_URL}/copy/admin/dashboard`, { headers: getAuthHeaders() })
       const data = await res.json()
       setDashboard(data.dashboard)
     } catch (error) {
@@ -53,7 +61,7 @@ const AdminCopyTrade = () => {
 
   const fetchMasters = async () => {
     try {
-      const res = await fetch(`${API_URL}/copy/admin/masters`)
+      const res = await fetch(`${API_URL}/copy/admin/masters`, { headers: getAuthHeaders() })
       const data = await res.json()
       setMasters(data.masters || [])
     } catch (error) {
@@ -64,7 +72,7 @@ const AdminCopyTrade = () => {
 
   const fetchApplications = async () => {
     try {
-      const res = await fetch(`${API_URL}/copy/admin/applications`)
+      const res = await fetch(`${API_URL}/copy/admin/applications`, { headers: getAuthHeaders() })
       const data = await res.json()
       setApplications(data.applications || [])
     } catch (error) {
@@ -74,7 +82,7 @@ const AdminCopyTrade = () => {
 
   const fetchFollowers = async () => {
     try {
-      const res = await fetch(`${API_URL}/copy/admin/followers`)
+      const res = await fetch(`${API_URL}/copy/admin/followers`, { headers: getAuthHeaders() })
       const data = await res.json()
       setFollowers(data.followers || [])
     } catch (error) {
@@ -87,7 +95,7 @@ const AdminCopyTrade = () => {
     try {
       const res = await fetch(`${API_URL}/copy/admin/approve/${selectedMaster._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           adminId: adminUser._id,
           ...approveForm
@@ -115,7 +123,7 @@ const AdminCopyTrade = () => {
     try {
       const res = await fetch(`${API_URL}/copy/admin/reject/${masterId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           adminId: adminUser._id,
           rejectionReason: reason
@@ -139,7 +147,7 @@ const AdminCopyTrade = () => {
     try {
       const res = await fetch(`${API_URL}/copy/admin/suspend/${masterId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ adminId: adminUser._id })
       })
       const data = await res.json()

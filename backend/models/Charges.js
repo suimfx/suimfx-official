@@ -100,11 +100,16 @@ const chargesSchema = new mongoose.Schema({
 }, { timestamps: true })
 
 // Merges charges from multiple levels - most specific wins for each field
-chargesSchema.statics.getChargesForTrade = async function(userId, symbol, segment, accountTypeId) {
-  console.log(`Getting charges for: userId=${userId}, symbol=${symbol}, segment=${segment}, accountTypeId=${accountTypeId}`)
+chargesSchema.statics.getChargesForTrade = async function(userId, symbol, segment, accountTypeId, adminId = null) {
+  console.log(`Getting charges for: userId=${userId}, symbol=${symbol}, segment=${segment}, accountTypeId=${accountTypeId}, adminId=${adminId}`)
   
   // Build query to find all potentially applicable charges
-  const allCharges = await this.find({ isActive: true }).sort({ createdAt: -1 })
+  // Filter by adminId: use admin-specific charges, fall back to global (adminId: null)
+  let adminFilter = {}
+  if (adminId) {
+    adminFilter.$or = [{ adminId: adminId }, { adminId: null }, { adminId: { $exists: false } }]
+  }
+  const allCharges = await this.find({ isActive: true, ...adminFilter }).sort({ createdAt: -1 })
   
   // Filter charges that apply to this trade
   let applicableCharges = allCharges.filter(charge => {
@@ -147,31 +152,43 @@ chargesSchema.statics.getChargesForTrade = async function(userId, symbol, segmen
   })
   
   // Merge charges at the same level - combine non-zero values from multiple charges
+  // Admin-specific charges (adminId set) take priority over global (adminId null) at same level
   const chargesByLevel = {}
   for (const charge of applicableCharges) {
+    const chargeAdminId = charge.adminId?.toString() || ''
     const key = `${charge.level}-${charge.segment || ''}-${charge.instrumentSymbol || ''}-${charge.accountTypeId || ''}`
     const existing = chargesByLevel[key]
     
     if (!existing) {
-      // Clone the charge object to avoid modifying the original
       chargesByLevel[key] = { ...charge.toObject ? charge.toObject() : charge }
     } else {
-      // Merge non-zero values from this charge into existing
-      if (charge.commissionValue > 0 && !existing.commissionValue) {
-        existing.commissionValue = charge.commissionValue
-        existing.commissionType = charge.commissionType
-        existing.commissionOnBuy = charge.commissionOnBuy
-        existing.commissionOnSell = charge.commissionOnSell
-        existing.commissionOnClose = charge.commissionOnClose
-      }
-      if (charge.spreadValue > 0 && !existing.spreadValue) {
-        existing.spreadValue = charge.spreadValue
-        existing.spreadType = charge.spreadType
-      }
-      if ((charge.swapLong !== 0 || charge.swapShort !== 0) && !existing.swapLong && !existing.swapShort) {
-        existing.swapLong = charge.swapLong
-        existing.swapShort = charge.swapShort
-        existing.swapType = charge.swapType
+      // Admin-specific charge always overrides global at same level
+      const existingIsGlobal = !existing.adminId
+      const newIsAdminSpecific = !!charge.adminId
+      
+      if (newIsAdminSpecific && existingIsGlobal) {
+        // Replace entirely with admin-specific charge
+        chargesByLevel[key] = { ...charge.toObject ? charge.toObject() : charge }
+      } else if (!newIsAdminSpecific && !existingIsGlobal) {
+        // Both are admin-specific, keep existing (first found)
+      } else {
+        // Merge non-zero values from this charge into existing
+        if (charge.commissionValue > 0 && !existing.commissionValue) {
+          existing.commissionValue = charge.commissionValue
+          existing.commissionType = charge.commissionType
+          existing.commissionOnBuy = charge.commissionOnBuy
+          existing.commissionOnSell = charge.commissionOnSell
+          existing.commissionOnClose = charge.commissionOnClose
+        }
+        if (charge.spreadValue > 0 && !existing.spreadValue) {
+          existing.spreadValue = charge.spreadValue
+          existing.spreadType = charge.spreadType
+        }
+        if ((charge.swapLong !== 0 || charge.swapShort !== 0) && !existing.swapLong && !existing.swapShort) {
+          existing.swapLong = charge.swapLong
+          existing.swapShort = charge.swapShort
+          existing.swapType = charge.swapType
+        }
       }
     }
   }

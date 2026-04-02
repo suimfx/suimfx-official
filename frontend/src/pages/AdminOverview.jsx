@@ -9,9 +9,23 @@ import {
   RefreshCw,
   Calendar,
   BookOpen,
-  ChevronRight
+  ChevronRight,
+  Copy,
+  Check,
+  LinkIcon,
+  UserPlus
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+
+function getAdminInfo() {
+  try {
+    const raw = localStorage.getItem('adminUser')
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
 
 function canAccessBookManagement() {
   try {
@@ -34,6 +48,18 @@ const AdminOverview = () => {
   const [bookLoading, setBookLoading] = useState(false)
   const [bookStats, setBookStats] = useState(null)
   const [lpConnected, setLpConnected] = useState(null)
+  const [copied, setCopied] = useState(false)
+  const [regLink, setRegLink] = useState('')
+  const adminInfo = getAdminInfo()
+  const isAdmin = adminInfo?.role === 'ADMIN'
+
+  const copyLink = () => {
+    if (!regLink) return
+    navigator.clipboard.writeText(regLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeToday: 0,
@@ -47,7 +73,40 @@ const AdminOverview = () => {
 
   useEffect(() => {
     fetchData()
+    if (isAdmin) fetchReferralCode()
   }, [])
+
+  const fetchReferralCode = async () => {
+    // First check localStorage
+    const stored = getAdminInfo()
+    if (stored?.referralCode) {
+      setRegLink(`${window.location.origin}/register?ref=${stored.referralCode}`)
+      return
+    }
+    // Fallback: fetch from API
+    const token = localStorage.getItem('adminToken')
+    if (!token) return
+    try {
+      const res = await fetch(`${API_URL}/admin-mgmt/my-profile`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const code = data.admin?.referralCode || data.referralCode
+        if (code) {
+          setRegLink(`${window.location.origin}/register?ref=${code}`)
+          // Update localStorage so it's available next time
+          const current = getAdminInfo()
+          if (current) {
+            current.referralCode = code
+            localStorage.setItem('adminUser', JSON.stringify(current))
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching referral code:', e)
+    }
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -140,41 +199,73 @@ const AdminOverview = () => {
       title: 'Total Users', 
       value: stats.totalUsers, 
       icon: Users, 
-      color: 'blue'
+      color: isAdmin ? 'blue' : 'blue'
     },
     { 
       title: 'New This Week', 
       value: stats.newThisWeek, 
       icon: TrendingUp, 
-      color: 'green'
+      color: isAdmin ? 'blue' : 'green'
     },
     { 
       title: 'Total Deposits', 
       value: `$${stats.totalDeposits.toLocaleString()}`, 
       icon: Wallet, 
-      color: 'purple'
+      color: isAdmin ? 'blue' : 'purple'
     },
     { 
       title: 'Total Withdrawals', 
       value: `$${stats.totalWithdrawals.toLocaleString()}`, 
       icon: CreditCard, 
-      color: 'orange'
+      color: isAdmin ? 'blue' : 'orange'
     },
   ]
 
   return (
-    <AdminLayout title="Overview Dashboard" subtitle="Welcome back, Admin">
+    <AdminLayout title="Overview Dashboard" subtitle={isAdmin ? 'Admin Panel' : 'Welcome back, Admin'}>
+      {/* Registration Link for Admin */}
+      {isAdmin && regLink && (
+        <div className="mb-6 bg-dark-800 rounded-xl p-5 border border-blue-500/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 bg-blue-500/20 rounded-lg flex items-center justify-center shrink-0">
+                <UserPlus size={22} className="text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-blue-400 font-semibold text-lg">User Registration Link</h2>
+                <p className="text-gray-400 text-sm mt-0.5">Share this link with your users to register under your panel</p>
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 bg-dark-700 border border-blue-500/20 rounded-lg px-3 py-2 max-w-full">
+                    <LinkIcon size={14} className="text-blue-400 shrink-0" />
+                    <span className="text-blue-300 text-sm font-mono truncate">{regLink}</span>
+                  </div>
+                  <button
+                    onClick={copyLink}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium transition-colors whitespace-nowrap"
+                  >
+                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                    {copied ? 'Copied!' : 'Copy Link'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {statCards.map((stat, index) => (
-          <div key={index} className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+          <div key={index} className={`bg-dark-800 rounded-xl p-5 border ${
+            isAdmin ? 'border-blue-500/20' : 'border-gray-800'
+          }`}>
             <div className="flex items-center justify-between mb-3">
               <div className={`w-10 h-10 bg-${stat.color}-500/20 rounded-lg flex items-center justify-center`}>
                 <stat.icon size={20} className={`text-${stat.color}-500`} />
               </div>
             </div>
-            <p className="text-gray-500 text-sm mb-1">{stat.title}</p>
-            <p className="text-white text-2xl font-bold">{stat.value}</p>
+            <p className={`text-sm mb-1 ${isAdmin ? 'text-blue-300/60' : 'text-gray-500'}`}>{stat.title}</p>
+            <p className={`text-2xl font-bold ${isAdmin ? 'text-blue-100' : 'text-white'}`}>{stat.value}</p>
           </div>
         ))}
       </div>
@@ -182,9 +273,9 @@ const AdminOverview = () => {
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Users */}
-        <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+        <div className={`bg-dark-800 rounded-xl p-5 border ${isAdmin ? 'border-blue-500/20' : 'border-gray-800'}`}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-white font-semibold">Recent Users</h2>
+            <h2 className={`font-semibold ${isAdmin ? 'text-blue-300' : 'text-white'}`}>Recent Users</h2>
             <button 
               onClick={() => { fetchData(); fetchBookLpSummary() }}
               className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
@@ -221,44 +312,44 @@ const AdminOverview = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
-          <h2 className="text-white font-semibold mb-4">Platform Overview</h2>
+        <div className={`bg-dark-800 rounded-xl p-5 border ${isAdmin ? 'border-blue-500/20' : 'border-gray-800'}`}>
+          <h2 className={`font-semibold mb-4 ${isAdmin ? 'text-blue-300' : 'text-white'}`}>Platform Overview</h2>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-dark-700 rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
                   <Users size={18} className="text-blue-500" />
                 </div>
-                <span className="text-gray-400">New Users This Week</span>
+                <span className={isAdmin ? 'text-blue-300/60' : 'text-gray-400'}>New Users This Week</span>
               </div>
-              <span className="text-white font-semibold">{stats.newThisWeek}</span>
+              <span className={`font-semibold ${isAdmin ? 'text-blue-100' : 'text-white'}`}>{stats.newThisWeek}</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-dark-700 rounded-lg">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                  <Calendar size={18} className="text-yellow-500" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isAdmin ? 'bg-blue-500/20' : 'bg-yellow-500/20'}`}>
+                  <Calendar size={18} className={isAdmin ? 'text-blue-500' : 'text-yellow-500'} />
                 </div>
-                <span className="text-gray-400">Pending KYC</span>
+                <span className={isAdmin ? 'text-blue-300/60' : 'text-gray-400'}>Pending KYC</span>
               </div>
-              <span className="text-white font-semibold">{stats.pendingKYC}</span>
+              <span className={`font-semibold ${isAdmin ? 'text-blue-100' : 'text-white'}`}>{stats.pendingKYC}</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-dark-700 rounded-lg">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                  <TrendingUp size={18} className="text-green-500" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isAdmin ? 'bg-blue-500/20' : 'bg-green-500/20'}`}>
+                  <TrendingUp size={18} className={isAdmin ? 'text-blue-500' : 'text-green-500'} />
                 </div>
-                <span className="text-gray-400">Active Trades</span>
+                <span className={isAdmin ? 'text-blue-300/60' : 'text-gray-400'}>Active Trades</span>
               </div>
-              <span className="text-white font-semibold">{stats.activeTrades}</span>
+              <span className={`font-semibold ${isAdmin ? 'text-blue-100' : 'text-white'}`}>{stats.activeTrades}</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-dark-700 rounded-lg">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                  <Wallet size={18} className="text-purple-500" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isAdmin ? 'bg-blue-500/20' : 'bg-purple-500/20'}`}>
+                  <Wallet size={18} className={isAdmin ? 'text-blue-500' : 'text-purple-500'} />
                 </div>
-                <span className="text-gray-400">Pending Withdrawals</span>
+                <span className={isAdmin ? 'text-blue-300/60' : 'text-gray-400'}>Pending Withdrawals</span>
               </div>
-              <span className="text-white font-semibold">{stats.pendingWithdrawals}</span>
+              <span className={`font-semibold ${isAdmin ? 'text-blue-100' : 'text-white'}`}>{stats.pendingWithdrawals}</span>
             </div>
           </div>
         </div>

@@ -29,6 +29,7 @@ import supportRoutes from './routes/support.js'
 import kycRoutes from './routes/kyc.js'
 import themeRoutes from './routes/theme.js'
 import adminManagementRoutes from './routes/adminManagement.js'
+import customDomainRoutes from './routes/customDomain.js'
 import impersonationRoutes from './routes/impersonation.js'
 import uploadRoutes from './routes/upload.js'
 import emailTemplatesRoutes from './routes/emailTemplates.js'
@@ -44,6 +45,8 @@ import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
 import infowayService from './services/infowayService.js'
+import AdminDomainConnection from './models/AdminDomainConnection.js'
+import { refreshDnsCheck } from './services/domainDnsService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -243,6 +246,42 @@ app.use(cors(corsOptions))
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Multi-Tenant Domain Routing Middleware
+// Detects custom domains and attaches the matching admin to req.tenantAdmin.
+// This allows routes to serve branded experiences per admin's custom domain.
+// ─────────────────────────────────────────────────────────────────────────────
+app.use(async (req, res, next) => {
+  try {
+    const hostname = req.hostname?.toLowerCase()
+    if (!hostname) return next()
+
+    // Skip localhost, IP addresses, and main platform domains
+    const isLocalhost = hostname === 'localhost' || hostname.startsWith('127.') || hostname.startsWith('192.168.')
+    const isPlatformDomain = hostname.endsWith('suimfx.com') || hostname === 'api.suimfx.com'
+    if (isLocalhost || isPlatformDomain) return next()
+
+    // Single Admin model import
+    const AdminModel = (await import('./models/Admin.js')).default
+
+    // First: check active domain connections
+    const conn = await AdminDomainConnection.findOne({ hostname, status: 'connected' }).lean()
+    if (conn) {
+      const admin = await AdminModel.findById(conn.adminId)
+        .select('_id email firstName lastName brandName urlSlug customDomain logo referralCode')
+        .lean()
+      if (admin) { req.tenantAdmin = admin; req.tenantDomain = hostname }
+    } else {
+      // Fallback: check Admin.customDomain field directly
+      const admin = await AdminModel.findOne({ customDomain: hostname })
+        .select('_id email firstName lastName brandName urlSlug customDomain logo referralCode')
+        .lean()
+      if (admin) { req.tenantAdmin = admin; req.tenantDomain = hostname }
+    }
+  } catch (_) { /* non-fatal: always proceed */ }
+  next()
+})
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
@@ -252,6 +291,19 @@ mongoose.connect(process.env.MONGODB_URI)
       await Transaction.syncIndexes()
     } catch (e) {
       console.warn('[MongoDB] Transaction.syncIndexes:', e.message)
+    }
+    // One-time migration: ensure all ADMINs have bankSettings enabled
+    try {
+      const Admin = (await import('./models/Admin.js')).default
+      const result = await Admin.updateMany(
+        { role: 'ADMIN', 'sidebarPermissions.bankSettings': { $ne: true } },
+        { $set: { 'sidebarPermissions.bankSettings': true } }
+      )
+      if (result.modifiedCount > 0) {
+        console.log(`[Migration] Enabled bankSettings for ${result.modifiedCount} existing admin(s)`)
+      }
+    } catch (e) {
+      console.warn('[Migration] bankSettings:', e.message)
     }
   })
   .catch((err) => console.error('MongoDB connection error:', err))
@@ -277,6 +329,7 @@ app.use('/api/support', supportRoutes)
 app.use('/api/kyc', kycRoutes)
 app.use('/api/theme', themeRoutes)
 app.use('/api/admin-mgmt', adminManagementRoutes)
+app.use('/api/custom-domain', customDomainRoutes)
 app.use('/api/impersonate', impersonationRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/email-templates', emailTemplatesRoutes)
@@ -309,7 +362,55 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 5000
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
-  
+
+  // ─── Domain Auto-Recheck Cron (every 5 minutes) ───────────────────────────
+  // Automatically re-checks pending/mismatched domains so admins don't need
+  // to manually refresh. If DNS becomes correct, status stays pending_dns
+  // until the admin clicks "Verify & Connect" to finalize.
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      const pendingDomains = await AdminDomainConnection.find({
+        status: { $in: ['pending_dns', 'dns_mismatch'] }
+      }).lean()
+
+      if (pendingDomains.length === 0) return
+
+      console.log(`[CRON-DOMAIN] Checking ${pendingDomains.length} pending domain(s)...`)
+
+      for (const connDoc of pendingDomains) {
+        try {
+          const { snapshot, flags } = await refreshDnsCheck(connDoc.hostname, connDoc.verificationToken)
+          const update = {
+            lastSnapshot: { ...snapshot, flags },
+            lastCheckedAt: new Date(),
+            a_record_ip: snapshot.aRecords || [],
+            cname_value: (snapshot.cnameRecords || [])[0] || '',
+            lastError: snapshot.errors.length > 0
+              ? snapshot.errors.map((e) => `${e.record}: ${e.message}`).join('; ')
+              : ''
+          }
+          // Update status: dns_mismatch if checks ran and failed, pending_dns if still waiting
+          // We don't auto-connect — user must click Verify
+          update.status = flags.fullyOk ? 'pending_dns' : 'dns_mismatch'
+
+          await AdminDomainConnection.updateOne({ _id: connDoc._id }, { $set: update })
+
+          if (flags.fullyOk) {
+            console.log(`[CRON-DOMAIN] ✅ ${connDoc.hostname} — DNS ready, awaiting manual verify`)
+          } else {
+            console.log(`[CRON-DOMAIN] ⏳ ${connDoc.hostname} — DNS not ready yet`)
+          }
+        } catch (domainErr) {
+          console.error(`[CRON-DOMAIN] Error checking ${connDoc.hostname}:`, domainErr.message)
+        }
+      }
+    } catch (err) {
+      console.error('[CRON-DOMAIN] Cron error:', err.message)
+    }
+  })
+  console.log('[CRON] Domain auto-recheck scheduled every 5 minutes')
+  // ──────────────────────────────────────────────────────────────────────────
+
   // Schedule daily commission calculation for copy trading
   cron.schedule('59 23 * * *', async () => {
     console.log('[CRON] Running daily copy trade commission calculation...')

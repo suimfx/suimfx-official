@@ -1,6 +1,12 @@
 import mongoose from 'mongoose'
 
 const propSettingsSchema = new mongoose.Schema({
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+    index: true
+  },
   challengeModeEnabled: {
     type: Boolean,
     default: false
@@ -28,9 +34,25 @@ const propSettingsSchema = new mongoose.Schema({
   }
 })
 
-// Singleton pattern - only one settings document
-propSettingsSchema.statics.getSettings = async function() {
-  let settings = await this.findOne()
+// Per-admin settings (inherits from global on first creation)
+propSettingsSchema.statics.getSettings = async function(adminId) {
+  if (adminId) {
+    let settings = await this.findOne({ adminId })
+    if (!settings) {
+      // Inherit from global settings if they exist
+      const global = await this.findOne({ adminId: null })
+      settings = await this.create({
+        adminId,
+        challengeModeEnabled: global?.challengeModeEnabled || false,
+        displayName: global?.displayName || 'Prop Trading Challenge',
+        description: global?.description || 'Trade with our capital. Pass the challenge and get funded.',
+        termsAndConditions: global?.termsAndConditions || ''
+      })
+    }
+    return settings
+  }
+  // Fallback: global settings (legacy)
+  let settings = await this.findOne({ adminId: null })
   if (!settings) {
     settings = await this.create({})
   }
@@ -38,9 +60,11 @@ propSettingsSchema.statics.getSettings = async function() {
 }
 
 propSettingsSchema.statics.updateSettings = async function(updates, adminId) {
-  let settings = await this.findOne()
+  let settings = adminId
+    ? await this.findOne({ adminId })
+    : await this.findOne({ adminId: null })
   if (!settings) {
-    settings = new this({})
+    settings = new this({ adminId: adminId || null })
   }
   
   Object.assign(settings, updates)

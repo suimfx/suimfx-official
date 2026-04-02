@@ -1,30 +1,73 @@
 import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 import Admin from '../models/Admin.js'
 import AdminWallet from '../models/AdminWallet.js'
 import AdminWalletTransaction from '../models/AdminWalletTransaction.js'
 import User from '../models/User.js'
+import Transaction from '../models/Transaction.js'
+import Trade from '../models/Trade.js'
 import { generateReferralCode } from '../utils/adminFilter.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Ensure logos directory exists
+const logosDir = path.join(__dirname, '../uploads/logos')
+if (!fs.existsSync(logosDir)) {
+  fs.mkdirSync(logosDir, { recursive: true })
+}
+
+// Multer config for logo uploads
+const logoStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, logosDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname)
+    cb(null, `logo-${req.adminId}-${Date.now()}${ext}`)
+  }
+})
+const logoUpload = multer({
+  storage: logoStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+    if (allowed.includes(file.mimetype)) cb(null, true)
+    else cb(new Error('Only image files are allowed'), false)
+  }
+})
 
 const router = express.Router()
 
 // Get JWT_SECRET dynamically to ensure env is loaded
 const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
 
-// Middleware to verify admin token
+// Middleware to verify admin token (payload: adminId from login; supports legacy id)
 const verifyAdminToken = (req, res, next) => {
   const authHeader = req.headers.authorization
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, message: 'No token provided' })
   }
-  
-  const token = authHeader.split(' ')[1]
+
+  const token = authHeader.slice(7).trim()
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'No token provided' })
+  }
   try {
     const decoded = jwt.verify(token, getJwtSecret())
-    req.adminId = decoded.adminId
+    const id = decoded.adminId || decoded.id
+    if (!id) {
+      return res.status(401).json({ success: false, message: 'Invalid token' })
+    }
+    req.adminId = id
     next()
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Session expired. Please login again.' })
+    }
     return res.status(401).json({ success: false, message: 'Invalid token' })
   }
 }
@@ -64,10 +107,10 @@ router.put('/change-password', verifyAdminToken, async (req, res) => {
   }
 })
 
-// PUT /api/admin-mgmt/update-profile - Update own profile (name, phone, brandName)
+// PUT /api/admin-mgmt/update-profile - Update own profile (name, phone, brandName, customDomain)
 router.put('/update-profile', verifyAdminToken, async (req, res) => {
   try {
-    const { firstName, lastName, phone, brandName } = req.body
+    const { firstName, lastName, phone, brandName, customDomain } = req.body
 
     if (!firstName || !firstName.trim()) {
       return res.status(400).json({ success: false, message: 'First name is required' })
@@ -84,6 +127,19 @@ router.put('/update-profile', verifyAdminToken, async (req, res) => {
     if (brandName !== undefined) {
       admin.brandName = brandName?.trim() || ''
     }
+    if (customDomain !== undefined) {
+      // Validate domain uniqueness if set
+      if (customDomain && customDomain.trim()) {
+        const domainClean = customDomain.trim().toLowerCase()
+        const existing = await Admin.findOne({ customDomain: domainClean, _id: { $ne: admin._id } })
+        if (existing) {
+          return res.status(400).json({ success: false, message: 'This domain is already in use by another admin' })
+        }
+        admin.customDomain = domainClean
+      } else {
+        admin.customDomain = null
+      }
+    }
     await admin.save()
 
     res.json({ 
@@ -93,11 +149,59 @@ router.put('/update-profile', verifyAdminToken, async (req, res) => {
         firstName: admin.firstName,
         lastName: admin.lastName,
         phone: admin.phone,
-        brandName: admin.brandName
+        brandName: admin.brandName,
+        customDomain: admin.customDomain,
+        logo: admin.logo
       }
     })
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating profile', error: error.message })
+  }
+})
+
+// POST /api/admin-mgmt/upload-logo - Upload admin logo
+router.post('/upload-logo', verifyAdminToken, logoUpload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' })
+    }
+
+    const admin = await Admin.findById(req.adminId)
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin not found' })
+    }
+
+    // Delete old logo file if exists
+    if (admin.logo) {
+      const oldPath = path.join(__dirname, '..', admin.logo)
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath)
+      }
+    }
+
+    admin.logo = `/uploads/logos/${req.file.filename}`
+    await admin.save()
+
+    res.json({ 
+      success: true, 
+      message: 'Logo uploaded successfully',
+      logo: admin.logo
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error uploading logo', error: error.message })
+  }
+})
+
+// GET /api/admin-mgmt/my-profile - Get own admin profile
+router.get('/my-profile', verifyAdminToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.adminId).select('-password')
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin not found' })
+    }
+    res.json({ success: true, admin })
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching profile', error: error.message })
   }
 })
 
@@ -147,6 +251,10 @@ router.post('/login', async (req, res) => {
         firstName: admin.firstName,
         lastName: admin.lastName,
         role: admin.role,
+        urlSlug: admin.urlSlug,
+        brandName: admin.brandName,
+        logo: admin.logo,
+        customDomain: admin.customDomain,
         sidebarPermissions: admin.sidebarPermissions,
         walletBalance: wallet?.balance || 0
       }
@@ -204,6 +312,11 @@ router.post('/admin-login', async (req, res) => {
         firstName: admin.firstName,
         lastName: admin.lastName,
         role: admin.role,
+        referralCode: admin.referralCode,
+        urlSlug: admin.urlSlug,
+        brandName: admin.brandName,
+        logo: admin.logo,
+        customDomain: admin.customDomain,
         sidebarPermissions: admin.sidebarPermissions,
         walletBalance: wallet?.balance || 0
       }
@@ -216,8 +329,13 @@ router.post('/admin-login', async (req, res) => {
 // ==================== SUPER ADMIN - ADMIN MANAGEMENT ====================
 
 // GET /api/admin-mgmt/admins - Get all admins (super admin only)
-router.get('/admins', async (req, res) => {
+router.get('/admins', verifyAdminToken, async (req, res) => {
   try {
+    const requester = await Admin.findById(req.adminId).select('role')
+    if (!requester || requester.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
     const admins = await Admin.find({ role: 'ADMIN' })
       .select('-password')
       .sort({ createdAt: -1 })
@@ -268,8 +386,13 @@ router.get('/admins/:id', async (req, res) => {
 })
 
 // POST /api/admin-mgmt/admins - Create new admin (super admin only)
-router.post('/admins', async (req, res) => {
+router.post('/admins', verifyAdminToken, async (req, res) => {
   try {
+    const requester = await Admin.findById(req.adminId).select('role')
+    if (!requester || requester.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
     const {
       email,
       password,
@@ -383,12 +506,13 @@ router.put('/admins/:id', async (req, res) => {
       phone,
       status,
       commissionRate,
-      customDomain
+      customDomain,
+      sidebarPermissions
     } = req.body
 
     const admin = await Admin.findById(req.params.id)
     if (!admin) {
-      return res.status(404).json({ message: 'Employee not found' })
+      return res.status(404).json({ message: 'Admin not found' })
     }
 
     // Update fields
@@ -398,12 +522,13 @@ router.put('/admins/:id', async (req, res) => {
     if (status) admin.status = status
     if (commissionRate !== undefined) admin.commissionRate = commissionRate
     if (customDomain !== undefined) admin.customDomain = customDomain
+    if (sidebarPermissions) admin.sidebarPermissions = sidebarPermissions
 
     await admin.save()
 
     res.json({
       success: true,
-      message: 'Employee updated successfully',
+      message: 'Admin updated successfully',
       admin: {
         _id: admin._id,
         email: admin.email,
@@ -414,7 +539,7 @@ router.put('/admins/:id', async (req, res) => {
       }
     })
   } catch (error) {
-    res.status(500).json({ message: 'Error updating employee', error: error.message })
+    res.status(500).json({ message: 'Error updating admin', error: error.message })
   }
 })
 
@@ -425,7 +550,7 @@ router.put('/admins/:id/permissions', async (req, res) => {
 
     const admin = await Admin.findById(req.params.id)
     if (!admin) {
-      return res.status(404).json({ message: 'Employee not found' })
+      return res.status(404).json({ message: 'Admin not found' })
     }
 
     // Default all permissions to false, then apply the provided ones
@@ -533,6 +658,165 @@ router.put('/admins/:id/reset-password', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({ message: 'Error resetting password', error: error.message })
+  }
+})
+
+// GET /api/admin-mgmt/super-admin-stats - Get total commission stats for the super admin
+router.get('/super-admin-stats', verifyAdminToken, async (req, res) => {
+  try {
+    const requester = await Admin.findById(req.adminId).select('role')
+    if (!requester || requester.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
+    const admins = await Admin.find().select('_id commissionRate')
+    let totalCommission = 0
+
+    for (const admin of admins) {
+      const users = await User.find({ assignedAdmin: admin._id }).select('_id')
+      const userIds = users.map(u => u._id)
+      if (userIds.length === 0) continue
+
+      const tradeAgg = await Trade.aggregate([
+        { $match: { userId: { $in: userIds }, status: { $in: ['OPEN', 'CLOSED'] } } },
+        { $group: {
+          _id: null,
+          totalCommission: { $sum: '$commission' },
+          totalSpread: { $sum: '$spread' },
+          totalSwap: { $sum: '$swap' }
+        }}
+      ])
+
+      const earnings = (tradeAgg[0]?.totalCommission || 0) + (tradeAgg[0]?.totalSpread || 0) + (tradeAgg[0]?.totalSwap || 0)
+      totalCommission += (earnings * (admin.commissionRate || 0)) / 100
+    }
+
+    res.json({ success: true, totalCommission })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/admin-mgmt/admin-summary/:adminId - Get detailed summary for a specific admin
+router.get('/admin-summary/:adminId', async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.params.adminId).select('-password')
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' })
+    }
+
+    // Get all user IDs assigned to this admin
+    const users = await User.find({ assignedAdmin: admin._id }).select('_id')
+    const userIds = users.map(u => u._id)
+    const totalUsers = userIds.length
+
+    // Wallet info
+    const wallet = await AdminWallet.findOne({ adminId: admin._id })
+
+    // Transaction aggregation for this admin's users
+    const depositAgg = await Transaction.aggregate([
+      { $match: { userId: { $in: userIds }, type: 'Deposit', status: { $in: ['Approved', 'Completed'] } } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ])
+    const withdrawalAgg = await Transaction.aggregate([
+      { $match: { userId: { $in: userIds }, type: 'Withdrawal', status: { $in: ['Approved', 'Completed'] } } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ])
+    const pendingWithdrawals = await Transaction.countDocuments({
+      userId: { $in: userIds }, type: 'Withdrawal', status: 'Pending'
+    })
+
+    // Trade earnings: commission + spread + swap
+    const tradeAgg = await Trade.aggregate([
+      { $match: { userId: { $in: userIds }, status: { $in: ['OPEN', 'CLOSED'] } } },
+      { $group: {
+        _id: null,
+        totalCommission: { $sum: '$commission' },
+        totalSpread: { $sum: '$spread' },
+        totalSwap: { $sum: '$swap' },
+        totalTrades: { $sum: 1 },
+        totalVolume: { $sum: '$quantity' },
+        totalRealizedPnl: { $sum: { $ifNull: ['$realizedPnl', 0] } }
+      }}
+    ])
+
+    // Closed trades only for realized P&L
+    const closedTradeAgg = await Trade.aggregate([
+      { $match: { userId: { $in: userIds }, status: 'CLOSED' } },
+      { $group: {
+        _id: null,
+        totalRealizedPnl: { $sum: { $ifNull: ['$realizedPnl', 0] } },
+        closedTrades: { $sum: 1 }
+      }}
+    ])
+
+    // Admin wallet transactions
+    const walletReceivedAgg = await AdminWalletTransaction.aggregate([
+      { $match: { toAdminId: admin._id, type: 'SUPER_TO_ADMIN', status: 'COMPLETED' } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ])
+    const walletGivenAgg = await AdminWalletTransaction.aggregate([
+      { $match: { fromAdminId: admin._id, type: 'ADMIN_TO_USER', status: 'COMPLETED' } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ])
+
+    // Super admin commission from this admin
+    const commissionRate = admin.commissionRate || 0
+    const totalDeposits = depositAgg[0]?.total || 0
+    const totalEarnings = (tradeAgg[0]?.totalCommission || 0) + (tradeAgg[0]?.totalSpread || 0) + (tradeAgg[0]?.totalSwap || 0)
+    const superAdminCommission = (totalEarnings * commissionRate) / 100
+
+    res.json({
+      success: true,
+      summary: {
+        admin: {
+          _id: admin._id,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          email: admin.email,
+          commissionRate,
+          status: admin.status,
+          createdAt: admin.createdAt
+        },
+        users: {
+          total: totalUsers
+        },
+        wallet: {
+          balance: wallet?.balance || 0,
+          totalReceived: walletReceivedAgg[0]?.total || 0,
+          receivedCount: walletReceivedAgg[0]?.count || 0,
+          totalGivenToUsers: walletGivenAgg[0]?.total || 0,
+          givenCount: walletGivenAgg[0]?.count || 0
+        },
+        deposits: {
+          total: totalDeposits,
+          count: depositAgg[0]?.count || 0
+        },
+        withdrawals: {
+          total: withdrawalAgg[0]?.total || 0,
+          count: withdrawalAgg[0]?.count || 0,
+          pending: pendingWithdrawals
+        },
+        trades: {
+          totalTrades: tradeAgg[0]?.totalTrades || 0,
+          totalVolume: tradeAgg[0]?.totalVolume || 0,
+          closedTrades: closedTradeAgg[0]?.closedTrades || 0,
+          realizedPnl: closedTradeAgg[0]?.totalRealizedPnl || 0
+        },
+        earnings: {
+          commission: tradeAgg[0]?.totalCommission || 0,
+          spread: tradeAgg[0]?.totalSpread || 0,
+          swap: tradeAgg[0]?.totalSwap || 0,
+          totalEarnings
+        },
+        superAdminCommission: {
+          rate: commissionRate,
+          amount: superAdminCommission
+        }
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching admin summary', error: error.message })
   }
 })
 
@@ -765,6 +1049,38 @@ router.get('/brand/:slug', async (req, res) => {
   }
 })
 
+// GET /api/admin-mgmt/branding - Get brand info by domain (public - for custom domain detection)
+router.get('/branding', async (req, res) => {
+  try {
+    const { domain } = req.query
+    if (!domain) {
+      return res.status(400).json({ success: false, message: 'Domain parameter required' })
+    }
+
+    const admin = await Admin.findOne({ 
+      customDomain: domain.toLowerCase(),
+      status: 'ACTIVE'
+    }).select('brandName logo urlSlug customDomain _id')
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'No brand found for this domain' })
+    }
+
+    res.json({
+      success: true,
+      brand: {
+        brandName: admin.brandName,
+        logo: admin.logo,
+        urlSlug: admin.urlSlug,
+        customDomain: admin.customDomain,
+        adminId: admin._id
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching brand', error: error.message })
+  }
+})
+
 // GET /api/admin-mgmt/by-slug/:slug - Get admin info by URL slug (public)
 router.get('/by-slug/:slug', async (req, res) => {
   try {
@@ -882,6 +1198,40 @@ router.post('/init-super-admin', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({ message: 'Error creating super admin', error: error.message })
+  }
+})
+
+// GET /api/admin-mgmt/admin-by-referral/:referralCode - Get admin by referral code
+router.get('/admin-by-referral/:referralCode', async (req, res) => {
+  try {
+    const { referralCode } = req.params
+    
+    const admin = await Admin.findOne({ 
+      referralCode: referralCode.toUpperCase(),
+      status: 'ACTIVE'
+    }).select('urlSlug brandName logo')
+    
+    if (!admin) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Admin not found with this referral code' 
+      })
+    }
+    
+    res.json({
+      success: true,
+      admin: {
+        urlSlug: admin.urlSlug,
+        brandName: admin.brandName,
+        logo: admin.logo
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching admin', 
+      error: error.message 
+    })
   }
 })
 

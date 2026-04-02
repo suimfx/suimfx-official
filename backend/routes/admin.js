@@ -6,34 +6,74 @@ import Trade from '../models/Trade.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 import EmailSettings from '../models/EmailSettings.js'
 import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
+
+// Helper: Check if admin can access this user
+const checkAdminUserAccess = async (req, userId) => {
+  const user = await User.findById(userId)
+  if (!user) return false
+  if (req.admin.role === 'SUPER_ADMIN') {
+    // Super Admin can only access unassigned users
+    return !user.assignedAdmin
+  }
+  return user.assignedAdmin?.toString() === req.admin._id.toString()
+}
 
 // Apply auth middleware to all routes
 router.use(verifyAdminToken)
 
-// GET /api/admin/dashboard-stats - Get dashboard statistics
+// GET /api/admin/dashboard-stats - Get dashboard statistics (filtered by admin role)
 router.get('/dashboard-stats', requireSidebarPermission(PERMISSIONS.SIDEBAR.OVERVIEW_DASHBOARD), async (req, res) => {
   try {
-    // Get user stats
-    const totalUsers = await User.countDocuments()
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const newThisWeek = await User.countDocuments({ createdAt: { $gte: oneWeekAgo } })
-    const pendingKYC = await User.countDocuments({ kycStatus: { $in: ['pending', 'Pending', null] } })
+    let userQuery = {}
+    let userIds = []
     
-    // Get transaction stats (using correct capitalized enum values)
+    // If admin role is ADMIN, filter by their assigned users
+    if (req.admin.role === 'ADMIN') {
+      userQuery.assignedAdmin = req.admin._id
+      const users = await User.find(userQuery).select('_id')
+      userIds = users.map(u => u._id)
+    } else {
+      // SUPER_ADMIN sees only unassigned users (not belonging to any Admin)
+      userQuery.$or = [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }]
+      const users = await User.find(userQuery).select('_id')
+      userIds = users.map(u => u._id)
+    }
+    
+    const totalUsers = await User.countDocuments(userQuery)
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const newThisWeek = await User.countDocuments({ ...userQuery, createdAt: { $gte: oneWeekAgo } })
+    const pendingKYC = await User.countDocuments({ ...userQuery, kycStatus: { $in: ['pending', 'Pending', null] } })
+    
+    // Get transaction stats (filtered by admin's users)
+    const depositMatch = { type: 'Deposit', status: { $in: ['Approved', 'Completed'] } }
+    const withdrawalMatch = { type: 'Withdrawal', status: { $in: ['Approved', 'Completed'] } }
+    const pendingWithdrawalMatch = { type: 'Withdrawal', status: 'Pending' }
+    
+    if (userIds.length > 0) {
+      depositMatch.userId = { $in: userIds }
+      withdrawalMatch.userId = { $in: userIds }
+      pendingWithdrawalMatch.userId = { $in: userIds }
+    }
+    
     const depositStats = await Transaction.aggregate([
-      { $match: { type: 'Deposit', status: { $in: ['Approved', 'Completed'] } } },
+      { $match: depositMatch },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ])
     const withdrawalStats = await Transaction.aggregate([
-      { $match: { type: 'Withdrawal', status: { $in: ['Approved', 'Completed'] } } },
+      { $match: withdrawalMatch },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ])
-    const pendingWithdrawals = await Transaction.countDocuments({ type: 'Withdrawal', status: 'Pending' })
+    const pendingWithdrawals = await Transaction.countDocuments(pendingWithdrawalMatch)
     
-    // Get active trades count
-    const activeTrades = await Trade.countDocuments({ status: { $in: ['OPEN', 'PENDING'] } })
+    // Get active trades count (filtered by admin's users)
+    const tradeQuery = { status: { $in: ['OPEN', 'PENDING'] } }
+    if (userIds.length > 0) {
+      tradeQuery.userId = { $in: userIds }
+    }
+    const activeTrades = await Trade.countDocuments(tradeQuery)
     
     res.json({
       success: true,
@@ -53,10 +93,20 @@ router.get('/dashboard-stats', requireSidebarPermission(PERMISSIONS.SIDEBAR.OVER
   }
 })
 
-// GET /api/admin/users - Get all users
+// GET /api/admin/users - Get all users (filtered by admin role)
 router.get('/users', requireSidebarPermission(PERMISSIONS.SIDEBAR.USER_MANAGEMENT), async (req, res) => {
   try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 })
+    let query = {}
+    
+    // If admin role is ADMIN, filter by assignedAdmin
+    if (req.admin.role === 'ADMIN') {
+      query.assignedAdmin = req.admin._id
+    } else {
+      // SUPER_ADMIN sees only unassigned users (not belonging to any Admin)
+      query.$or = [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }]
+    }
+    
+    const users = await User.find(query).select('-password').sort({ createdAt: -1 })
     res.json({
       success: true,
       message: 'Users fetched successfully',
@@ -69,13 +119,19 @@ router.get('/users', requireSidebarPermission(PERMISSIONS.SIDEBAR.USER_MANAGEMEN
   }
 })
 
-// GET /api/admin/users/:id - Get single user
+// GET /api/admin/users/:id - Get single user (with permission check)
 router.get('/users/:id', requireSidebarPermission(PERMISSIONS.SIDEBAR.USER_MANAGEMENT), async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password')
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
+    
+    // Check if admin has permission to view this user
+    if (req.admin.role === 'ADMIN' && user.assignedAdmin?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ message: 'You do not have permission to view this user' })
+    }
+    
     res.json({ user })
   } catch (error) {
     res.status(500).json({ message: 'Error fetching user', error: error.message })
@@ -85,6 +141,9 @@ router.get('/users/:id', requireSidebarPermission(PERMISSIONS.SIDEBAR.USER_MANAG
 // PUT /api/admin/users/:id/password - Change user password
 router.put('/users/:id/password', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
+    if (!await checkAdminUserAccess(req, req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
     const { password } = req.body
     if (!password || password.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' })
@@ -111,6 +170,10 @@ router.post('/users/:id/deduct', requireSidebarPermission(PERMISSIONS.SIDEBAR.FU
     const { amount, reason } = req.body
     if (!amount || amount <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid amount' })
+    }
+    
+    if (!await checkAdminUserAccess(req, req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
     }
     
     const user = await User.findById(req.params.id)
@@ -148,6 +211,9 @@ router.post('/users/:id/deduct', requireSidebarPermission(PERMISSIONS.SIDEBAR.FU
 // POST /api/admin/users/:id/add-fund - Add funds to user wallet (Admin only)
 router.post('/users/:id/add-fund', requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
   try {
+    if (!await checkAdminUserAccess(req, req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
     const { amount, reason, adminId } = req.body
     if (!amount || amount <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid amount' })
@@ -280,6 +346,9 @@ router.post('/trading-account/:id/deduct', requireSidebarPermission(PERMISSIONS.
 // PUT /api/admin/users/:id/block - Block/Unblock user
 router.put('/users/:id/block', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
+    if (!await checkAdminUserAccess(req, req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
     const { blocked, reason } = req.body
     
     const user = await User.findById(req.params.id)
@@ -305,6 +374,9 @@ router.put('/users/:id/block', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MA
 // PUT /api/admin/users/:id/ban - Ban/Unban user
 router.put('/users/:id/ban', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
+    if (!await checkAdminUserAccess(req, req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
     const { banned, reason } = req.body
     
     const user = await User.findById(req.params.id)
@@ -353,6 +425,9 @@ router.put('/users/:id/ban', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANA
 // DELETE /api/admin/users/:id - Delete user
 router.delete('/users/:id', requireEmployeePermission(PERMISSIONS.EMPLOYEE.DELETE_USERS), async (req, res) => {
   try {
+    if (!await checkAdminUserAccess(req, req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
     const user = await User.findByIdAndDelete(req.params.id)
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
@@ -514,6 +589,9 @@ router.get('/trading-account/:id/summary', requireSidebarPermission(PERMISSIONS.
 // POST /api/admin/login-as-user/:userId - Generate token to login as user
 router.post('/login-as-user/:userId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANAGE_USERS), async (req, res) => {
   try {
+    if (!await checkAdminUserAccess(req, req.params.userId)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
     const { adminId } = req.body
     
     const user = await User.findById(req.params.userId).select('-password')
@@ -565,14 +643,19 @@ router.get('/password-reset-requests', requireSidebarPermission(PERMISSIONS.SIDE
     const { status } = req.query
     
     const filter = status ? { status } : {}
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const resetUserIds = await getAdminUserIds(req.admin)
+    if (resetUserIds) filter.userId = { $in: resetUserIds }
+    
     const requests = await PasswordResetRequest.find(filter)
       .populate('userId', 'firstName lastName email phone')
       .sort({ createdAt: -1 })
     
     // Get stats
-    const pendingCount = await PasswordResetRequest.countDocuments({ status: 'Pending' })
-    const completedCount = await PasswordResetRequest.countDocuments({ status: 'Completed' })
-    const rejectedCount = await PasswordResetRequest.countDocuments({ status: 'Rejected' })
+    const pendingCount = await PasswordResetRequest.countDocuments({ ...filter, status: 'Pending' })
+    const completedCount = await PasswordResetRequest.countDocuments({ ...filter, status: 'Completed' })
+    const rejectedCount = await PasswordResetRequest.countDocuments({ ...filter, status: 'Rejected' })
     
     res.json({ 
       success: true, 

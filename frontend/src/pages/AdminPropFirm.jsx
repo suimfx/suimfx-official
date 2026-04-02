@@ -21,6 +21,14 @@ import {
 import { API_URL } from '../config/api'
 
 const AdminPropFirm = () => {
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('adminToken')
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
+  }
+
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('challenges')
   const [challengeModeEnabled, setChallengeModeEnabled] = useState(false)
@@ -87,7 +95,7 @@ const AdminPropFirm = () => {
     setLoading(true)
     try {
       // Fetch settings
-      const settingsRes = await fetch(`${API_URL}/prop/admin/settings`)
+      const settingsRes = await fetch(`${API_URL}/prop/admin/settings`, { headers: getAuthHeaders() })
       const settingsData = await settingsRes.json()
       if (settingsData.success) {
         setChallengeModeEnabled(settingsData.settings.challengeModeEnabled)
@@ -99,28 +107,28 @@ const AdminPropFirm = () => {
       }
 
       // Fetch challenges
-      const challengesRes = await fetch(`${API_URL}/prop/admin/challenges`)
+      const challengesRes = await fetch(`${API_URL}/prop/admin/challenges`, { headers: getAuthHeaders() })
       const challengesData = await challengesRes.json()
       if (challengesData.success) {
         setChallenges(challengesData.challenges || [])
       }
 
       // Fetch participants
-      const accountsRes = await fetch(`${API_URL}/prop/admin/accounts?limit=50`)
+      const accountsRes = await fetch(`${API_URL}/prop/admin/accounts?limit=50`, { headers: getAuthHeaders() })
       const accountsData = await accountsRes.json()
       if (accountsData.success) {
         setParticipants(accountsData.accounts || [])
       }
 
       // Fetch dashboard stats
-      const dashRes = await fetch(`${API_URL}/prop/admin/dashboard`)
+      const dashRes = await fetch(`${API_URL}/prop/admin/dashboard`, { headers: getAuthHeaders() })
       const dashData = await dashRes.json()
       if (dashData.success) {
         setStats(dashData.stats || {})
       }
 
       // Fetch funded accounts
-      const fundedRes = await fetch(`${API_URL}/prop/admin/funded-accounts`)
+      const fundedRes = await fetch(`${API_URL}/prop/admin/funded-accounts`, { headers: getAuthHeaders() })
       const fundedData = await fundedRes.json()
       if (fundedData.success) {
         setFundedAccounts(fundedData.accounts || [])
@@ -146,7 +154,7 @@ const AdminPropFirm = () => {
     try {
       const res = await fetch(`${API_URL}/prop/admin/withdraw/${selectedFundedAccount._id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ adminId: 'admin', amount })
       })
       const data = await res.json()
@@ -170,7 +178,7 @@ const AdminPropFirm = () => {
       const newValue = !challengeModeEnabled
       const res = await fetch(`${API_URL}/prop/admin/settings`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ challengeModeEnabled: newValue })
       })
       const data = await res.json()
@@ -188,7 +196,7 @@ const AdminPropFirm = () => {
     try {
       const res = await fetch(`${API_URL}/prop/admin/settings`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           challengeModeEnabled,
           ...settings
@@ -249,7 +257,7 @@ const AdminPropFirm = () => {
       
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(challengeForm)
       })
       const data = await res.json()
@@ -270,7 +278,8 @@ const AdminPropFirm = () => {
     if (!confirm('Are you sure you want to delete this challenge?')) return
     try {
       const res = await fetch(`${API_URL}/prop/admin/challenges/${challengeId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       })
       const data = await res.json()
       if (data.success) {

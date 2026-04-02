@@ -24,6 +24,14 @@ import {
   Target
 } from 'lucide-react'
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('adminToken')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  }
+}
+
 const AdminIBManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState('ibs') // ibs, applications, plans, settings, transfer
@@ -77,7 +85,7 @@ const AdminIBManagement = () => {
 
   const fetchAllUsers = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/users`)
+      const res = await fetch(`${API_URL}/admin/users`, { headers: getAuthHeaders() })
       const data = await res.json()
       setAllUsers(data.users || [])
     } catch (error) {
@@ -99,7 +107,7 @@ const AdminIBManagement = () => {
     try {
       const res = await fetch(`${API_URL}/ib/admin/transfer-referrals`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           userIds: selectedUsers,
           targetIBId: targetIB
@@ -147,7 +155,7 @@ const AdminIBManagement = () => {
 
   const fetchDashboard = async () => {
     try {
-      const res = await fetch(`${API_URL}/ib/admin/dashboard`)
+      const res = await fetch(`${API_URL}/ib/admin/dashboard`, { headers: getAuthHeaders() })
       const data = await res.json()
       // Handle both old format (data.dashboard) and new format (data.stats)
       if (data.stats) {
@@ -170,7 +178,7 @@ const AdminIBManagement = () => {
 
   const fetchIBs = async () => {
     try {
-      const res = await fetch(`${API_URL}/ib/admin/all`)
+      const res = await fetch(`${API_URL}/ib/admin/all`, { headers: getAuthHeaders() })
       const data = await res.json()
       setIbs(data.ibs || [])
     } catch (error) {
@@ -181,7 +189,7 @@ const AdminIBManagement = () => {
 
   const fetchApplications = async () => {
     try {
-      const res = await fetch(`${API_URL}/ib/admin/pending`)
+      const res = await fetch(`${API_URL}/ib/admin/pending`, { headers: getAuthHeaders() })
       const data = await res.json()
       setApplications(data.pending || [])
     } catch (error) {
@@ -191,7 +199,7 @@ const AdminIBManagement = () => {
 
   const fetchPlans = async () => {
     try {
-      const res = await fetch(`${API_URL}/ib/admin/plans`)
+      const res = await fetch(`${API_URL}/ib/admin/plans`, { headers: getAuthHeaders() })
       const data = await res.json()
       setPlans(data.plans || [])
     } catch (error) {
@@ -201,7 +209,7 @@ const AdminIBManagement = () => {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch(`${API_URL}/ib/admin/settings`)
+      const res = await fetch(`${API_URL}/ib/admin/settings`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.settings) setSettings(data.settings)
     } catch (error) {
@@ -211,7 +219,7 @@ const AdminIBManagement = () => {
 
   const fetchIBLevels = async () => {
     try {
-      const res = await fetch(`${API_URL}/ib/admin/levels`)
+      const res = await fetch(`${API_URL}/ib/admin/levels`, { headers: getAuthHeaders() })
       const data = await res.json()
       setIbLevels(data.levels || [])
     } catch (error) {
@@ -228,7 +236,7 @@ const AdminIBManagement = () => {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(levelData)
       })
       const data = await res.json()
@@ -251,7 +259,8 @@ const AdminIBManagement = () => {
     
     try {
       const res = await fetch(`${API_URL}/ib/admin/levels/${levelId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       })
       const data = await res.json()
       if (data.success) {
@@ -270,7 +279,7 @@ const AdminIBManagement = () => {
     try {
       const res = await fetch(`${API_URL}/ib/admin/approve/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ planId: planId })
       })
       const data = await res.json()
@@ -295,7 +304,7 @@ const AdminIBManagement = () => {
     try {
       const res = await fetch(`${API_URL}/ib/admin/reject/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ reason })
       })
       const data = await res.json()
@@ -319,7 +328,7 @@ const AdminIBManagement = () => {
     try {
       const res = await fetch(`${API_URL}/ib/admin/block/${userId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ reason })
       })
       const data = await res.json()
@@ -333,59 +342,6 @@ const AdminIBManagement = () => {
     }
   }
 
-  const handleSuspend = async (ibId) => {
-    if (!confirm('Are you sure you want to suspend this IB?')) return
-
-    try {
-      const res = await fetch(`${API_URL}/ib/admin/suspend/${ibId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminId: 'admin' })
-      })
-      const data = await res.json()
-      if (data.ibUser) {
-        alert('IB suspended')
-        fetchIBs()
-      }
-    } catch (error) {
-      console.error('Error suspending:', error)
-    }
-  }
-
-  const handleViewIB = (ib) => {
-    setViewingIB(ib)
-    setIbCommission(ib.ibLevel || 1)
-    setShowIBModal(true)
-  }
-
-  const handleSaveIBDetails = async () => {
-    if (!viewingIB) return
-    setSavingIB(true)
-    
-    try {
-      const res = await fetch(`${API_URL}/ib/admin/update/${viewingIB._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ibLevel: parseInt(ibCommission) || 1
-        })
-      })
-      const data = await res.json()
-      if (data.success) {
-        alert('IB updated successfully!')
-        setShowIBModal(false)
-        setViewingIB(null)
-        fetchIBs()
-      } else {
-        alert(data.message || 'Failed to update IB')
-      }
-    } catch (error) {
-      console.error('Error updating IB:', error)
-      alert('Failed to update IB')
-    }
-    setSavingIB(false)
-  }
-
   const handleSavePlan = async (planData) => {
     try {
       const url = editingPlan 
@@ -395,7 +351,7 @@ const AdminIBManagement = () => {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(planData)
       })
       const data = await res.json()
@@ -417,7 +373,7 @@ const AdminIBManagement = () => {
     try {
       const res = await fetch(`${API_URL}/ib/admin/settings`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newSettings)
       })
       const data = await res.json()
@@ -428,6 +384,42 @@ const AdminIBManagement = () => {
     } catch (error) {
       console.error('Error updating settings:', error)
     }
+  }
+
+  const handleViewIB = (ib) => {
+    setViewingIB(ib)
+    setIbCommission(ib.ibLevel?.toString() || '')
+    setIbPlan(ib.ibPlanId?._id || ib.ibPlanId || '')
+    setShowIBModal(true)
+  }
+
+  const handleSaveIBDetails = async () => {
+    if (!viewingIB) return
+    setSavingIB(true)
+    
+    try {
+      const res = await fetch(`${API_URL}/ib/admin/update/${viewingIB._id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          ibLevel: ibCommission ? parseInt(ibCommission) : undefined,
+          ibPlanId: ibPlan || undefined
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert('IB details updated!')
+        setShowIBModal(false)
+        setViewingIB(null)
+        fetchIBs()
+      } else {
+        alert(data.message || 'Failed to update IB')
+      }
+    } catch (error) {
+      console.error('Error updating IB:', error)
+      alert('Failed to update IB details')
+    }
+    setSavingIB(false)
   }
 
   const filteredIBs = ibs.filter(ib => 
@@ -576,6 +568,24 @@ const AdminIBManagement = () => {
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-1">
+                          {ib.ibStatus === 'PENDING' && (
+                            <>
+                              <button 
+                                onClick={() => handleApprove(ib._id)}
+                                className="p-2 hover:bg-green-500/20 rounded-lg transition-colors text-green-500 hover:text-green-400"
+                                title="Approve"
+                              >
+                                <Check size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleReject(ib._id)}
+                                className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-red-500 hover:text-red-400"
+                                title="Reject"
+                              >
+                                <X size={16} />
+                              </button>
+                            </>
+                          )}
                           <button 
                             onClick={() => handleViewIB(ib)}
                             className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-white"
@@ -695,7 +705,7 @@ const AdminIBManagement = () => {
               <p>No IB levels configured</p>
               <button
                 onClick={async () => {
-                  await fetch(`${API_URL}/ib/admin/init-levels`, { method: 'POST' })
+                  await fetch(`${API_URL}/ib/admin/init-levels`, { method: 'POST', headers: getAuthHeaders() })
                   fetchIBLevels()
                 }}
                 className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
@@ -1500,7 +1510,7 @@ const IBDetailsModal = ({ ib, plans, ibCommission, setIbCommission, ibPlan, setI
               <button
                 onClick={async () => {
                   try {
-                    const res = await fetch(`${API_URL}/ib/admin/unblock/${ib._id}`, { method: 'PUT' })
+                    const res = await fetch(`${API_URL}/ib/admin/unblock/${ib._id}`, { method: 'PUT', headers: getAuthHeaders() })
                     const data = await res.json()
                     if (data.success) {
                       alert('IB unblocked!')
@@ -1521,7 +1531,7 @@ const IBDetailsModal = ({ ib, plans, ibCommission, setIbCommission, ibPlan, setI
                   try {
                     const res = await fetch(`${API_URL}/ib/admin/block/${ib._id}`, {
                       method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: getAuthHeaders(),
                       body: JSON.stringify({ reason })
                     })
                     const data = await res.json()

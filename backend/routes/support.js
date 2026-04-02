@@ -2,6 +2,7 @@ import express from 'express'
 import SupportTicket from '../models/SupportTicket.js'
 import User from '../models/User.js'
 import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
@@ -159,6 +160,12 @@ router.get('/admin/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.
     const { status, priority, category, limit = 50, offset = 0 } = req.query
 
     const query = {}
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) query.userId = { $in: userIds }
+    // SUPER_ADMIN sees all tickets
+    
     if (status) query.status = status
     if (priority) query.priority = priority
     if (category) query.category = category

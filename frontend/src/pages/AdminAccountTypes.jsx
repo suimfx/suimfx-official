@@ -11,6 +11,14 @@ import {
 } from 'lucide-react'
 import { API_URL } from '../config/api'
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('adminToken')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  }
+}
+
 const AdminAccountTypes = () => {
   const [accountTypes, setAccountTypes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -38,7 +46,9 @@ const AdminAccountTypes = () => {
   const fetchAccountTypes = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/account-types/all`)
+      const res = await fetch(`${API_URL}/account-types/all`, {
+        headers: getAuthHeaders()
+      })
       const data = await res.json()
       setAccountTypes(data.accountTypes || [])
     } catch (error) {
@@ -60,7 +70,7 @@ const AdminAccountTypes = () => {
       
       const res = await fetch(url, {
         method: editingType ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           ...formData,
           minDeposit: parseFloat(formData.minDeposit),
@@ -92,7 +102,8 @@ const AdminAccountTypes = () => {
 
     try {
       const res = await fetch(`${API_URL}/account-types/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       })
       
       if (res.ok) {
@@ -109,7 +120,7 @@ const AdminAccountTypes = () => {
     try {
       const res = await fetch(`${API_URL}/account-types/${type._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ ...type, isActive: !type.isActive })
       })
       

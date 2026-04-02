@@ -6,6 +6,12 @@ const paymentMethodSchema = new mongoose.Schema({
     enum: ['Bank Transfer', 'UPI', 'QR Code'],
     required: true
   },
+  // Admin who created this payment method (null = Super Admin / global)
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
   // Currency - INR for Indian payments, USD for international
   currency: {
     type: String,

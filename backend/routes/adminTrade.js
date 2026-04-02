@@ -10,19 +10,24 @@ import tradeEngine from '../services/tradeEngine.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
 import MasterTrader from '../models/MasterTrader.js'
 import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
 // Apply auth middleware to all routes
 router.use(verifyAdminToken)
 
-// GET /api/admin/trade/all - Get all trades with pagination (for admin dashboard)
+// GET /api/admin/trade/all - Get all trades with pagination (filtered by admin role)
 router.get('/all', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MANAGEMENT), async (req, res) => {
   try {
     const { status, limit = 20, offset = 0 } = req.query
 
     let query = {}
     if (status) query.status = status
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) query.userId = { $in: userIds }
 
     const total = await Trade.countDocuments(query)
     const trades = await Trade.find(query)

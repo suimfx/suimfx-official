@@ -4,7 +4,10 @@ import ChallengeAccount from '../models/ChallengeAccount.js'
 import PropSettings from '../models/PropSettings.js'
 import Wallet from '../models/Wallet.js'
 import Transaction from '../models/Transaction.js'
+import User from '../models/User.js'
 import propTradingEngine from '../services/propTradingEngine.js'
+import { verifyAdminToken } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
@@ -40,10 +43,11 @@ function getProfitWithdrawalMeta(account, challenge) {
 
 // ==================== PUBLIC ROUTES ====================
 
-// GET /api/prop/status - Check if challenge mode is enabled
+// GET /api/prop/status - Check if challenge mode is enabled (per-admin)
 router.get('/status', async (req, res) => {
   try {
-    const settings = await PropSettings.getSettings()
+    const adminId = req.query.adminId || null
+    const settings = await PropSettings.getSettings(adminId)
     res.json({
       success: true,
       enabled: settings.challengeModeEnabled,
@@ -55,15 +59,20 @@ router.get('/status', async (req, res) => {
   }
 })
 
-// GET /api/prop/challenges - Get available challenges
+// GET /api/prop/challenges - Get available challenges (filtered by admin)
 router.get('/challenges', async (req, res) => {
   try {
-    const settings = await PropSettings.getSettings()
+    const adminId = req.query.adminId || null
+    const settings = await PropSettings.getSettings(adminId)
     if (!settings.challengeModeEnabled) {
       return res.json({ success: true, challenges: [], enabled: false })
     }
 
-    const challenges = await Challenge.find({ isActive: true })
+    const query = { isActive: true }
+    if (adminId) {
+      query.adminId = adminId
+    }
+    const challenges = await Challenge.find(query)
       .sort({ sortOrder: 1, fundSize: 1 })
 
     res.json({ success: true, challenges, enabled: true })
@@ -96,7 +105,10 @@ router.post('/buy', async (req, res) => {
       return res.status(400).json({ success: false, message: 'User ID and Challenge ID required' })
     }
 
-    const settings = await PropSettings.getSettings()
+    // Look up user's assigned admin for per-admin settings
+    const buyUser = await User.findById(userId).select('assignedAdmin')
+    const userAdminId = buyUser?.assignedAdmin || null
+    const settings = await PropSettings.getSettings(userAdminId)
     if (!settings.challengeModeEnabled) {
       return res.status(400).json({ 
         success: false, 
@@ -449,27 +461,27 @@ router.post('/update-equity', async (req, res) => {
 
 // ==================== ADMIN ROUTES ====================
 
-// GET /api/prop/admin/settings - Get prop settings
-router.get('/admin/settings', async (req, res) => {
+// GET /api/prop/admin/settings - Get prop settings (per-admin)
+router.get('/admin/settings', verifyAdminToken, async (req, res) => {
   try {
-    const settings = await PropSettings.getSettings()
+    const settings = await PropSettings.getSettings(req.admin._id)
     res.json({ success: true, settings })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
 })
 
-// PUT /api/prop/admin/settings - Update prop settings
-router.put('/admin/settings', async (req, res) => {
+// PUT /api/prop/admin/settings - Update prop settings (per-admin)
+router.put('/admin/settings', verifyAdminToken, async (req, res) => {
   try {
-    const { challengeModeEnabled, displayName, description, termsAndConditions, adminId } = req.body
+    const { challengeModeEnabled, displayName, description, termsAndConditions } = req.body
     
     const settings = await PropSettings.updateSettings({
       challengeModeEnabled,
       displayName,
       description,
       termsAndConditions
-    }, adminId)
+    }, req.admin._id)
 
     res.json({ success: true, message: 'Settings updated', settings })
   } catch (error) {
@@ -478,9 +490,11 @@ router.put('/admin/settings', async (req, res) => {
 })
 
 // POST /api/prop/admin/challenges - Create new challenge
-router.post('/admin/challenges', async (req, res) => {
+router.post('/admin/challenges', verifyAdminToken, async (req, res) => {
   try {
-    const challengeData = req.body
+    const challengeData = { ...req.body }
+    // Tag challenge with adminId for both roles
+    challengeData.adminId = req.admin._id
     const challenge = await Challenge.create(challengeData)
     res.json({ success: true, message: 'Challenge created', challenge })
   } catch (error) {
@@ -489,9 +503,12 @@ router.post('/admin/challenges', async (req, res) => {
 })
 
 // GET /api/prop/admin/challenges - Get all challenges (admin)
-router.get('/admin/challenges', async (req, res) => {
+router.get('/admin/challenges', verifyAdminToken, async (req, res) => {
   try {
-    const challenges = await Challenge.find().sort({ sortOrder: 1, fundSize: 1 })
+    let challengeQuery = {}
+    // Each admin sees only their own challenges
+    challengeQuery.adminId = req.admin._id
+    const challenges = await Challenge.find(challengeQuery).sort({ sortOrder: 1, fundSize: 1 })
     res.json({ success: true, challenges })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
@@ -499,8 +516,13 @@ router.get('/admin/challenges', async (req, res) => {
 })
 
 // PUT /api/prop/admin/challenges/:id - Update challenge
-router.put('/admin/challenges/:id', async (req, res) => {
+router.put('/admin/challenges/:id', verifyAdminToken, async (req, res) => {
   try {
+    // Each admin can only update their own challenges
+    const existing = await Challenge.findById(req.params.id)
+    if (!existing || existing.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
     const challenge = await Challenge.findByIdAndUpdate(
       req.params.id,
       { ...req.body, updatedAt: new Date() },
@@ -516,8 +538,13 @@ router.put('/admin/challenges/:id', async (req, res) => {
 })
 
 // DELETE /api/prop/admin/challenges/:id - Delete challenge
-router.delete('/admin/challenges/:id', async (req, res) => {
+router.delete('/admin/challenges/:id', verifyAdminToken, async (req, res) => {
   try {
+    // Each admin can only delete their own challenges
+    const existingChallenge = await Challenge.findById(req.params.id)
+    if (!existingChallenge || existingChallenge.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
     const accountsCount = await ChallengeAccount.countDocuments({ challengeId: req.params.id })
     if (accountsCount > 0) {
       return res.status(400).json({ 
@@ -534,13 +561,17 @@ router.delete('/admin/challenges/:id', async (req, res) => {
 })
 
 // GET /api/prop/admin/accounts - Get all challenge accounts
-router.get('/admin/accounts', async (req, res) => {
+router.get('/admin/accounts', verifyAdminToken, async (req, res) => {
   try {
     const { status, challengeId, limit = 50, offset = 0 } = req.query
 
     let query = {}
     if (status) query.status = status
     if (challengeId) query.challengeId = challengeId
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const acctUserIds = await getAdminUserIds(req.admin)
+    if (acctUserIds) query.userId = { $in: acctUserIds }
 
     const accounts = await ChallengeAccount.find(query)
       .populate('userId', 'firstName email')
@@ -682,11 +713,14 @@ router.post('/admin/withdraw/:id', async (req, res) => {
 })
 
 // GET /api/prop/admin/funded-accounts - Get all funded accounts with withdrawal info
-router.get('/admin/funded-accounts', async (req, res) => {
+router.get('/admin/funded-accounts', verifyAdminToken, async (req, res) => {
   try {
-    const fundedAccounts = await ChallengeAccount.find({ 
-      $or: [{ accountType: 'FUNDED' }, { status: 'FUNDED' }]
-    })
+    let fundedQuery = { $or: [{ accountType: 'FUNDED' }, { status: 'FUNDED' }] }
+    
+    const fundedUserIds = await getAdminUserIds(req.admin)
+    if (fundedUserIds) fundedQuery.userId = { $in: fundedUserIds }
+    
+    const fundedAccounts = await ChallengeAccount.find(fundedQuery)
     .populate('userId', 'firstName lastName email phone')
     .populate('challengeId', 'name fundSize fundedSettings')
     .sort({ createdAt: -1 })
@@ -724,16 +758,24 @@ router.get('/admin/funded-accounts', async (req, res) => {
 })
 
 // GET /api/prop/admin/dashboard - Admin dashboard stats
-router.get('/admin/dashboard', async (req, res) => {
+router.get('/admin/dashboard', verifyAdminToken, async (req, res) => {
   try {
-    const totalChallenges = await Challenge.countDocuments({ isActive: true })
-    const totalAccounts = await ChallengeAccount.countDocuments()
-    const activeAccounts = await ChallengeAccount.countDocuments({ status: 'ACTIVE' })
-    const passedAccounts = await ChallengeAccount.countDocuments({ status: 'PASSED' })
-    const failedAccounts = await ChallengeAccount.countDocuments({ status: 'FAILED' })
-    const fundedAccounts = await ChallengeAccount.countDocuments({ status: 'FUNDED' })
+    let accountFilter = {}
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const statsUserIds = await getAdminUserIds(req.admin)
+    if (statsUserIds) accountFilter.userId = { $in: statsUserIds }
+    
+    const challengeFilter = { isActive: true }
+    challengeFilter.adminId = req.admin._id
+    const totalChallenges = await Challenge.countDocuments(challengeFilter)
+    const totalAccounts = await ChallengeAccount.countDocuments(accountFilter)
+    const activeAccounts = await ChallengeAccount.countDocuments({ ...accountFilter, status: 'ACTIVE' })
+    const passedAccounts = await ChallengeAccount.countDocuments({ ...accountFilter, status: 'PASSED' })
+    const failedAccounts = await ChallengeAccount.countDocuments({ ...accountFilter, status: 'FAILED' })
+    const fundedAccounts = await ChallengeAccount.countDocuments({ ...accountFilter, status: 'FUNDED' })
 
-    const settings = await PropSettings.getSettings()
+    const settings = await PropSettings.getSettings(req.admin._id)
 
     res.json({
       success: true,

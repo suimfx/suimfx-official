@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
  * Checks if user has permission to access the current route
  * Redirects to dashboard if unauthorized
  */
-const ProtectedAdminRoute = ({ children, requiredPermission }) => {
+const ProtectedAdminRoute = ({ children, requiredPermission, requireSuperAdmin }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -34,6 +34,15 @@ const ProtectedAdminRoute = ({ children, requiredPermission }) => {
       // Super Admin has all permissions
       if (admin.role === 'SUPER_ADMIN') {
         setIsAuthorized(true)
+        setIsLoading(false)
+        return
+      }
+
+      if (requireSuperAdmin) {
+        console.warn(`[RBAC] Super Admin only: ${location.pathname}`)
+        navigate('/admin/dashboard', {
+          state: { error: 'Super Admin access only.' }
+        })
         setIsLoading(false)
         return
       }
@@ -94,7 +103,7 @@ const ProtectedAdminRoute = ({ children, requiredPermission }) => {
     }
 
     checkAuthorization()
-  }, [navigate, location.pathname, requiredPermission])
+  }, [navigate, location.pathname, requiredPermission, requireSuperAdmin])
 
   if (isLoading) {
     return (

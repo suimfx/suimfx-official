@@ -7,6 +7,8 @@ import IBLevel from '../models/IBLevel.js'
 import IBSettings from '../models/IBSettings.js'
 import ibEngine from '../services/ibEngineNew.js'
 import mongoose from 'mongoose'
+import { verifyAdminToken } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
@@ -199,12 +201,16 @@ router.post('/withdraw', async (req, res) => {
 // ==================== ADMIN ROUTES ====================
 
 // GET /api/ib/admin/all - Get all IBs
-router.get('/admin/all', async (req, res) => {
+router.get('/admin/all', verifyAdminToken, async (req, res) => {
   try {
     const { status, limit = 50, offset = 0 } = req.query
 
     let query = { isIB: true }
     if (status) query.ibStatus = status
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) query._id = { $in: userIds }
 
     const ibs = await User.find(query)
       .populate('ibPlanId', 'name')
@@ -233,9 +239,12 @@ router.get('/admin/all', async (req, res) => {
 })
 
 // GET /api/ib/admin/pending - Get pending IB applications
-router.get('/admin/pending', async (req, res) => {
+router.get('/admin/pending', verifyAdminToken, async (req, res) => {
   try {
-    const pending = await User.find({ isIB: true, ibStatus: 'PENDING' })
+    let pendingQuery = { isIB: true, ibStatus: 'PENDING' }
+    const pendingUserIds = await getAdminUserIds(req.admin)
+    if (pendingUserIds) pendingQuery._id = { $in: pendingUserIds }
+    const pending = await User.find(pendingQuery)
       .select('firstName lastName email referralCode ibLevel createdAt')
       .sort({ createdAt: -1 })
 
@@ -247,7 +256,7 @@ router.get('/admin/pending', async (req, res) => {
 })
 
 // PUT /api/ib/admin/approve/:userId - Approve IB application
-router.put('/admin/approve/:userId', async (req, res) => {
+router.put('/admin/approve/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const { planId } = req.body
@@ -270,7 +279,7 @@ router.put('/admin/approve/:userId', async (req, res) => {
 })
 
 // PUT /api/ib/admin/reject/:userId - Reject IB application
-router.put('/admin/reject/:userId', async (req, res) => {
+router.put('/admin/reject/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const { reason } = req.body
@@ -298,7 +307,7 @@ router.put('/admin/reject/:userId', async (req, res) => {
 })
 
 // PUT /api/ib/admin/block/:userId - Block IB
-router.put('/admin/block/:userId', async (req, res) => {
+router.put('/admin/block/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const { reason } = req.body
@@ -320,7 +329,7 @@ router.put('/admin/block/:userId', async (req, res) => {
 })
 
 // PUT /api/ib/admin/unblock/:userId - Unblock IB
-router.put('/admin/unblock/:userId', async (req, res) => {
+router.put('/admin/unblock/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const user = await User.findById(userId)
@@ -345,7 +354,7 @@ router.put('/admin/unblock/:userId', async (req, res) => {
 })
 
 // PUT /api/ib/admin/update/:userId - Update IB details (level)
-router.put('/admin/update/:userId', async (req, res) => {
+router.put('/admin/update/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const { ibLevel } = req.body
@@ -377,7 +386,7 @@ router.put('/admin/update/:userId', async (req, res) => {
 })
 
 // PUT /api/ib/admin/change-plan/:userId - Change IB plan
-router.put('/admin/change-plan/:userId', async (req, res) => {
+router.put('/admin/change-plan/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const { planId } = req.body
@@ -399,7 +408,7 @@ router.put('/admin/change-plan/:userId', async (req, res) => {
 })
 
 // GET /api/ib/admin/tree/:userId - Get IB tree for admin
-router.get('/admin/tree/:userId', async (req, res) => {
+router.get('/admin/tree/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const { maxDepth = 5 } = req.query
@@ -417,7 +426,7 @@ router.get('/admin/tree/:userId', async (req, res) => {
 })
 
 // GET /api/ib/admin/stats/:userId - Get IB stats for admin
-router.get('/admin/stats/:userId', async (req, res) => {
+router.get('/admin/stats/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const stats = await ibEngine.getIBStats(userId)
@@ -429,7 +438,7 @@ router.get('/admin/stats/:userId', async (req, res) => {
 })
 
 // POST /api/ib/admin/reverse-commission - Reverse a commission
-router.post('/admin/reverse-commission', async (req, res) => {
+router.post('/admin/reverse-commission', verifyAdminToken, async (req, res) => {
   try {
     const { commissionId, adminId, reason } = req.body
     if (!commissionId || !adminId) {
@@ -449,12 +458,16 @@ router.post('/admin/reverse-commission', async (req, res) => {
 })
 
 // GET /api/ib/admin/commissions - Get all commissions
-router.get('/admin/commissions', async (req, res) => {
+router.get('/admin/commissions', verifyAdminToken, async (req, res) => {
   try {
     const { status, limit = 50, offset = 0 } = req.query
 
     let query = {}
     if (status) query.status = status
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const commUserIds = await getAdminUserIds(req.admin)
+    if (commUserIds) query.ibUserId = { $in: commUserIds }
 
     const commissions = await IBCommission.find(query)
       .populate('ibUserId', 'firstName email referralCode')
@@ -467,8 +480,10 @@ router.get('/admin/commissions', async (req, res) => {
     const total = await IBCommission.countDocuments(query)
 
     // Calculate totals
+    let totalsMatch = { status: 'CREDITED' }
+    if (commUserIds) totalsMatch.ibUserId = { $in: commUserIds }
     const totals = await IBCommission.aggregate([
-      { $match: { status: 'CREDITED' } },
+      { $match: totalsMatch },
       {
         $group: {
           _id: null,
@@ -507,7 +522,7 @@ router.get('/plans', async (req, res) => {
 })
 
 // GET /api/ib/admin/plans - Get all plans (admin)
-router.get('/admin/plans', async (req, res) => {
+router.get('/admin/plans', verifyAdminToken, async (req, res) => {
   try {
     const plans = await IBPlan.find().sort({ createdAt: -1 })
     
@@ -534,7 +549,7 @@ router.get('/admin/plans', async (req, res) => {
 })
 
 // POST /api/ib/admin/plans - Create new plan
-router.post('/admin/plans', async (req, res) => {
+router.post('/admin/plans', verifyAdminToken, async (req, res) => {
   try {
     const { name, description, maxLevels, commissionType, levelCommissions, commissionSources, minWithdrawalAmount, isDefault } = req.body
 
@@ -577,7 +592,7 @@ router.post('/admin/plans', async (req, res) => {
 })
 
 // PUT /api/ib/admin/plans/:planId - Update plan
-router.put('/admin/plans/:planId', async (req, res) => {
+router.put('/admin/plans/:planId', verifyAdminToken, async (req, res) => {
   try {
     const { planId } = req.params
     const { name, description, maxLevels, commissionType, levelCommissions, commissionSources, minWithdrawalAmount, isActive, isDefault } = req.body
@@ -613,7 +628,7 @@ router.put('/admin/plans/:planId', async (req, res) => {
 })
 
 // DELETE /api/ib/admin/plans/:planId - Delete plan
-router.delete('/admin/plans/:planId', async (req, res) => {
+router.delete('/admin/plans/:planId', verifyAdminToken, async (req, res) => {
   try {
     const { planId } = req.params
     
@@ -635,7 +650,7 @@ router.delete('/admin/plans/:planId', async (req, res) => {
 })
 
 // POST /api/ib/admin/transfer-referrals - Transfer users to a different IB
-router.post('/admin/transfer-referrals', async (req, res) => {
+router.post('/admin/transfer-referrals', verifyAdminToken, async (req, res) => {
   try {
     const { userIds, targetIBId } = req.body
 
@@ -690,14 +705,26 @@ router.post('/admin/transfer-referrals', async (req, res) => {
 })
 
 // GET /api/ib/admin/dashboard - Admin dashboard stats
-router.get('/admin/dashboard', async (req, res) => {
+router.get('/admin/dashboard', verifyAdminToken, async (req, res) => {
   try {
-    const totalIBs = await User.countDocuments({ isIB: true })
-    const activeIBs = await User.countDocuments({ isIB: true, ibStatus: 'ACTIVE' })
-    const pendingIBs = await User.countDocuments({ isIB: true, ibStatus: 'PENDING' })
+    let userFilter = { isIB: true }
+    let walletFilter = {}
+    let commissionFilter = { status: 'CREDITED' }
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const dashUserIds = await getAdminUserIds(req.admin)
+    if (dashUserIds) {
+      userFilter._id = { $in: dashUserIds }
+      walletFilter.ibUserId = { $in: dashUserIds }
+      commissionFilter.ibUserId = { $in: dashUserIds }
+    }
+    
+    const totalIBs = await User.countDocuments(userFilter)
+    const activeIBs = await User.countDocuments({ ...userFilter, ibStatus: 'ACTIVE' })
+    const pendingIBs = await User.countDocuments({ ...userFilter, ibStatus: 'PENDING' })
 
     const commissionStats = await IBCommission.aggregate([
-      { $match: { status: 'CREDITED' } },
+      { $match: commissionFilter },
       {
         $group: {
           _id: null,
@@ -708,6 +735,7 @@ router.get('/admin/dashboard', async (req, res) => {
     ])
 
     const walletStats = await IBWallet.aggregate([
+      { $match: walletFilter },
       {
         $group: {
           _id: null,
@@ -755,7 +783,7 @@ router.get('/levels', async (req, res) => {
 })
 
 // GET /api/ib/admin/levels - Get all IB levels (admin)
-router.get('/admin/levels', async (req, res) => {
+router.get('/admin/levels', verifyAdminToken, async (req, res) => {
   try {
     let levels = await IBLevel.find().sort({ order: 1 })
     if (levels.length === 0) {
@@ -770,7 +798,7 @@ router.get('/admin/levels', async (req, res) => {
 })
 
 // POST /api/ib/admin/levels - Create new IB level
-router.post('/admin/levels', async (req, res) => {
+router.post('/admin/levels', verifyAdminToken, async (req, res) => {
   try {
     const { name, order, referralTarget, commissionRate, commissionType, downlineCommission, color, icon } = req.body
 
@@ -806,7 +834,7 @@ router.post('/admin/levels', async (req, res) => {
 })
 
 // PUT /api/ib/admin/levels/:levelId - Update IB level
-router.put('/admin/levels/:levelId', async (req, res) => {
+router.put('/admin/levels/:levelId', verifyAdminToken, async (req, res) => {
   try {
     const { levelId } = req.params
     const { name, order, referralTarget, commissionRate, commissionType, downlineCommission, color, icon, isActive } = req.body
@@ -844,7 +872,7 @@ router.put('/admin/levels/:levelId', async (req, res) => {
 })
 
 // DELETE /api/ib/admin/levels/:levelId - Delete IB level
-router.delete('/admin/levels/:levelId', async (req, res) => {
+router.delete('/admin/levels/:levelId', verifyAdminToken, async (req, res) => {
   try {
     const { levelId } = req.params
 
@@ -866,7 +894,7 @@ router.delete('/admin/levels/:levelId', async (req, res) => {
 })
 
 // PUT /api/ib/admin/user-level/:userId - Manually change user's IB level
-router.put('/admin/user-level/:userId', async (req, res) => {
+router.put('/admin/user-level/:userId', verifyAdminToken, async (req, res) => {
   try {
     const { userId } = req.params
     const { levelId } = req.body
@@ -927,7 +955,7 @@ router.put('/toggle-auto-upgrade/:userId', async (req, res) => {
 })
 
 // POST /api/ib/admin/init-levels - Initialize default levels
-router.post('/admin/init-levels', async (req, res) => {
+router.post('/admin/init-levels', verifyAdminToken, async (req, res) => {
   try {
     await IBLevel.initializeDefaultLevels()
     const levels = await IBLevel.getAllLevels()
@@ -941,7 +969,7 @@ router.post('/admin/init-levels', async (req, res) => {
 // ==================== SETTINGS ROUTES ====================
 
 // GET /api/ib/admin/settings - Get IB settings
-router.get('/admin/settings', async (req, res) => {
+router.get('/admin/settings', verifyAdminToken, async (req, res) => {
   try {
     const settings = await IBSettings.getSettings()
     res.json({ success: true, settings })
@@ -952,7 +980,7 @@ router.get('/admin/settings', async (req, res) => {
 })
 
 // PUT /api/ib/admin/settings - Update IB settings
-router.put('/admin/settings', async (req, res) => {
+router.put('/admin/settings', verifyAdminToken, async (req, res) => {
   try {
     const settings = await IBSettings.getSettings()
     const { 

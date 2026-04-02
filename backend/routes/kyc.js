@@ -8,6 +8,7 @@ import User from '../models/User.js'
 import { sendTemplateEmail } from '../services/emailService.js'
 import EmailSettings from '../models/EmailSettings.js'
 import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -278,14 +279,26 @@ router.get('/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBA
     const searchRaw = (req.query.search || '').trim()
 
     const filter = {}
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const kycUserIds = await getAdminUserIds(req.admin)
+    if (kycUserIds) filter.userId = { $in: kycUserIds }
+    // SUPER_ADMIN sees all KYC requests
+    
     if (status && status !== 'all') {
       filter.status = status
     }
     if (searchRaw) {
       const re = new RegExp(escapeRegex(searchRaw), 'i')
-      const matchingUsers = await User.find({
-        $or: [{ firstName: re }, { lastName: re }, { email: re }, { phone: re }]
-      })
+      const searchFilter = { $or: [{ firstName: re }, { lastName: re }, { email: re }, { phone: re }] }
+      let userQuery = {}
+      // Add admin filter to user search
+      if (req.admin.role === 'ADMIN') {
+        userQuery = { ...searchFilter, assignedAdmin: req.admin._id }
+      } else {
+        userQuery = { $and: [searchFilter, { $or: [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }] }] }
+      }
+      const matchingUsers = await User.find(userQuery)
         .select('_id')
         .lean()
       filter.userId = { $in: matchingUsers.map((u) => u._id) }

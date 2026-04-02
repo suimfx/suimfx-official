@@ -88,7 +88,7 @@ const adminSchema = new mongoose.Schema({
     tradeManagement: { type: Boolean, default: false },
     bookManagement: { type: Boolean, default: false },
     fundManagement: { type: Boolean, default: false },
-    bankSettings: { type: Boolean, default: false },
+    bankSettings: { type: Boolean, default: true },
     ibManagement: { type: Boolean, default: false },
     forexCharges: { type: Boolean, default: false },
     earningsReport: { type: Boolean, default: false },

@@ -156,19 +156,44 @@ router.post('/signup', async (req, res) => {
       }
     }
 
-    // Handle referral code - find the referring IB
+    // Handle referral code - first check if it's an Admin referral, then IB referral
     let parentIBId = null
     let referredBy = null
     if (referralCode) {
-      const referringIB = await User.findOne({ 
-        referralCode: referralCode, 
-        isIB: true, 
-        ibStatus: 'ACTIVE' 
-      })
-      if (referringIB) {
-        parentIBId = referringIB._id
-        referredBy = referralCode
-        console.log(`[Signup] User ${email} referred by IB ${referringIB.firstName} (${referralCode})`)
+      // First: Check if referral code belongs to an Admin (white-label)
+      if (!assignedAdmin) {
+        const referringAdmin = await Admin.findOne({ 
+          referralCode: referralCode.toUpperCase(), 
+          status: 'ACTIVE' 
+        })
+        if (referringAdmin) {
+          assignedAdmin = referringAdmin._id
+          adminUrlSlug = referringAdmin.urlSlug
+          referredBy = referralCode
+          console.log(`[Signup] User ${email} assigned to Admin ${referringAdmin.firstName} (${referralCode})`)
+        }
+      }
+      
+      // Second: Check if referral code belongs to an IB user
+      if (!assignedAdmin) {
+        const referringIB = await User.findOne({ 
+          referralCode: referralCode, 
+          isIB: true, 
+          ibStatus: 'ACTIVE' 
+        })
+        if (referringIB) {
+          parentIBId = referringIB._id
+          referredBy = referralCode
+          // Inherit the IB's assigned admin so referred user belongs to the same admin
+          if (referringIB.assignedAdmin) {
+            assignedAdmin = referringIB.assignedAdmin
+            const ibAdmin = await Admin.findById(referringIB.assignedAdmin)
+            if (ibAdmin) {
+              adminUrlSlug = ibAdmin.urlSlug
+            }
+          }
+          console.log(`[Signup] User ${email} referred by IB ${referringIB.firstName} (${referralCode}), assignedAdmin: ${assignedAdmin}`)
+        }
       }
     }
 
@@ -260,6 +285,19 @@ router.post('/login', async (req, res) => {
     // Generate token
     const token = generateToken(user._id)
 
+    // Fetch assigned admin's branding if user has one
+    let adminBranding = null
+    if (user.assignedAdmin) {
+      const assignedAdmin = await Admin.findById(user.assignedAdmin).select('brandName logo urlSlug')
+      if (assignedAdmin) {
+        adminBranding = {
+          brandName: assignedAdmin.brandName || '',
+          logo: assignedAdmin.logo || '',
+          urlSlug: assignedAdmin.urlSlug || ''
+        }
+      }
+    }
+
     res.json({
       message: 'Login successful',
       user: {
@@ -272,6 +310,7 @@ router.post('/login', async (req, res) => {
         profileImage: user.profileImage,
         assignedAdmin: user.assignedAdmin,
         adminUrlSlug: user.adminUrlSlug,
+        adminBranding,
         kycApproved: user.kycApproved,
         createdAt: user.createdAt
       },
@@ -331,6 +370,42 @@ router.get('/me', async (req, res) => {
     res.json({ user })
   } catch (error) {
     res.status(401).json({ message: 'Invalid token' })
+  }
+})
+
+// GET /api/auth/my-branding - Get branding for the current user's assigned admin
+router.get('/my-branding', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) {
+      console.log('[my-branding] No token provided')
+      return res.json({ success: true, branding: null })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    const userId = decoded.userId || decoded.id || decoded.adminId || decoded._id
+    const user = await User.findById(userId).select('assignedAdmin firstName')
+    console.log('[my-branding] userId:', userId, '-> User:', user ? `${user.firstName} (assignedAdmin: ${user.assignedAdmin})` : 'NULL')
+
+    if (!user || !user.assignedAdmin) {
+      return res.json({ success: true, branding: null })
+    }
+
+    const admin = await Admin.findById(user.assignedAdmin).select('brandName logo urlSlug')
+    if (!admin) {
+      return res.json({ success: true, branding: null })
+    }
+
+    res.json({
+      success: true,
+      branding: {
+        brandName: admin.brandName || '',
+        logo: admin.logo || '',
+        urlSlug: admin.urlSlug || ''
+      }
+    })
+  } catch (error) {
+    res.json({ success: true, branding: null })
   }
 })
 

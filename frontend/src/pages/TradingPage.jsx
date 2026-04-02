@@ -1042,7 +1042,9 @@ const TradingPage = () => {
 
     try {
 
-      const res = await fetch(`${API_URL}/charges/spreads`)
+      const u = JSON.parse(localStorage.getItem('user') || '{}')
+      const adminParam = u.assignedAdmin ? `?adminId=${u.assignedAdmin}` : ''
+      const res = await fetch(`${API_URL}/charges/spreads${adminParam}`)
 
       const data = await res.json()
 

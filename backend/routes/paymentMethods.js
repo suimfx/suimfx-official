@@ -1,14 +1,32 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import PaymentMethod from '../models/PaymentMethod.js'
 import Currency from '../models/Currency.js'
 import UserBankAccount from '../models/UserBankAccount.js'
+import User from '../models/User.js'
+import { verifyAdminToken } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
-// GET /api/payment-methods - Get all active payment methods (for users)
+// GET /api/payment-methods - Get active payment methods for a specific user (filtered by their assigned admin)
 router.get('/', async (req, res) => {
   try {
-    const paymentMethods = await PaymentMethod.find({ isActive: true })
+    const { userId } = req.query
+    let query = { isActive: true }
+    
+    // If userId provided, filter by that user's assigned admin
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      const user = await User.findById(userId)
+      if (user && user.assignedAdmin) {
+        query.adminId = user.assignedAdmin
+      } else {
+        // Unassigned user - show payment methods from admins with no assignedAdmin context (Super Admin's)
+        query.adminId = { $exists: true }
+      }
+    }
+    
+    const paymentMethods = await PaymentMethod.find(query)
     res.json({ paymentMethods })
   } catch (error) {
     res.status(500).json({ message: 'Error fetching payment methods', error: error.message })
@@ -16,9 +34,10 @@ router.get('/', async (req, res) => {
 })
 
 // GET /api/payment-methods/all - Get all payment methods (for admin)
-router.get('/all', async (req, res) => {
+router.get('/all', verifyAdminToken, async (req, res) => {
   try {
-    const paymentMethods = await PaymentMethod.find()
+    let query = { adminId: req.admin._id }
+    const paymentMethods = await PaymentMethod.find(query)
     res.json({ paymentMethods })
   } catch (error) {
     res.status(500).json({ message: 'Error fetching payment methods', error: error.message })
@@ -26,7 +45,7 @@ router.get('/all', async (req, res) => {
 })
 
 // POST /api/payment-methods - Create payment method (admin)
-router.post('/', async (req, res) => {
+router.post('/', verifyAdminToken, async (req, res) => {
   try {
     const { type, bankName, accountNumber, accountHolderName, ifscCode, upiId, qrCodeImage } = req.body
     const paymentMethod = new PaymentMethod({
@@ -36,7 +55,8 @@ router.post('/', async (req, res) => {
       accountHolderName,
       ifscCode,
       upiId,
-      qrCodeImage
+      qrCodeImage,
+      adminId: req.admin._id
     })
     await paymentMethod.save()
     res.status(201).json({ message: 'Payment method created', paymentMethod })
@@ -46,16 +66,19 @@ router.post('/', async (req, res) => {
 })
 
 // PUT /api/payment-methods/:id - Update payment method (admin)
-router.put('/:id', async (req, res) => {
+router.put('/:id', verifyAdminToken, async (req, res) => {
   try {
+    // Verify ownership
+    const existing = await PaymentMethod.findById(req.params.id)
+    if (!existing) return res.status(404).json({ message: 'Payment method not found' })
+    if (existing.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ message: 'Access denied' })
+    }
     const paymentMethod = await PaymentMethod.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     )
-    if (!paymentMethod) {
-      return res.status(404).json({ message: 'Payment method not found' })
-    }
     res.json({ message: 'Payment method updated', paymentMethod })
   } catch (error) {
     res.status(500).json({ message: 'Error updating payment method', error: error.message })
@@ -63,12 +86,14 @@ router.put('/:id', async (req, res) => {
 })
 
 // DELETE /api/payment-methods/:id - Delete payment method (admin)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyAdminToken, async (req, res) => {
   try {
-    const paymentMethod = await PaymentMethod.findByIdAndDelete(req.params.id)
-    if (!paymentMethod) {
-      return res.status(404).json({ message: 'Payment method not found' })
+    const existing = await PaymentMethod.findById(req.params.id)
+    if (!existing) return res.status(404).json({ message: 'Payment method not found' })
+    if (existing.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ message: 'Access denied' })
     }
+    await PaymentMethod.findByIdAndDelete(req.params.id)
     res.json({ message: 'Payment method deleted' })
   } catch (error) {
     res.status(500).json({ message: 'Error deleting payment method', error: error.message })
@@ -299,8 +324,7 @@ router.get('/user-banks/:userId/approved', async (req, res) => {
   try {
     const accounts = await UserBankAccount.find({ 
       userId: req.params.userId, 
-      status: 'Approved',
-      isActive: true 
+      status: { $in: ['Approved', 'Pending'] }
     }).sort({ createdAt: -1 })
     res.json({ accounts })
   } catch (error) {
@@ -338,13 +362,15 @@ router.post('/user-banks', async (req, res) => {
       ifscCode,
       branchName,
       upiId,
-      status: 'Pending'
+      status: 'Approved',
+      isActive: true,
+      approvedAt: new Date()
     })
 
     await account.save()
     res.status(201).json({ 
       success: true,
-      message: 'Bank account submitted for approval',
+      message: 'Bank account added successfully',
       account 
     })
   } catch (error) {
@@ -368,10 +394,14 @@ router.delete('/user-banks/:id', async (req, res) => {
 // ==================== ADMIN BANK REQUEST ROUTES ====================
 
 // GET /api/payment-methods/admin/bank-requests - Get all pending bank requests
-router.get('/admin/bank-requests', async (req, res) => {
+router.get('/admin/bank-requests', verifyAdminToken, async (req, res) => {
   try {
     const { status } = req.query
     const query = status ? { status } : {}
+    
+    // Filter by admin's users
+    const userIds = await getAdminUserIds(req.admin)
+    if (userIds) query.userId = { $in: userIds }
     
     const requests = await UserBankAccount.find(query)
       .populate('userId', 'firstName lastName email phone')
@@ -384,11 +414,14 @@ router.get('/admin/bank-requests', async (req, res) => {
 })
 
 // GET /api/payment-methods/admin/bank-requests/stats - Get bank request stats
-router.get('/admin/bank-requests/stats', async (req, res) => {
+router.get('/admin/bank-requests/stats', verifyAdminToken, async (req, res) => {
   try {
-    const pending = await UserBankAccount.countDocuments({ status: 'Pending' })
-    const approved = await UserBankAccount.countDocuments({ status: 'Approved' })
-    const rejected = await UserBankAccount.countDocuments({ status: 'Rejected' })
+    const userIds = await getAdminUserIds(req.admin)
+    const userFilter = userIds ? { userId: { $in: userIds } } : {}
+    
+    const pending = await UserBankAccount.countDocuments({ ...userFilter, status: 'Pending' })
+    const approved = await UserBankAccount.countDocuments({ ...userFilter, status: 'Approved' })
+    const rejected = await UserBankAccount.countDocuments({ ...userFilter, status: 'Rejected' })
     
     res.json({ stats: { pending, approved, rejected, total: pending + approved + rejected } })
   } catch (error) {
@@ -397,7 +430,7 @@ router.get('/admin/bank-requests/stats', async (req, res) => {
 })
 
 // PUT /api/payment-methods/admin/bank-requests/:id/approve - Approve bank request
-router.put('/admin/bank-requests/:id/approve', async (req, res) => {
+router.put('/admin/bank-requests/:id/approve', verifyAdminToken, async (req, res) => {
   try {
     const account = await UserBankAccount.findById(req.params.id)
     if (!account) {
@@ -416,7 +449,7 @@ router.put('/admin/bank-requests/:id/approve', async (req, res) => {
 })
 
 // PUT /api/payment-methods/admin/bank-requests/:id/reject - Reject bank request
-router.put('/admin/bank-requests/:id/reject', async (req, res) => {
+router.put('/admin/bank-requests/:id/reject', verifyAdminToken, async (req, res) => {
   try {
     const { reason } = req.body
     const account = await UserBankAccount.findById(req.params.id)

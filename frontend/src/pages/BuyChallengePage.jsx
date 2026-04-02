@@ -31,7 +31,8 @@ export default function BuyChallengePage() {
 
   const fetchChallenges = async () => {
     try {
-      const res = await fetch(`${API_URL}/prop/challenges`)
+      const adminId = user.assignedAdmin || ''
+      const res = await fetch(`${API_URL}/prop/challenges${adminId ? '?adminId=' + adminId : ''}`)
       const data = await res.json()
       if (data.success) {
         setChallenges(data.challenges || [])
@@ -45,7 +46,8 @@ export default function BuyChallengePage() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch(`${API_URL}/prop/status`)
+      const adminId = user.assignedAdmin || ''
+      const res = await fetch(`${API_URL}/prop/status${adminId ? '?adminId=' + adminId : ''}`)
       const data = await res.json()
       if (data.success) {
         setSettings(data)

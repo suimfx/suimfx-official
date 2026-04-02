@@ -11,6 +11,7 @@ import {
   Download
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+import { getAdminHeaders } from '../utils/adminApi'
 
 const AdminEarnings = () => {
   const [summary, setSummary] = useState(null)
@@ -38,7 +39,7 @@ const AdminEarnings = () => {
 
   const fetchSummary = async () => {
     try {
-      const res = await fetch(`${API_URL}/earnings/summary`)
+      const res = await fetch(`${API_URL}/earnings/summary`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setSummary(data.earnings)
@@ -50,7 +51,7 @@ const AdminEarnings = () => {
 
   const fetchDailyEarnings = async () => {
     try {
-      const res = await fetch(`${API_URL}/earnings/daily?days=${dateRange}`)
+      const res = await fetch(`${API_URL}/earnings/daily?days=${dateRange}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setDailyEarnings(data.earnings || [])
@@ -62,7 +63,7 @@ const AdminEarnings = () => {
 
   const fetchUserEarnings = async () => {
     try {
-      const res = await fetch(`${API_URL}/earnings/by-user?days=${dateRange}`)
+      const res = await fetch(`${API_URL}/earnings/by-user?days=${dateRange}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setUserEarnings(data.earnings || [])
@@ -74,7 +75,7 @@ const AdminEarnings = () => {
 
   const fetchSymbolEarnings = async () => {
     try {
-      const res = await fetch(`${API_URL}/earnings/by-symbol?days=${dateRange}`)
+      const res = await fetch(`${API_URL}/earnings/by-symbol?days=${dateRange}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
         setSymbolEarnings(data.earnings || [])
@@ -179,7 +180,7 @@ const AdminEarnings = () => {
           </div>
 
           {/* Breakdown Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {/* Commission Breakdown */}
             <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
               <h3 className="text-white font-semibold mb-4">Commission Earnings</h3>
@@ -199,6 +200,29 @@ const AdminEarnings = () => {
                 <div className="flex justify-between border-t border-gray-700 pt-3">
                   <span className="text-gray-400">All Time</span>
                   <span className="text-green-500 font-mono font-bold">{formatCurrency(summary?.allTime?.commission)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Spread Breakdown */}
+            <div className="bg-dark-800 rounded-xl border border-gray-800 p-5">
+              <h3 className="text-white font-semibold mb-4">Spread Earnings</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Today</span>
+                  <span className="text-white font-mono">{formatCurrency(summary?.today?.spread)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">This Week</span>
+                  <span className="text-white font-mono">{formatCurrency(summary?.thisWeek?.spread)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">This Month</span>
+                  <span className="text-white font-mono">{formatCurrency(summary?.thisMonth?.spread)}</span>
+                </div>
+                <div className="flex justify-between border-t border-gray-700 pt-3">
+                  <span className="text-gray-400">All Time</span>
+                  <span className="text-orange-500 font-mono font-bold">{formatCurrency(summary?.allTime?.spread)}</span>
                 </div>
               </div>
             </div>
@@ -281,6 +305,7 @@ const AdminEarnings = () => {
                     <tr>
                       <th className="text-left text-gray-400 text-xs font-medium px-4 py-3">Date</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Commission</th>
+                      <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Spread</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Swap</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Total</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Trades</th>
@@ -290,13 +315,14 @@ const AdminEarnings = () => {
                   <tbody>
                     {dailyEarnings.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center text-gray-500 py-8">No data for selected period</td>
+                        <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
                       dailyEarnings.map((day, idx) => (
                         <tr key={idx} className="border-t border-gray-800 hover:bg-dark-700">
                           <td className="px-4 py-3 text-white text-sm">{day.date}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(day.commission)}</td>
+                          <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(day.spread)}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(day.swap)}</td>
                           <td className="px-4 py-3 text-right text-green-500 font-mono text-sm font-semibold">{formatCurrency(day.total)}</td>
                           <td className="px-4 py-3 text-right text-gray-400 text-sm">{day.trades}</td>
@@ -319,6 +345,7 @@ const AdminEarnings = () => {
                     <tr>
                       <th className="text-left text-gray-400 text-xs font-medium px-4 py-3">User</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Commission</th>
+                      <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Spread</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Swap</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Total</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Trades</th>
@@ -328,7 +355,7 @@ const AdminEarnings = () => {
                   <tbody>
                     {userEarnings.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center text-gray-500 py-8">No data for selected period</td>
+                        <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
                       userEarnings.map((user, idx) => (
@@ -340,6 +367,7 @@ const AdminEarnings = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(user.commission)}</td>
+                          <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(user.spread)}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(user.swap)}</td>
                           <td className="px-4 py-3 text-right text-green-500 font-mono text-sm font-semibold">{formatCurrency(user.total)}</td>
                           <td className="px-4 py-3 text-right text-gray-400 text-sm">{user.trades}</td>
@@ -362,6 +390,7 @@ const AdminEarnings = () => {
                     <tr>
                       <th className="text-left text-gray-400 text-xs font-medium px-4 py-3">Symbol</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Commission</th>
+                      <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Spread</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Swap</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Total</th>
                       <th className="text-right text-gray-400 text-xs font-medium px-4 py-3">Trades</th>
@@ -371,13 +400,14 @@ const AdminEarnings = () => {
                   <tbody>
                     {symbolEarnings.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center text-gray-500 py-8">No data for selected period</td>
+                        <td colSpan="7" className="text-center text-gray-500 py-8">No data for selected period</td>
                       </tr>
                     ) : (
                       symbolEarnings.map((sym, idx) => (
                         <tr key={idx} className="border-t border-gray-800 hover:bg-dark-700">
                           <td className="px-4 py-3 text-white text-sm font-medium">{sym.symbol}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(sym.commission)}</td>
+                          <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(sym.spread)}</td>
                           <td className="px-4 py-3 text-right text-white font-mono text-sm">{formatCurrency(sym.swap)}</td>
                           <td className="px-4 py-3 text-right text-green-500 font-mono text-sm font-semibold">{formatCurrency(sym.total)}</td>
                           <td className="px-4 py-3 text-right text-gray-400 text-sm">{sym.trades}</td>

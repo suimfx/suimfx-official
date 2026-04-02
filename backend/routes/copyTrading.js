@@ -6,7 +6,10 @@ import CopyCommission from '../models/CopyCommission.js'
 import CopySettings from '../models/CopySettings.js'
 import TradingAccount from '../models/TradingAccount.js'
 import Trade from '../models/Trade.js'
+import User from '../models/User.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
+import { verifyAdminToken } from '../middleware/rbac.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
@@ -84,13 +87,24 @@ router.post('/master/apply', async (req, res) => {
   }
 })
 
-// GET /api/copy/masters - Get all active public masters
+// GET /api/copy/masters - Get all active public masters (filtered by admin)
 router.get('/masters', async (req, res) => {
   try {
-    const masters = await MasterTrader.find({
-      status: 'ACTIVE',
-      visibility: 'PUBLIC'
-    })
+    const { adminId } = req.query
+    let masterQuery = { status: 'ACTIVE', visibility: 'PUBLIC' }
+
+    // Filter masters to only show those belonging to users under the same admin
+    if (adminId) {
+      const adminUsers = await User.find({ assignedAdmin: adminId }).select('_id')
+      const adminUserIds = adminUsers.map(u => u._id)
+      masterQuery.userId = { $in: adminUserIds }
+    } else {
+      // No admin specified - show masters from unassigned users only
+      const unassignedUsers = await User.find({ $or: [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }] }).select('_id')
+      masterQuery.userId = { $in: unassignedUsers.map(u => u._id) }
+    }
+
+    const masters = await MasterTrader.find(masterQuery)
       .populate('userId', 'firstName lastName')
       .select('-pendingCommission -totalCommissionEarned -totalCommissionWithdrawn')
       .sort({ 'stats.totalFollowers': -1 })
@@ -174,6 +188,17 @@ router.post('/follow', async (req, res) => {
       return res.status(400).json({ 
         message: 'You cannot follow your own master account. This would cause duplicate trades when you trade.' 
       })
+    }
+
+    // Admin isolation: ensure follower and master belong to the same admin
+    const followerUser = await User.findById(followerUserId).select('assignedAdmin')
+    const masterUser = await User.findById(master.userId).select('assignedAdmin')
+    if (followerUser && masterUser) {
+      const followerAdmin = followerUser.assignedAdmin?.toString() || null
+      const masterAdmin = masterUser.assignedAdmin?.toString() || null
+      if (followerAdmin !== masterAdmin) {
+        return res.status(400).json({ message: 'Cannot follow a master from a different platform' })
+      }
     }
 
     // Check follower limit
@@ -501,9 +526,12 @@ router.get('/my-followers/:masterId', async (req, res) => {
 // ==================== ADMIN ROUTES ====================
 
 // GET /api/copy/admin/applications - Get pending master applications
-router.get('/admin/applications', async (req, res) => {
+router.get('/admin/applications', verifyAdminToken, async (req, res) => {
   try {
-    const applications = await MasterTrader.find({ status: 'PENDING' })
+    let appQuery = { status: 'PENDING' }
+    const appUserIds = await getAdminUserIds(req.admin)
+    if (appUserIds) appQuery.userId = { $in: appUserIds }
+    const applications = await MasterTrader.find(appQuery)
       .populate('userId', 'firstName lastName email')
       .populate('tradingAccountId', 'accountId balance')
       .sort({ createdAt: -1 })
@@ -515,7 +543,7 @@ router.get('/admin/applications', async (req, res) => {
 })
 
 // PUT /api/copy/admin/approve/:id - Approve master application
-router.put('/admin/approve/:id', async (req, res) => {
+router.put('/admin/approve/:id', verifyAdminToken, async (req, res) => {
   try {
     const { adminId, approvedCommissionPercentage, visibility, adminSharePercentage } = req.body
 
@@ -543,7 +571,7 @@ router.put('/admin/approve/:id', async (req, res) => {
 })
 
 // PUT /api/copy/admin/reject/:id - Reject master application
-router.put('/admin/reject/:id', async (req, res) => {
+router.put('/admin/reject/:id', verifyAdminToken, async (req, res) => {
   try {
     const { adminId, rejectionReason } = req.body
 
@@ -565,7 +593,7 @@ router.put('/admin/reject/:id', async (req, res) => {
 })
 
 // PUT /api/copy/admin/suspend/:id - Suspend master
-router.put('/admin/suspend/:id', async (req, res) => {
+router.put('/admin/suspend/:id', verifyAdminToken, async (req, res) => {
   try {
     const { adminId, reason, currentPrices } = req.body
 
@@ -594,9 +622,12 @@ router.put('/admin/suspend/:id', async (req, res) => {
 })
 
 // GET /api/copy/admin/masters - Get all masters (admin view)
-router.get('/admin/masters', async (req, res) => {
+router.get('/admin/masters', verifyAdminToken, async (req, res) => {
   try {
-    const masters = await MasterTrader.find()
+    let masterQuery = {}
+    const masterUserIds = await getAdminUserIds(req.admin)
+    if (masterUserIds) masterQuery.userId = { $in: masterUserIds }
+    const masters = await MasterTrader.find(masterQuery)
       .populate('userId', 'firstName lastName email')
       .populate('tradingAccountId', 'accountId balance')
       .sort({ createdAt: -1 })
@@ -608,9 +639,12 @@ router.get('/admin/masters', async (req, res) => {
 })
 
 // GET /api/copy/admin/followers - Get all followers (admin view)
-router.get('/admin/followers', async (req, res) => {
+router.get('/admin/followers', verifyAdminToken, async (req, res) => {
   try {
-    const followers = await CopyFollower.find()
+    let followerQuery = {}
+    const followerUserIds = await getAdminUserIds(req.admin)
+    if (followerUserIds) followerQuery.followerId = { $in: followerUserIds }
+    const followers = await CopyFollower.find(followerQuery)
       .populate('followerId', 'firstName lastName email')
       .populate('masterId', 'displayName')
       .populate('followerAccountId', 'accountId balance')
@@ -623,13 +657,17 @@ router.get('/admin/followers', async (req, res) => {
 })
 
 // GET /api/copy/admin/commissions - Get commission records
-router.get('/admin/commissions', async (req, res) => {
+router.get('/admin/commissions', verifyAdminToken, async (req, res) => {
   try {
     const { status, tradingDay, limit = 100 } = req.query
 
     const query = {}
     if (status) query.status = status
     if (tradingDay) query.tradingDay = tradingDay
+    
+    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
+    const commUserIds = await getAdminUserIds(req.admin)
+    if (commUserIds) query.masterUserId = { $in: commUserIds }
 
     const commissions = await CopyCommission.find(query)
       .populate('masterId', 'displayName')
@@ -660,7 +698,7 @@ router.get('/admin/commissions', async (req, res) => {
 })
 
 // POST /api/copy/admin/calculate-daily-commission - Trigger daily commission calculation
-router.post('/admin/calculate-daily-commission', async (req, res) => {
+router.post('/admin/calculate-daily-commission', verifyAdminToken, async (req, res) => {
   try {
     const { tradingDay } = req.body
     const results = await copyTradingEngine.calculateDailyCommission(tradingDay)
@@ -676,7 +714,7 @@ router.post('/admin/calculate-daily-commission', async (req, res) => {
 })
 
 // GET /api/copy/admin/settings - Get copy trading settings
-router.get('/admin/settings', async (req, res) => {
+router.get('/admin/settings', verifyAdminToken, async (req, res) => {
   try {
     const settings = await CopySettings.getSettings()
     res.json({ settings })
@@ -686,7 +724,7 @@ router.get('/admin/settings', async (req, res) => {
 })
 
 // PUT /api/copy/admin/settings - Update copy trading settings
-router.put('/admin/settings', async (req, res) => {
+router.put('/admin/settings', verifyAdminToken, async (req, res) => {
   try {
     const settings = await CopySettings.getSettings()
     
@@ -708,9 +746,22 @@ router.put('/admin/settings', async (req, res) => {
 })
 
 // GET /api/copy/admin/dashboard - Get admin dashboard stats
-router.get('/admin/dashboard', async (req, res) => {
+router.get('/admin/dashboard', verifyAdminToken, async (req, res) => {
   try {
     const settings = await CopySettings.getSettings()
+    
+    let masterFilter = {}
+    let followerFilter = {}
+    let tradeFilter = {}
+    let commissionMatch = {}
+    
+    const dashIds = await getAdminUserIds(req.admin)
+    if (dashIds) {
+      masterFilter.userId = { $in: dashIds }
+      followerFilter.followerId = { $in: dashIds }
+      tradeFilter.followerId = { $in: dashIds }
+      commissionMatch.masterUserId = { $in: dashIds }
+    }
 
     const [
       totalMasters,
@@ -721,19 +772,19 @@ router.get('/admin/dashboard', async (req, res) => {
       totalCopyTrades,
       openCopyTrades
     ] = await Promise.all([
-      MasterTrader.countDocuments(),
-      MasterTrader.countDocuments({ status: 'ACTIVE' }),
-      MasterTrader.countDocuments({ status: 'PENDING' }),
-      CopyFollower.countDocuments(),
-      CopyFollower.countDocuments({ status: 'ACTIVE' }),
-      CopyTrade.countDocuments(),
-      CopyTrade.countDocuments({ status: 'OPEN' })
+      MasterTrader.countDocuments(masterFilter),
+      MasterTrader.countDocuments({ ...masterFilter, status: 'ACTIVE' }),
+      MasterTrader.countDocuments({ ...masterFilter, status: 'PENDING' }),
+      CopyFollower.countDocuments(followerFilter),
+      CopyFollower.countDocuments({ ...followerFilter, status: 'ACTIVE' }),
+      CopyTrade.countDocuments(tradeFilter),
+      CopyTrade.countDocuments({ ...tradeFilter, status: 'OPEN' })
     ])
 
     // Today's stats
     const today = new Date().toISOString().split('T')[0]
     const todayCommissions = await CopyCommission.aggregate([
-      { $match: { tradingDay: today } },
+      { $match: { tradingDay: today, ...commissionMatch } },
       {
         $group: {
           _id: null,

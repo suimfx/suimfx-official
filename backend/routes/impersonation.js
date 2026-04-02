@@ -8,22 +8,56 @@ const router = express.Router()
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
 
-// Middleware to verify admin token
+// Middleware to verify admin JWT (same payload shape as /api/admin-mgmt/login: adminId, or legacy id)
 const verifyAdminToken = async (req, res, next) => {
   const authHeader = req.headers.authorization
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, message: 'No token provided' })
   }
-  
-  const token = authHeader.split(' ')[1]
+
+  const token = authHeader.slice(7).trim()
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'No token provided' })
+  }
+
+  let decoded
   try {
-    const decoded = jwt.verify(token, getJwtSecret())
-    req.admin = await Admin.findById(decoded.adminId)
-    req.originalAdminId = decoded.originalAdminId || decoded.adminId
-    next()
+    decoded = jwt.verify(token, getJwtSecret())
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Session expired. Please login again.' })
+    }
     return res.status(401).json({ success: false, message: 'Invalid token' })
   }
+
+  // Employee-only JWT has no admin id
+  if (decoded.employeeId && !decoded.adminId && !decoded.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Use Super Admin login at /admin for impersonation.'
+    })
+  }
+
+  const adminId = decoded.adminId || decoded.id
+  if (!adminId) {
+    return res.status(401).json({ success: false, message: 'Invalid admin token' })
+  }
+
+  let adminDoc
+  try {
+    adminDoc = await Admin.findById(String(adminId))
+  } catch (error) {
+    console.error('[impersonate] Admin.findById failed:', error.message)
+    return res.status(401).json({ success: false, message: 'Invalid token' })
+  }
+
+  if (!adminDoc) {
+    return res.status(401).json({ success: false, message: 'Admin not found' })
+  }
+
+  req.admin = adminDoc
+  req.originalAdminId = decoded.originalAdminId || adminDoc._id
+  next()
 }
 
 // POST /api/impersonate/admin/:adminId - Super Admin impersonates Admin
@@ -72,6 +106,11 @@ router.post('/admin/:adminId', verifyAdminToken, async (req, res) => {
         firstName: targetAdmin.firstName,
         lastName: targetAdmin.lastName,
         role: targetAdmin.role,
+        referralCode: targetAdmin.referralCode,
+        urlSlug: targetAdmin.urlSlug,
+        brandName: targetAdmin.brandName,
+        logo: targetAdmin.logo,
+        customDomain: targetAdmin.customDomain,
         sidebarPermissions: targetAdmin.sidebarPermissions,
         isImpersonating: true,
         originalAdminName: `${req.admin.firstName} ${req.admin.lastName}`

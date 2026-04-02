@@ -272,8 +272,10 @@ class TradeEngine {
       }
     }
 
-    // Get charges for this trade
-    const charges = await Charges.getChargesForTrade(userId, symbol, segment, account.accountTypeId?._id)
+    // Get charges for this trade (filtered by user's assigned admin)
+    const tradeUser = await User.findById(userId).select('assignedAdmin')
+    const userAdminId = tradeUser?.assignedAdmin || null
+    const charges = await Charges.getChargesForTrade(userId, symbol, segment, account.accountTypeId?._id, userAdminId)
     
     // Fallback to AccountType's spread/commission if no charges found
     if (charges.spreadValue === 0 && account.accountTypeId?.minSpread > 0) {
@@ -396,11 +398,14 @@ class TradeEngine {
     const closePrice = trade.side === 'BUY' ? currentBid : currentAsk
     
     // Get charges to check if commission on close is enabled
+    const closeUser = await User.findById(trade.userId).select('assignedAdmin')
+    const closeAdminId = closeUser?.assignedAdmin || null
     const charges = await Charges.getChargesForTrade(
       trade.userId, 
       trade.symbol, 
       trade.segment, 
-      trade.tradingAccountId?.accountTypeId?._id
+      trade.tradingAccountId?.accountTypeId?._id,
+      closeAdminId
     )
     
     // Calculate commission on close if enabled
@@ -824,11 +829,14 @@ class TradeEngine {
     })
 
     for (const trade of openTrades) {
+      const swapUser = await User.findById(trade.userId).select('assignedAdmin')
+      const swapAdminId = swapUser?.assignedAdmin || null
       const charges = await Charges.getChargesForTrade(
         trade.userId,
         trade.symbol,
         trade.segment,
-        trade.tradingAccountId?.accountTypeId?._id
+        trade.tradingAccountId?.accountTypeId?._id,
+        swapAdminId
       )
 
       const swapRate = trade.side === 'BUY' ? charges.swapLong : charges.swapShort

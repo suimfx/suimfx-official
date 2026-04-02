@@ -1,152 +1,166 @@
 import { useState, useEffect } from 'react'
 import AdminLayout from '../components/AdminLayout'
 import { 
-  Shield,
+  Users,
   Plus,
   Search,
-  Eye,
   Edit,
   Trash2,
   Key,
-  Mail,
   Calendar,
   X,
-  Wallet,
-  Users,
-  DollarSign,
-  Link,
-  Copy,
   Check,
   AlertCircle,
-  Lock
+  Lock,
+  UserCog,
+  Briefcase
 } from 'lucide-react'
 import { API_URL } from '../config/api'
 import { getAdminHeaders } from '../utils/adminApi'
 
+const ROLE_OPTIONS = ['SUPPORT', 'FINANCE', 'KYC_OFFICER', 'TRADE_MANAGER', 'MANAGER', 'CUSTOM']
+
+const ROLE_COLORS = {
+  SUPPORT: 'bg-blue-500/20 text-blue-500',
+  FINANCE: 'bg-green-500/20 text-green-500',
+  KYC_OFFICER: 'bg-yellow-500/20 text-yellow-500',
+  TRADE_MANAGER: 'bg-purple-500/20 text-purple-500',
+  MANAGER: 'bg-emerald-500/20 text-emerald-500',
+  CUSTOM: 'bg-gray-500/20 text-gray-400'
+}
+
+const PERMISSION_GROUPS = [
+  { title: 'Dashboard', keys: ['canViewDashboard'] },
+  { title: 'Users', keys: ['canViewUsers', 'canManageUsers', 'canCreateUsers', 'canEditUsers', 'canDeleteUsers'] },
+  { title: 'Accounts', keys: ['canViewAccounts', 'canManageAccounts', 'canCreateAccounts', 'canModifyLeverage'] },
+  { title: 'Trades', keys: ['canViewTrades', 'canManageTrades', 'canCloseTrades', 'canModifyTrades'] },
+  { title: 'Deposits', keys: ['canViewDeposits', 'canApproveDeposits', 'canRejectDeposits'] },
+  { title: 'Withdrawals', keys: ['canViewWithdrawals', 'canApproveWithdrawals', 'canRejectWithdrawals'] },
+  { title: 'KYC', keys: ['canViewKYC', 'canApproveKYC', 'canRejectKYC'] },
+  { title: 'IB', keys: ['canViewIB', 'canManageIB', 'canApproveIB'] },
+  { title: 'Copy Trading', keys: ['canViewCopyTrading', 'canManageCopyTrading', 'canApproveMasters'] },
+  { title: 'Prop Trading', keys: ['canViewPropTrading', 'canManagePropTrading'] },
+  { title: 'Support', keys: ['canViewSupport', 'canManageSupport', 'canReplySupport'] },
+  { title: 'Reports', keys: ['canViewReports', 'canExportReports'] },
+  { title: 'Settings', keys: ['canViewSettings', 'canManageSettings', 'canManagePaymentMethods', 'canManageCharges', 'canManageTheme', 'canManageEmailTemplates', 'canManageBanners', 'canManageBonus'] },
+]
+
+const formatPermKey = (key) => key.replace(/^can/, '').replace(/([A-Z])/g, ' $1').trim()
+
 const AdminManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [admins, setAdmins] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [roleTemplates, setRoleTemplates] = useState({})
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [showFundModal, setShowFundModal] = useState(false)
   const [showPermissionsModal, setShowPermissionsModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [selectedAdmin, setSelectedAdmin] = useState(null)
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [newPassword, setNewPassword] = useState('')
   
-  const [newAdmin, setNewAdmin] = useState({
+  const [newEmployee, setNewEmployee] = useState({
     email: '',
     password: '',
     firstName: '',
     lastName: '',
     phone: '',
-    sidebarPermissions: {
-      overviewDashboard: true
-    }
+    role: 'SUPPORT',
+    permissions: {}
   })
-  
-  const [fundAmount, setFundAmount] = useState('')
-  const [fundDescription, setFundDescription] = useState('')
-
-  // Sidebar permissions matching the image layout
-  const sidebarPermissions = [
-    { key: 'overviewDashboard', label: 'Overview Dashboard' },
-    { key: 'userManagement', label: 'User Management' },
-    { key: 'tradeManagement', label: 'Trade Management' },
-    { key: 'bookManagement', label: 'Book Management' },
-    { key: 'fundManagement', label: 'Fund Management' },
-    { key: 'bankSettings', label: 'Bank Settings' },
-    { key: 'ibManagement', label: 'IB Management' },
-    { key: 'forexCharges', label: 'Forex Charges' },
-    { key: 'earningsReport', label: 'Earnings Report' },
-    { key: 'copyTrade', label: 'Copy Trade' },
-    { key: 'propFirmChallenges', label: 'Prop Firm Challenges' },
-    { key: 'accountTypes', label: 'Account Types' },
-    { key: 'themeSettings', label: 'Theme Settings' },
-    { key: 'emailTemplates', label: 'Email Templates' },
-    { key: 'bonusManagement', label: 'Bonus Management' },
-    { key: 'adminManagement', label: 'Admin Management' },
-    { key: 'employeeManagement', label: 'Admin Management' },
-    { key: 'kycVerification', label: 'KYC Verification' },
-    { key: 'supportTickets', label: 'Support Tickets' },
-  ]
 
   useEffect(() => {
-    fetchAdmins()
+    fetchEmployees()
+    fetchRoleTemplates()
   }, [])
 
-  const fetchAdmins = async () => {
+  const fetchEmployees = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admins`, { headers: getAdminHeaders() })
+      const res = await fetch(`${API_URL}/employee-mgmt/employees`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
-        setAdmins(data.admins || [])
+        setEmployees(data.employees || [])
       }
     } catch (error) {
-      console.error('Error fetching admins:', error)
+      console.error('Error fetching employees:', error)
     }
     setLoading(false)
   }
 
-  const handleCreateAdmin = async () => {
+  const fetchRoleTemplates = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admins`, {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify(newAdmin)
-      })
+      const res = await fetch(`${API_URL}/employee-mgmt/role-templates`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.success) {
-        alert('Admin created successfully!')
-        setShowAddModal(false)
-        setNewAdmin({ email: '', password: '', firstName: '', lastName: '', phone: '', sidebarPermissions: { overviewDashboard: true } })
-        fetchAdmins()
-      } else {
-        alert(data.message || 'Failed to create admin')
+        setRoleTemplates(data.roleTemplates || {})
       }
     } catch (error) {
-      alert('Error creating admin')
+      console.error('Error fetching role templates:', error)
     }
   }
 
-  const handleUpdateAdmin = async () => {
+  const handleCreateEmployee = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admins/${selectedAdmin._id}`, {
+      const res = await fetch(`${API_URL}/employee-mgmt/employees`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify(newEmployee)
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert('Employee created successfully!')
+        setShowAddModal(false)
+        setNewEmployee({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'SUPPORT', permissions: {} })
+        fetchEmployees()
+      } else {
+        alert(data.message || 'Failed to create employee')
+      }
+    } catch (error) {
+      alert('Error creating employee')
+    }
+  }
+
+  const handleUpdateEmployee = async () => {
+    try {
+      const res = await fetch(`${API_URL}/employee-mgmt/employees/${selectedEmployee._id}`, {
         method: 'PUT',
         headers: getAdminHeaders(),
         body: JSON.stringify({
-          firstName: selectedAdmin.firstName,
-          lastName: selectedAdmin.lastName,
-          phone: selectedAdmin.phone,
-          status: selectedAdmin.status
+          firstName: selectedEmployee.firstName,
+          lastName: selectedEmployee.lastName,
+          phone: selectedEmployee.phone,
+          role: selectedEmployee.role,
+          status: selectedEmployee.status
         })
       })
       const data = await res.json()
       if (data.success) {
-        alert('Admin updated successfully!')
+        alert('Employee updated successfully!')
         setShowEditModal(false)
-        fetchAdmins()
+        fetchEmployees()
       } else {
-        alert(data.message || 'Failed to update admin')
+        alert(data.message || 'Failed to update employee')
       }
     } catch (error) {
-      alert('Error updating admin')
+      alert('Error updating employee')
     }
   }
 
   const handleUpdatePermissions = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admins/${selectedAdmin._id}/permissions`, {
+      const res = await fetch(`${API_URL}/employee-mgmt/employees/${selectedEmployee._id}/permissions`, {
         method: 'PUT',
         headers: getAdminHeaders(),
-        body: JSON.stringify({ sidebarPermissions: selectedAdmin.sidebarPermissions })
+        body: JSON.stringify({ 
+          permissions: selectedEmployee.permissions,
+          role: selectedEmployee.role
+        })
       })
       const data = await res.json()
       if (data.success) {
         alert('Permissions updated successfully!')
         setShowPermissionsModal(false)
-        fetchAdmins()
+        fetchEmployees()
       } else {
         alert(data.message || 'Failed to update permissions')
       }
@@ -155,65 +169,37 @@ const AdminManagement = () => {
     }
   }
 
-  const handleFundAdmin = async () => {
+  const handleToggleStatus = async (emp) => {
+    const newStatus = emp.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/wallet/fund`, {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({
-          adminId: selectedAdmin._id,
-          amount: parseFloat(fundAmount),
-          description: fundDescription
-        })
-      })
-      const data = await res.json()
-      if (data.success) {
-        alert(data.message)
-        setShowFundModal(false)
-        setFundAmount('')
-        setFundDescription('')
-        fetchAdmins()
-      } else {
-        alert(data.message || 'Failed to fund admin')
-      }
-    } catch (error) {
-      alert('Error funding admin')
-    }
-  }
-
-  const handleToggleStatus = async (admin) => {
-    const newStatus = admin.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
-    try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admins/${admin._id}/status`, {
+      const res = await fetch(`${API_URL}/employee-mgmt/employees/${emp._id}/status`, {
         method: 'PUT',
         headers: getAdminHeaders(),
         body: JSON.stringify({ status: newStatus })
       })
       const data = await res.json()
-      if (data.success) {
-        fetchAdmins()
-      }
+      if (data.success) fetchEmployees()
     } catch (error) {
       alert('Error updating status')
     }
   }
 
-  const handleDeleteAdmin = async (admin) => {
-    if (!confirm(`Are you sure you want to delete ${admin.firstName} ${admin.lastName}?`)) return
+  const handleDeleteEmployee = async (emp) => {
+    if (!confirm(`Are you sure you want to delete ${emp.firstName} ${emp.lastName}?`)) return
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admins/${admin._id}`, {
+      const res = await fetch(`${API_URL}/employee-mgmt/employees/${emp._id}`, {
         method: 'DELETE',
         headers: getAdminHeaders()
       })
       const data = await res.json()
       if (data.success) {
-        alert('Admin deleted successfully!')
-        fetchAdmins()
+        alert('Employee deleted successfully!')
+        fetchEmployees()
       } else {
-        alert(data.message || 'Failed to delete admin')
+        alert(data.message || 'Failed to delete employee')
       }
     } catch (error) {
-      alert('Error deleting admin')
+      alert('Error deleting employee')
     }
   }
 
@@ -223,7 +209,7 @@ const AdminManagement = () => {
       return
     }
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admins/${selectedAdmin._id}/reset-password`, {
+      const res = await fetch(`${API_URL}/employee-mgmt/employees/${selectedEmployee._id}/password`, {
         method: 'PUT',
         headers: getAdminHeaders(),
         body: JSON.stringify({ newPassword })
@@ -241,48 +227,30 @@ const AdminManagement = () => {
     }
   }
 
-  const selectAllPermissions = () => {
-    const allSelected = {}
-    sidebarPermissions.forEach(p => allSelected[p.key] = true)
-    if (showAddModal) {
-      setNewAdmin({ ...newAdmin, sidebarPermissions: allSelected })
-    } else if (selectedAdmin) {
-      setSelectedAdmin({ ...selectedAdmin, sidebarPermissions: allSelected })
-    }
+  const getPermissionCount = (perms) => {
+    if (!perms) return 0
+    return Object.values(perms).filter(v => v === true).length
   }
 
-  const deselectAllPermissions = () => {
-    const noneSelected = { overviewDashboard: true } // Dashboard always enabled
-    if (showAddModal) {
-      setNewAdmin({ ...newAdmin, sidebarPermissions: noneSelected })
-    } else if (selectedAdmin) {
-      setSelectedAdmin({ ...selectedAdmin, sidebarPermissions: noneSelected })
-    }
-  }
-
-  const filteredAdmins = admins.filter(admin => 
-    admin.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    admin.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    admin.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredEmployees = employees.filter(emp => 
+    emp.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.role?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const getPermissionCount = (sidebarPerms) => {
-    if (!sidebarPerms) return 0
-    return Object.values(sidebarPerms).filter(v => v === true).length
-  }
-
   return (
-    <AdminLayout title="Admin Management" subtitle="Manage admins and their sidebar permissions">
+    <AdminLayout title="Employee Management" subtitle="Manage employees and their permissions">
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-              <Shield size={20} className="text-blue-500" />
+              <Users size={20} className="text-blue-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Total Admins</p>
-              <p className="text-white text-xl font-bold">{admins.length}</p>
+              <p className="text-gray-500 text-sm">Total Employees</p>
+              <p className="text-white text-xl font-bold">{employees.length}</p>
             </div>
           </div>
         </div>
@@ -292,30 +260,30 @@ const AdminManagement = () => {
               <Check size={20} className="text-green-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Active Admins</p>
-              <p className="text-white text-xl font-bold">{admins.filter(a => a.status === 'ACTIVE').length}</p>
+              <p className="text-gray-500 text-sm">Active</p>
+              <p className="text-white text-xl font-bold">{employees.filter(a => a.status === 'ACTIVE').length}</p>
             </div>
           </div>
         </div>
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-              <Users size={20} className="text-red-500" />
+              <AlertCircle size={20} className="text-red-500" />
             </div>
             <div>
               <p className="text-gray-500 text-sm">Suspended</p>
-              <p className="text-white text-xl font-bold">{admins.filter(a => a.status === 'SUSPENDED').length}</p>
+              <p className="text-white text-xl font-bold">{employees.filter(a => a.status === 'SUSPENDED').length}</p>
             </div>
           </div>
         </div>
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-              <Key size={20} className="text-purple-500" />
+              <Briefcase size={20} className="text-purple-500" />
             </div>
             <div>
-              <p className="text-gray-500 text-sm">Avg Permissions</p>
-              <p className="text-white text-xl font-bold">{admins.length ? Math.round(admins.reduce((sum, a) => sum + getPermissionCount(a.sidebarPermissions), 0) / admins.length) : 0}</p>
+              <p className="text-gray-500 text-sm">Roles</p>
+              <p className="text-white text-xl font-bold">{[...new Set(employees.map(e => e.role))].length}</p>
             </div>
           </div>
         </div>
@@ -324,13 +292,13 @@ const AdminManagement = () => {
       {/* Employee List */}
       <div className="bg-dark-800 rounded-xl border border-gray-800 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 border-b border-gray-800">
-          <h2 className="text-white font-semibold text-lg">Admins</h2>
+          <h2 className="text-white font-semibold text-lg">Employees</h2>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 type="text"
-                placeholder="Search admins..."
+                placeholder="Search employees..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full sm:w-64 bg-dark-700 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
@@ -341,72 +309,72 @@ const AdminManagement = () => {
               className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
             >
               <Plus size={16} />
-              <span>Add Admin</span>
+              <span>Add Employee</span>
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading admins...</div>
-        ) : filteredAdmins.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">Loading employees...</div>
+        ) : filteredEmployees.length === 0 ? (
           <div className="p-8 text-center">
-            <Shield size={48} className="mx-auto text-gray-600 mb-4" />
-            <p className="text-gray-500">No admins found</p>
-            <p className="text-gray-600 text-sm mt-1">Create your first admin to get started</p>
+            <UserCog size={48} className="mx-auto text-gray-600 mb-4" />
+            <p className="text-gray-500">No employees found</p>
+            <p className="text-gray-600 text-sm mt-1">Create your first employee to get started</p>
           </div>
         ) : (
           <>
             {/* Mobile Card View */}
             <div className="block lg:hidden p-4 space-y-3">
-              {filteredAdmins.map((admin) => (
-                <div key={admin._id} className="bg-dark-700 rounded-xl p-4 border border-gray-700">
+              {filteredEmployees.map((emp) => (
+                <div key={emp._id} className="bg-dark-700 rounded-xl p-4 border border-gray-700">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                        <span className="text-blue-500 font-bold">{admin.firstName?.charAt(0)}</span>
+                        <span className="text-blue-500 font-bold">{emp.firstName?.charAt(0)}</span>
                       </div>
                       <div>
-                        <p className="text-white font-medium">{admin.firstName} {admin.lastName}</p>
-                        <p className="text-gray-500 text-sm">{admin.email}</p>
+                        <p className="text-white font-medium">{emp.firstName} {emp.lastName}</p>
+                        <p className="text-gray-500 text-sm">{emp.email}</p>
                       </div>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs ${
-                      admin.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
+                      emp.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
                     }`}>
-                      {admin.status}
+                      {emp.status}
                     </span>
                   </div>
                   <div className="space-y-2 text-sm mb-3">
                     <div className="flex items-center gap-2 text-gray-400">
-                      <Key size={14} />
-                      <span>{getPermissionCount(admin.sidebarPermissions)} permissions</span>
+                      <Briefcase size={14} />
+                      <span className={`px-2 py-0.5 rounded text-xs ${ROLE_COLORS[emp.role] || ROLE_COLORS.CUSTOM}`}>{emp.role}</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-400">
-                      <Calendar size={14} />
-                      <span>Joined: {new Date(admin.createdAt).toLocaleDateString()}</span>
+                      <Key size={14} />
+                      <span>{getPermissionCount(emp.permissions)} permissions</span>
                     </div>
                   </div>
                   <div className="grid grid-cols-4 gap-2 pt-3 border-t border-gray-600">
                     <button 
-                      onClick={() => { setSelectedAdmin({...admin}); setShowPermissionsModal(true) }}
+                      onClick={() => { setSelectedEmployee({...emp}); setShowPermissionsModal(true) }}
                       className="flex items-center justify-center gap-1 py-2 bg-purple-500/20 text-purple-500 rounded-lg text-xs"
                     >
                       <Key size={14} />
                     </button>
                     <button 
-                      onClick={() => { setSelectedAdmin(admin); setShowPasswordModal(true) }}
+                      onClick={() => { setSelectedEmployee(emp); setShowPasswordModal(true) }}
                       className="flex items-center justify-center gap-1 py-2 bg-yellow-500/20 text-yellow-500 rounded-lg text-xs"
                     >
                       <Lock size={14} />
                     </button>
                     <button 
-                      onClick={() => { setSelectedAdmin({...admin}); setShowEditModal(true) }}
+                      onClick={() => { setSelectedEmployee({...emp}); setShowEditModal(true) }}
                       className="flex items-center justify-center gap-1 py-2 bg-blue-500/20 text-blue-500 rounded-lg text-xs"
                     >
                       <Edit size={14} />
                     </button>
                     <button 
-                      onClick={() => handleDeleteAdmin(admin)}
+                      onClick={() => handleDeleteEmployee(emp)}
                       className="flex items-center justify-center gap-1 py-2 bg-red-500/20 text-red-500 rounded-lg text-xs"
                     >
                       <Trash2 size={14} />
@@ -421,68 +389,72 @@ const AdminManagement = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-700">
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Admin</th>
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Permissions</th>
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Joined</th>
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Status</th>
-                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">Actions</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">EMPLOYEE</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">ROLE</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">PERMISSIONS</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">JOINED</th>
+                    <th className="text-left text-gray-500 text-sm font-medium py-3 px-4">STATUS</th>
+                    <th className="text-right text-gray-500 text-sm font-medium py-3 px-4">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAdmins.map((admin) => (
-                    <tr key={admin._id} className="border-b border-gray-800 hover:bg-dark-700/50">
+                  {filteredEmployees.map((emp) => (
+                    <tr key={emp._id} className="border-b border-gray-800 hover:bg-dark-700/50">
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                            <span className="text-blue-500 font-bold">{admin.firstName?.charAt(0)}</span>
+                            <span className="text-blue-500 font-bold">{emp.firstName?.charAt(0)}</span>
                           </div>
                           <div>
-                            <p className="text-white font-medium">{admin.firstName} {admin.lastName}</p>
-                            <p className="text-gray-500 text-sm">{admin.email}</p>
+                            <p className="text-white font-medium">{emp.firstName} {emp.lastName}</p>
+                            <p className="text-gray-500 text-sm">{emp.email}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <span className="text-gray-400">{getPermissionCount(admin.sidebarPermissions)} / {sidebarPermissions.length}</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${ROLE_COLORS[emp.role] || ROLE_COLORS.CUSTOM}`}>{emp.role}</span>
                       </td>
                       <td className="py-4 px-4">
-                        <span className="text-gray-400">{new Date(admin.createdAt).toLocaleDateString()}</span>
+                        <span className="text-gray-400">{getPermissionCount(emp.permissions)}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-gray-400">{new Date(emp.createdAt).toLocaleDateString()}</span>
                       </td>
                       <td className="py-4 px-4">
                         <button
-                          onClick={() => handleToggleStatus(admin)}
+                          onClick={() => handleToggleStatus(emp)}
                           className={`px-3 py-1 rounded-full text-xs ${
-                            admin.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
+                            emp.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
                           }`}
                         >
-                          {admin.status}
+                          {emp.status}
                         </button>
                       </td>
                       <td className="py-4 px-4">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center justify-end gap-1">
                           <button 
-                            onClick={() => { setSelectedAdmin({...admin}); setShowPermissionsModal(true) }}
+                            onClick={() => { setSelectedEmployee({...emp}); setShowPermissionsModal(true) }}
                             className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-purple-500"
                             title="Permissions"
                           >
                             <Key size={16} />
                           </button>
                           <button 
-                            onClick={() => { setSelectedAdmin(admin); setShowPasswordModal(true) }}
+                            onClick={() => { setSelectedEmployee(emp); setShowPasswordModal(true) }}
                             className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-yellow-500"
                             title="Reset Password"
                           >
                             <Lock size={16} />
                           </button>
                           <button 
-                            onClick={() => { setSelectedAdmin({...admin}); setShowEditModal(true) }}
+                            onClick={() => { setSelectedEmployee({...emp}); setShowEditModal(true) }}
                             className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-blue-500"
                             title="Edit"
                           >
                             <Edit size={16} />
                           </button>
                           <button 
-                            onClick={() => handleDeleteAdmin(admin)}
+                            onClick={() => handleDeleteEmployee(emp)}
                             className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-gray-400 hover:text-red-500"
                             title="Delete"
                           >
@@ -502,9 +474,9 @@ const AdminManagement = () => {
       {/* Add Employee Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-dark-800 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">Create New Admin</h3>
+              <h3 className="text-white font-semibold text-lg">Create New Employee</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
@@ -515,18 +487,18 @@ const AdminManagement = () => {
                   <label className="text-gray-400 text-sm mb-1 block">First Name *</label>
                   <input
                     type="text"
-                    value={newAdmin.firstName}
-                    onChange={(e) => setNewAdmin({...newAdmin, firstName: e.target.value})}
+                    value={newEmployee.firstName}
+                    onChange={(e) => setNewEmployee({...newEmployee, firstName: e.target.value})}
                     className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                     placeholder="John"
                   />
                 </div>
                 <div>
-                  <label className="text-gray-400 text-sm mb-1 block">Last Name *</label>
+                  <label className="text-gray-400 text-sm mb-1 block">Last Name</label>
                   <input
                     type="text"
-                    value={newAdmin.lastName}
-                    onChange={(e) => setNewAdmin({...newAdmin, lastName: e.target.value})}
+                    value={newEmployee.lastName}
+                    onChange={(e) => setNewEmployee({...newEmployee, lastName: e.target.value})}
                     className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                     placeholder="Doe"
                   />
@@ -536,18 +508,18 @@ const AdminManagement = () => {
                 <label className="text-gray-400 text-sm mb-1 block">Email *</label>
                 <input
                   type="email"
-                  value={newAdmin.email}
-                  onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
+                  value={newEmployee.email}
+                  onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
                   className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
-                  placeholder="admin@example.com"
+                  placeholder="employee@example.com"
                 />
               </div>
               <div>
                 <label className="text-gray-400 text-sm mb-1 block">Password *</label>
                 <input
                   type="password"
-                  value={newAdmin.password}
-                  onChange={(e) => setNewAdmin({...newAdmin, password: e.target.value})}
+                  value={newEmployee.password}
+                  onChange={(e) => setNewEmployee({...newEmployee, password: e.target.value})}
                   className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   placeholder="••••••••"
                 />
@@ -556,54 +528,24 @@ const AdminManagement = () => {
                 <label className="text-gray-400 text-sm mb-1 block">Phone</label>
                 <input
                   type="text"
-                  value={newAdmin.phone}
-                  onChange={(e) => setNewAdmin({...newAdmin, phone: e.target.value})}
+                  value={newEmployee.phone}
+                  onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
                   className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   placeholder="+1234567890"
                 />
               </div>
-              
-              {/* Sidebar Permissions */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-gray-400 text-sm">Sidebar Permissions</label>
-                  <div className="flex gap-2 text-sm">
-                    <button 
-                      type="button"
-                      onClick={selectAllPermissions}
-                      className="text-blue-500 hover:text-blue-400"
-                    >
-                      Select All
-                    </button>
-                    <span className="text-gray-600">|</span>
-                    <button 
-                      type="button"
-                      onClick={deselectAllPermissions}
-                      className="text-gray-400 hover:text-gray-300"
-                    >
-                      Deselect All
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 bg-dark-700 rounded-lg p-4">
-                  {sidebarPermissions.map(perm => (
-                    <label key={perm.key} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newAdmin.sidebarPermissions?.[perm.key] || false}
-                        onChange={(e) => setNewAdmin({
-                          ...newAdmin,
-                          sidebarPermissions: {...newAdmin.sidebarPermissions, [perm.key]: e.target.checked}
-                        })}
-                        disabled={perm.key === 'overviewDashboard'}
-                        className="rounded bg-dark-600 border-gray-600 text-blue-500 focus:ring-blue-500"
-                      />
-                      <span className={`${perm.key === 'overviewDashboard' ? 'text-gray-500' : 'text-gray-300'}`}>
-                        {perm.label}
-                      </span>
-                    </label>
+                <label className="text-gray-400 text-sm mb-1 block">Role *</label>
+                <select
+                  value={newEmployee.role}
+                  onChange={(e) => setNewEmployee({...newEmployee, role: e.target.value})}
+                  className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                >
+                  {ROLE_OPTIONS.map(role => (
+                    <option key={role} value={role}>{role.replace(/_/g, ' ')}</option>
                   ))}
-                </div>
+                </select>
+                <p className="text-gray-500 text-xs mt-1">Permissions will be auto-assigned based on role template (except CUSTOM)</p>
               </div>
             </div>
             <div className="flex gap-3 p-5 border-t border-gray-700">
@@ -614,10 +556,10 @@ const AdminManagement = () => {
                 Cancel
               </button>
               <button
-                onClick={handleCreateAdmin}
+                onClick={handleCreateEmployee}
                 className="flex-1 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
               >
-                Create Admin
+                Create Employee
               </button>
             </div>
           </div>
@@ -625,11 +567,11 @@ const AdminManagement = () => {
       )}
 
       {/* Edit Employee Modal */}
-      {showEditModal && selectedAdmin && (
+      {showEditModal && selectedEmployee && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-800 rounded-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">Edit Admin</h3>
+              <h3 className="text-white font-semibold text-lg">Edit Employee</h3>
               <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
@@ -640,8 +582,8 @@ const AdminManagement = () => {
                   <label className="text-gray-400 text-sm mb-1 block">First Name</label>
                   <input
                     type="text"
-                    value={selectedAdmin.firstName}
-                    onChange={(e) => setSelectedAdmin({...selectedAdmin, firstName: e.target.value})}
+                    value={selectedEmployee.firstName}
+                    onChange={(e) => setSelectedEmployee({...selectedEmployee, firstName: e.target.value})}
                     className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
                 </div>
@@ -649,8 +591,8 @@ const AdminManagement = () => {
                   <label className="text-gray-400 text-sm mb-1 block">Last Name</label>
                   <input
                     type="text"
-                    value={selectedAdmin.lastName}
-                    onChange={(e) => setSelectedAdmin({...selectedAdmin, lastName: e.target.value})}
+                    value={selectedEmployee.lastName || ''}
+                    onChange={(e) => setSelectedEmployee({...selectedEmployee, lastName: e.target.value})}
                     className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
                 </div>
@@ -659,21 +601,33 @@ const AdminManagement = () => {
                 <label className="text-gray-400 text-sm mb-1 block">Phone</label>
                 <input
                   type="text"
-                  value={selectedAdmin.phone || ''}
-                  onChange={(e) => setSelectedAdmin({...selectedAdmin, phone: e.target.value})}
+                  value={selectedEmployee.phone || ''}
+                  onChange={(e) => setSelectedEmployee({...selectedEmployee, phone: e.target.value})}
                   className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
               <div>
+                <label className="text-gray-400 text-sm mb-1 block">Role</label>
+                <select
+                  value={selectedEmployee.role}
+                  onChange={(e) => setSelectedEmployee({...selectedEmployee, role: e.target.value})}
+                  className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                >
+                  {ROLE_OPTIONS.map(role => (
+                    <option key={role} value={role}>{role.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="text-gray-400 text-sm mb-1 block">Status</label>
                 <select
-                  value={selectedAdmin.status}
-                  onChange={(e) => setSelectedAdmin({...selectedAdmin, status: e.target.value})}
+                  value={selectedEmployee.status}
+                  onChange={(e) => setSelectedEmployee({...selectedEmployee, status: e.target.value})}
                   className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="ACTIVE">Active</option>
                   <option value="SUSPENDED">Suspended</option>
-                  <option value="PENDING">Pending</option>
+                  <option value="INACTIVE">Inactive</option>
                 </select>
               </div>
             </div>
@@ -685,7 +639,7 @@ const AdminManagement = () => {
                 Cancel
               </button>
               <button
-                onClick={handleUpdateAdmin}
+                onClick={handleUpdateEmployee}
                 className="flex-1 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
               >
                 Save Changes
@@ -695,113 +649,63 @@ const AdminManagement = () => {
         </div>
       )}
 
-      {/* Fund Admin Modal */}
-      {showFundModal && selectedAdmin && (
+      {/* Permissions Modal */}
+      {showPermissionsModal && selectedEmployee && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-800 rounded-xl w-full max-w-md">
+          <div className="bg-dark-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">Fund Admin Wallet</h3>
-              <button onClick={() => setShowFundModal(false)} className="text-gray-400 hover:text-white">
+              <div>
+                <h3 className="text-white font-semibold text-lg">Employee Permissions</h3>
+                <p className="text-gray-500 text-sm mt-1">{selectedEmployee.firstName} {selectedEmployee.lastName} — <span className={`px-2 py-0.5 rounded text-xs ${ROLE_COLORS[selectedEmployee.role] || ROLE_COLORS.CUSTOM}`}>{selectedEmployee.role}</span></p>
+              </div>
+              <button onClick={() => setShowPermissionsModal(false)} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="bg-dark-700 rounded-lg p-4">
-                <p className="text-gray-400 text-sm">Admin</p>
-                <p className="text-white font-medium">{selectedAdmin.firstName} {selectedAdmin.lastName}</p>
-                <p className="text-gray-500 text-sm">{selectedAdmin.email}</p>
-              </div>
-              <div className="bg-dark-700 rounded-lg p-4">
-                <p className="text-gray-400 text-sm">Current Balance</p>
-                <p className="text-green-500 text-2xl font-bold">${selectedAdmin.walletBalance?.toLocaleString() || 0}</p>
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Amount to Add ($)</label>
-                <input
-                  type="number"
-                  value={fundAmount}
-                  onChange={(e) => setFundAmount(e.target.value)}
-                  className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
-                  placeholder="1000"
-                  min="0"
-                />
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm mb-1 block">Description (optional)</label>
-                <input
-                  type="text"
-                  value={fundDescription}
-                  onChange={(e) => setFundDescription(e.target.value)}
-                  className="w-full bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
-                  placeholder="Monthly allocation"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 p-5 border-t border-gray-700">
-              <button
-                onClick={() => setShowFundModal(false)}
-                className="flex-1 py-2 bg-dark-700 text-white rounded-lg hover:bg-dark-600"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleFundAdmin}
-                disabled={!fundAmount || parseFloat(fundAmount) <= 0}
-                className="flex-1 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 disabled:opacity-50"
-              >
-                Add Funds
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Permissions Modal */}
-      {showPermissionsModal && selectedAdmin && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h3 className="text-white font-semibold text-lg">Sidebar Permissions</h3>
-              <div className="flex items-center gap-4">
-                <div className="flex gap-2 text-sm">
-                  <button 
-                    type="button"
-                    onClick={selectAllPermissions}
-                    className="text-blue-500 hover:text-blue-400"
+              {/* Quick role apply */}
+              <div className="flex flex-wrap gap-2">
+                {ROLE_OPTIONS.filter(r => r !== 'CUSTOM').map(role => (
+                  <button
+                    key={role}
+                    onClick={() => {
+                      const tmpl = roleTemplates[role] || {}
+                      setSelectedEmployee({...selectedEmployee, role, permissions: {...selectedEmployee.permissions, ...Object.fromEntries(Object.keys(selectedEmployee.permissions || {}).map(k => [k, false])), ...tmpl}})
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                      selectedEmployee.role === role 
+                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/50' 
+                        : 'bg-dark-700 text-gray-400 border-gray-700 hover:border-gray-600'
+                    }`}
                   >
-                    Select All
+                    {role.replace(/_/g, ' ')}
                   </button>
-                  <span className="text-gray-600">|</span>
-                  <button 
-                    type="button"
-                    onClick={deselectAllPermissions}
-                    className="text-gray-400 hover:text-gray-300"
-                  >
-                    Deselect All
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="p-5">
-              <div className="grid grid-cols-2 gap-3 bg-dark-700 rounded-lg p-4">
-                {sidebarPermissions.map(perm => (
-                  <label key={perm.key} className="flex items-center gap-3 text-sm cursor-pointer py-1">
-                    <input
-                      type="checkbox"
-                      checked={selectedAdmin.sidebarPermissions?.[perm.key] || false}
-                      onChange={(e) => setSelectedAdmin({
-                        ...selectedAdmin,
-                        sidebarPermissions: {...selectedAdmin.sidebarPermissions, [perm.key]: e.target.checked}
-                      })}
-                      disabled={perm.key === 'overviewDashboard'}
-                      className="w-4 h-4 rounded bg-dark-600 border-gray-600 text-blue-500 focus:ring-blue-500"
-                    />
-                    <span className={`${perm.key === 'overviewDashboard' ? 'text-gray-500' : 'text-gray-300'}`}>
-                      {perm.label}
-                    </span>
-                  </label>
                 ))}
               </div>
+
+              {/* Permission groups */}
+              {PERMISSION_GROUPS.map(group => (
+                <div key={group.title} className="bg-dark-700 rounded-lg p-3">
+                  <p className="text-gray-300 text-sm font-medium mb-2">{group.title}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {group.keys.map(key => (
+                      <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedEmployee.permissions?.[key] || false}
+                          onChange={(e) => setSelectedEmployee({
+                            ...selectedEmployee,
+                            role: 'CUSTOM',
+                            permissions: {...selectedEmployee.permissions, [key]: e.target.checked}
+                          })}
+                          className="rounded bg-dark-600 border-gray-600 text-blue-500 focus:ring-blue-500"
+                        />
+                        <span className="text-gray-400">{formatPermKey(key)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
             <div className="flex gap-3 p-5 border-t border-gray-700">
               <button
@@ -822,7 +726,7 @@ const AdminManagement = () => {
       )}
 
       {/* Password Reset Modal */}
-      {showPasswordModal && selectedAdmin && (
+      {showPasswordModal && selectedEmployee && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-800 rounded-xl w-full max-w-md">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
@@ -833,16 +737,16 @@ const AdminManagement = () => {
             </div>
             <div className="p-5 space-y-4">
               <div className="bg-dark-700 rounded-lg p-4">
-                <p className="text-gray-400 text-sm">Admin</p>
-                <p className="text-white font-medium">{selectedAdmin.firstName} {selectedAdmin.lastName}</p>
-                <p className="text-gray-500 text-sm">{selectedAdmin.email}</p>
+                <p className="text-gray-400 text-sm">Employee</p>
+                <p className="text-white font-medium">{selectedEmployee.firstName} {selectedEmployee.lastName}</p>
+                <p className="text-gray-500 text-sm">{selectedEmployee.email}</p>
               </div>
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-yellow-500">
                   <AlertCircle size={16} />
                   <span className="text-sm font-medium">Warning</span>
                 </div>
-                <p className="text-yellow-500/80 text-sm mt-1">This will immediately change the admin's password. They will need to use the new password to login.</p>
+                <p className="text-yellow-500/80 text-sm mt-1">This will immediately change the employee's password.</p>
               </div>
               <div>
                 <label className="text-gray-400 text-sm mb-1 block">New Password</label>

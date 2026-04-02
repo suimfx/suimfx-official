@@ -34,6 +34,14 @@ import { API_URL } from '../config/api'
 
 
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('adminToken')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  }
+}
+
 const AdminForexCharges = () => {
 
   const [charges, setCharges] = useState([])
@@ -106,7 +114,9 @@ const AdminForexCharges = () => {
 
     try {
 
-      const res = await fetch(`${API_URL}/account-types/all`)
+      const res = await fetch(`${API_URL}/account-types/all`, {
+        headers: getAuthHeaders()
+      })
 
       const data = await res.json()
 
@@ -126,7 +136,9 @@ const AdminForexCharges = () => {
 
     try {
 
-      const res = await fetch(`${API_URL}/admin/users`)
+      const res = await fetch(`${API_URL}/admin/users`, {
+        headers: getAuthHeaders()
+      })
 
       const data = await res.json()
 
@@ -152,7 +164,9 @@ const AdminForexCharges = () => {
 
     try {
 
-      const res = await fetch(`${API_URL}/charges?segment=Forex`)
+      const res = await fetch(`${API_URL}/charges?segment=Forex`, {
+        headers: getAuthHeaders()
+      })
 
       const data = await res.json()
 
@@ -192,7 +206,7 @@ const AdminForexCharges = () => {
 
         method,
 
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
 
         body: JSON.stringify(form)
 
@@ -234,7 +248,7 @@ const AdminForexCharges = () => {
 
     try {
 
-      const res = await fetch(`${API_URL}/charges/${chargeId}`, { method: 'DELETE' })
+      const res = await fetch(`${API_URL}/charges/${chargeId}`, { method: 'DELETE', headers: getAuthHeaders() })
 
       const data = await res.json()
 
