@@ -35,7 +35,7 @@ const emailSettingsSchema = new mongoose.Schema({
   },
   otpVerificationEnabled: {
     type: Boolean,
-    default: true
+    default: false
   },
   otpExpiryMinutes: {
     type: Number,

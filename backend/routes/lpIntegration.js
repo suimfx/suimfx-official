@@ -1,31 +1,29 @@
 /**
  * LP Integration Routes — Corecen → SuimFX
- * Instruments sync and optional real-time price push.
+ * Instruments sync and real-time price push from Corecen LP.
+ * All market data comes from Corecen LP — no direct Infoway dependency.
  */
 
 import express from 'express'
 import crypto from 'crypto'
 import Instrument from '../models/Instrument.js'
+import lpPriceService from '../services/lpPriceService.js'
 
 const router = express.Router()
 
 const LP_API_KEY = process.env.LP_API_KEY || 'suimfx_lp_api_key'
 const LP_API_SECRET = process.env.LP_API_SECRET || 'suimfx_lp_api_secret'
 
-// Price cache for real-time distribution from Corecen
-const lpPriceCache = new Map()
-
 /**
  * HMAC Authentication Middleware
  * Validates requests from Corecen LP
  */
-function validateLpRequest(req, res, next) {
+function validateLpRequest (req, res, next) {
   try {
     const apiKey = req.headers['x-api-key']
     const timestamp = req.headers['x-timestamp']
     const signature = req.headers['x-signature']
 
-    // Debug logging
     console.log('[LP Auth] Received API Key:', apiKey?.substring(0, 20) + '...')
     console.log('[LP Auth] Expected API Key:', LP_API_KEY?.substring(0, 20) + '...')
     console.log('[LP Auth] Keys match:', apiKey === LP_API_KEY)
@@ -72,7 +70,7 @@ function validateLpRequest(req, res, next) {
 
 /**
  * POST /api/lp/instruments/bulk
- * Receive bulk instruments from Corecen (synced from Infoway)
+ * Receive bulk instruments from Corecen LP
  */
 router.post('/instruments/bulk', validateLpRequest, async (req, res) => {
   try {
@@ -99,7 +97,7 @@ router.post('/instruments/bulk', validateLpRequest, async (req, res) => {
             $set: {
               symbol: inst.symbol,
               name: inst.name || inst.symbol,
-              segment: segment,
+              segment,
               baseCurrency: inst.baseCurrency || inst.symbol.substring(0, 3),
               quoteCurrency: inst.quoteCurrency || 'USD',
               contractSize: inst.contractSize || 100000,
@@ -118,11 +116,11 @@ router.post('/instruments/bulk', validateLpRequest, async (req, res) => {
               marginPercent: inst.marginPercent || 1,
               precision: inst.precision || 5,
               source: 'CORECEN_LP',
-              updatedAt: new Date(),
-            },
+              updatedAt: new Date()
+            }
           },
-          upsert: true,
-        },
+          upsert: true
+        }
       })
 
       results.push({ symbol: inst.symbol, status: 'UPDATED' })
@@ -137,7 +135,7 @@ router.post('/instruments/bulk', validateLpRequest, async (req, res) => {
     res.json({
       success: true,
       results,
-      message: `Processed ${instruments.length} instruments`,
+      message: `Processed ${instruments.length} instruments`
     })
   } catch (error) {
     console.error('LP instruments bulk error:', error)
@@ -171,8 +169,8 @@ router.post('/instruments', validateLpRequest, async (req, res) => {
           segment,
           ...instrumentData,
           source: 'CORECEN_LP',
-          updatedAt: new Date(),
-        },
+          updatedAt: new Date()
+        }
       },
       { upsert: true, new: true }
     )
@@ -196,32 +194,13 @@ router.post('/instruments', validateLpRequest, async (req, res) => {
  */
 router.post('/prices/batch', validateLpRequest, (req, res) => {
   try {
-    const { brokerId, ticks, timestamp } = req.body
+    const { ticks } = req.body
 
     if (!ticks || !Array.isArray(ticks)) {
       return res.status(400).json({ success: false, message: 'ticks array required' })
     }
 
-    const now = Date.now()
-
-    for (const tick of ticks) {
-      lpPriceCache.set(tick.symbol, {
-        bid: tick.bid,
-        ask: tick.ask,
-        spread: tick.spread || (tick.ask - tick.bid),
-        time: tick.timestamp || now,
-        source: 'CORECEN_LP',
-      })
-    }
-
-    // Emit to connected WebSocket clients (if io is available)
-    if (global.io) {
-      global.io.to('prices').emit('priceStream', {
-        prices: Object.fromEntries(lpPriceCache),
-        updated: ticks.reduce((acc, t) => { acc[t.symbol] = { bid: t.bid, ask: t.ask, time: now }; return acc }, {}),
-        timestamp: now
-      })
-    }
+    lpPriceService.updatePrices(ticks)
 
     res.json({ success: true, received: ticks.length })
   } catch (error) {
@@ -236,21 +215,13 @@ router.post('/prices/batch', validateLpRequest, (req, res) => {
  */
 router.post('/prices', validateLpRequest, (req, res) => {
   try {
-    const { brokerId, symbol, bid, ask, spread, timestamp } = req.body
+    const { symbol, bid, ask, spread, timestamp } = req.body
 
     if (!symbol || bid === undefined || ask === undefined) {
       return res.status(400).json({ success: false, message: 'symbol, bid, ask required' })
     }
 
-    const now = Date.now()
-
-    lpPriceCache.set(symbol, {
-      bid,
-      ask,
-      spread: spread || (ask - bid),
-      time: timestamp || now,
-      source: 'CORECEN_LP',
-    })
+    lpPriceService.updatePrices([{ symbol, bid, ask, spread, timestamp }])
 
     res.json({ success: true, symbol })
   } catch (error) {
@@ -264,11 +235,9 @@ router.post('/prices', validateLpRequest, (req, res) => {
  * Get all LP prices (for internal use)
  */
 router.get('/prices', (req, res) => {
-  const prices = {}
-  for (const [symbol, data] of lpPriceCache) {
-    prices[symbol] = data
-  }
-  res.json({ success: true, prices, count: lpPriceCache.size })
+  const cache = lpPriceService.getPriceCache()
+  const prices = Object.fromEntries(cache)
+  res.json({ success: true, prices, count: cache.size })
 })
 
 /**
@@ -277,7 +246,7 @@ router.get('/prices', (req, res) => {
  */
 router.get('/prices/:symbol', (req, res) => {
   const { symbol } = req.params
-  const price = lpPriceCache.get(symbol)
+  const price = lpPriceService.getPrice(symbol)
 
   if (price) {
     res.json({ success: true, price })
@@ -294,13 +263,14 @@ router.get('/health', (req, res) => {
   res.json({
     success: true,
     status: 'ok',
-    priceCount: lpPriceCache.size,
-    timestamp: Date.now(),
+    priceCount: lpPriceService.getPriceCache().size,
+    source: 'CORECEN_LP',
+    timestamp: Date.now()
   })
 })
 
 // Export price cache for use in other modules
-export const getLpPrice = (symbol) => lpPriceCache.get(symbol)
-export const getAllLpPrices = () => lpPriceCache
+export const getLpPrice = (symbol) => lpPriceService.getPrice(symbol)
+export const getAllLpPrices = () => lpPriceService.getPriceCache()
 
 export default router

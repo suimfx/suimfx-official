@@ -9,24 +9,15 @@ import copyTradingEngine from '../services/copyTradingEngine.js'
 import ibEngine from '../services/ibEngineNew.js'
 import MasterTrader from '../models/MasterTrader.js'
 import User from '../models/User.js'
-import infowayService from '../services/infowayService.js'
+import lpPriceService from '../services/lpPriceService.js'
 
-// Fetch fresh price from Infoway
-async function getFreshPrice(symbol) {
+async function getFreshPrice (symbol) {
   try {
-    // Try cache first
-    let price = infowayService.getPrice(symbol)
-    if (price) {
+    const price = lpPriceService.getPrice(symbol)
+    if (price && price.bid != null && price.ask != null) {
       return { bid: price.bid, ask: price.ask }
     }
-    
-    // Fetch via REST API
-    price = await infowayService.fetchPriceREST(symbol)
-    if (price) {
-      return { bid: price.bid, ask: price.ask }
-    }
-    
-    console.log(`[getFreshPrice] No data for ${symbol}`)
+    console.log(`[getFreshPrice] No LP price data for ${symbol}`)
     return null
   } catch (e) {
     console.log(`[getFreshPrice] Error for ${symbol}:`, e.message)

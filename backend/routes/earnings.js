@@ -1,30 +1,55 @@
 import express from 'express'
 import Trade from '../models/Trade.js'
-import User from '../models/User.js'
-import mongoose from 'mongoose'
 import { verifyAdminToken } from '../middleware/rbac.js'
 import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
+/** Exclude demo TradingAccount trades; keep ChallengeAccount trades (prop). */
+const REAL_ACCOUNT_STAGES = [
+  {
+    $lookup: {
+      from: 'tradingaccounts',
+      localField: 'tradingAccountId',
+      foreignField: '_id',
+      as: '_ta'
+    }
+  },
+  {
+    $match: {
+      $or: [
+        { accountType: 'ChallengeAccount' },
+        {
+          $and: [
+            { accountType: 'TradingAccount' },
+            { '_ta.0': { $exists: true } },
+            { '_ta.0.isDemo': { $ne: true } }
+          ]
+        }
+      ]
+    }
+  }
+]
+
+function earningsTotal (commission, spread, swap) {
+  return (commission || 0) + (spread || 0) + (swap || 0)
+}
+
 // GET /api/earnings/summary - Get earnings summary (daily, weekly, monthly)
 router.get('/summary', verifyAdminToken, async (req, res) => {
   try {
     const now = new Date()
-    
-    // Get admin's user IDs for filtering
+
     let userFilter = {}
     const userIds = await getAdminUserIds(req.admin)
     if (userIds) userFilter.userId = { $in: userIds }
-    
-    // Calculate date ranges
+
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const weekStart = new Date(todayStart)
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay()) // Start of week (Sunday)
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay())
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const yearStart = new Date(now.getFullYear(), 0, 1)
 
-    // Aggregate earnings from trades
     const aggregateEarnings = async (startDate, endDate = now) => {
       const result = await Trade.aggregate([
         {
@@ -39,6 +64,7 @@ router.get('/summary', verifyAdminToken, async (req, res) => {
             status: { $in: ['OPEN', 'CLOSED'] }
           }
         },
+        ...REAL_ACCOUNT_STAGES,
         {
           $group: {
             _id: null,
@@ -50,11 +76,11 @@ router.get('/summary', verifyAdminToken, async (req, res) => {
           }
         }
       ])
-      
+
       if (result.length === 0) {
         return { totalCommission: 0, totalSpread: 0, totalSwap: 0, tradeCount: 0, totalVolume: 0 }
       }
-      
+
       return result[0]
     }
 
@@ -63,52 +89,26 @@ router.get('/summary', verifyAdminToken, async (req, res) => {
       aggregateEarnings(weekStart),
       aggregateEarnings(monthStart),
       aggregateEarnings(yearStart),
-      aggregateEarnings(new Date(0)) // All time
+      aggregateEarnings(new Date(0))
     ])
+
+    const pack = (row) => ({
+      commission: row.totalCommission,
+      spread: row.totalSpread,
+      swap: row.totalSwap,
+      total: earningsTotal(row.totalCommission, row.totalSpread, row.totalSwap),
+      trades: row.tradeCount,
+      volume: row.totalVolume
+    })
 
     res.json({
       success: true,
       earnings: {
-        today: {
-          commission: today.totalCommission,
-          spread: today.totalSpread,
-          swap: today.totalSwap,
-          total: today.totalCommission + today.totalSpread + today.totalSwap,
-          trades: today.tradeCount,
-          volume: today.totalVolume
-        },
-        thisWeek: {
-          commission: thisWeek.totalCommission,
-          spread: thisWeek.totalSpread,
-          swap: thisWeek.totalSwap,
-          total: thisWeek.totalCommission + thisWeek.totalSpread + thisWeek.totalSwap,
-          trades: thisWeek.tradeCount,
-          volume: thisWeek.totalVolume
-        },
-        thisMonth: {
-          commission: thisMonth.totalCommission,
-          spread: thisMonth.totalSpread,
-          swap: thisMonth.totalSwap,
-          total: thisMonth.totalCommission + thisMonth.totalSpread + thisMonth.totalSwap,
-          trades: thisMonth.tradeCount,
-          volume: thisMonth.totalVolume
-        },
-        thisYear: {
-          commission: thisYear.totalCommission,
-          spread: thisYear.totalSpread,
-          swap: thisYear.totalSwap,
-          total: thisYear.totalCommission + thisYear.totalSpread + thisYear.totalSwap,
-          trades: thisYear.tradeCount,
-          volume: thisYear.totalVolume
-        },
-        allTime: {
-          commission: allTime.totalCommission,
-          spread: allTime.totalSpread,
-          swap: allTime.totalSwap,
-          total: allTime.totalCommission + allTime.totalSpread + allTime.totalSwap,
-          trades: allTime.tradeCount,
-          volume: allTime.totalVolume
-        }
+        today: pack(today),
+        thisWeek: pack(thisWeek),
+        thisMonth: pack(thisMonth),
+        thisYear: pack(thisYear),
+        allTime: pack(allTime)
       }
     })
   } catch (error) {
@@ -121,11 +121,11 @@ router.get('/summary', verifyAdminToken, async (req, res) => {
 router.get('/daily', verifyAdminToken, async (req, res) => {
   try {
     const { startDate, endDate, days = 30 } = req.query
-    
+
     let userFilter = {}
     const userIds = await getAdminUserIds(req.admin)
     if (userIds) userFilter.userId = { $in: userIds }
-    
+
     let start, end
     if (startDate && endDate) {
       start = new Date(startDate)
@@ -149,6 +149,7 @@ router.get('/daily', verifyAdminToken, async (req, res) => {
           status: { $in: ['OPEN', 'CLOSED'] }
         }
       },
+      ...REAL_ACCOUNT_STAGES,
       {
         $group: {
           _id: {
@@ -164,17 +165,16 @@ router.get('/daily', verifyAdminToken, async (req, res) => {
         }
       },
       {
-        $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
+        $sort: { '_id.year': -1, '_id.month': -1, '_id.day': -1 }
       }
     ])
 
-    // Format the results
     const formatted = dailyEarnings.map(day => ({
       date: `${day._id.year}-${String(day._id.month).padStart(2, '0')}-${String(day._id.day).padStart(2, '0')}`,
       commission: day.commission,
       spread: day.spread,
       swap: day.swap,
-      total: day.commission + day.spread + day.swap,
+      total: earningsTotal(day.commission, day.spread, day.swap),
       trades: day.trades,
       volume: day.volume
     }))
@@ -190,11 +190,11 @@ router.get('/daily', verifyAdminToken, async (req, res) => {
 router.get('/by-user', verifyAdminToken, async (req, res) => {
   try {
     const { startDate, endDate, days = 30 } = req.query
-    
+
     let userFilter = {}
     const userIds = await getAdminUserIds(req.admin)
     if (userIds) userFilter.userId = { $in: userIds }
-    
+
     let start, end
     if (startDate && endDate) {
       start = new Date(startDate)
@@ -218,6 +218,7 @@ router.get('/by-user', verifyAdminToken, async (req, res) => {
           status: { $in: ['OPEN', 'CLOSED'] }
         }
       },
+      ...REAL_ACCOUNT_STAGES,
       {
         $group: {
           _id: '$userId',
@@ -247,7 +248,7 @@ router.get('/by-user', verifyAdminToken, async (req, res) => {
           commission: 1,
           spread: 1,
           swap: 1,
-          total: { $add: ['$commission', '$spread', '$swap'] },
+          total: { $add: ['$commission', { $ifNull: ['$spread', 0] }, '$swap'] },
           trades: 1,
           volume: 1
         }
@@ -268,11 +269,11 @@ router.get('/by-user', verifyAdminToken, async (req, res) => {
 router.get('/by-symbol', verifyAdminToken, async (req, res) => {
   try {
     const { startDate, endDate, days = 30 } = req.query
-    
+
     let userFilter = {}
     const userIds = await getAdminUserIds(req.admin)
     if (userIds) userFilter.userId = { $in: userIds }
-    
+
     let start, end
     if (startDate && endDate) {
       start = new Date(startDate)
@@ -296,6 +297,7 @@ router.get('/by-symbol', verifyAdminToken, async (req, res) => {
           status: { $in: ['OPEN', 'CLOSED'] }
         }
       },
+      ...REAL_ACCOUNT_STAGES,
       {
         $group: {
           _id: '$symbol',
@@ -312,7 +314,7 @@ router.get('/by-symbol', verifyAdminToken, async (req, res) => {
           commission: 1,
           spread: 1,
           swap: 1,
-          total: { $add: ['$commission', '$spread', '$swap'] },
+          total: { $add: ['$commission', { $ifNull: ['$spread', 0] }, '$swap'] },
           trades: 1,
           volume: 1
         }

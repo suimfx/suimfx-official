@@ -7,6 +7,7 @@ import lpService from '../services/lpService.js'
 import dotenv from 'dotenv'
 import { verifyAdminToken, requireSidebarPermission, PERMISSIONS } from '../middleware/rbac.js'
 import { getAdminUserIds } from '../utils/adminFilter.js'
+import { getAllLpPrices } from './lpIntegration.js'
 
 dotenv.config()
 
@@ -494,18 +495,21 @@ router.get('/lp-status', async (req, res) => {
         signal: AbortSignal.timeout(3000)
       })
 
+      const tickCount = getAllLpPrices().size
       if (response.ok) {
         res.json({
           success: true,
           connected: true,
-          message: 'LP is connected and responding',
-          lpUrl: settings.lpApiUrl
+          message: 'Corecen LP is reachable. Market ticks on this server: POST /api/lp/prices/batch.',
+          lpUrl: settings.lpApiUrl,
+          suimfxCachedSymbols: tickCount
         })
       } else {
         res.json({
           success: true,
           connected: false,
-          message: `LP returned status ${response.status}`
+          message: `LP returned status ${response.status}`,
+          suimfxCachedSymbols: tickCount
         })
       }
     } catch (fetchError) {
@@ -516,7 +520,8 @@ router.get('/lp-status', async (req, res) => {
           ? 'LP server is not running'
           : fetchError.name === 'TimeoutError'
             ? 'LP connection timed out'
-            : fetchError.message
+            : fetchError.message,
+        suimfxCachedSymbols: getAllLpPrices().size
       })
     }
   } catch (error) {

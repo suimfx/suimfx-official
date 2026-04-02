@@ -214,20 +214,9 @@ const SuperAdminManagement = () => {
 
   const handleImpersonateAdmin = async (adminId) => {
     try {
-      const id = String(adminId ?? '').trim()
-      if (!id || id === 'undefined') {
-        alert('Invalid admin id')
-        return
-      }
-      // Always use the original Super Admin token when mid–impersonation session
-      const raw =
-        localStorage.getItem('originalAdminToken') || localStorage.getItem('adminToken')
-      const originalToken = (raw || '').trim()
-      if (!originalToken) {
-        alert('Session expired. Please login again at /admin')
-        return
-      }
-      const res = await fetch(`${API_URL}/impersonate/admin/${id}`, {
+      // Always use the original Super Admin token for impersonation requests
+      const originalToken = localStorage.getItem('originalAdminToken') || localStorage.getItem('adminToken')
+      const res = await fetch(`${API_URL}/impersonate/admin/${adminId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

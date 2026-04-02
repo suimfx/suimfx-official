@@ -44,7 +44,7 @@ import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
-import infowayService from './services/infowayService.js'
+import lpPriceService from './services/lpPriceService.js'
 import AdminDomainConnection from './models/AdminDomainConnection.js'
 import { refreshDnsCheck } from './services/domainDnsService.js'
 
@@ -104,17 +104,12 @@ global.io = io
 const connectedClients = new Map()
 const priceSubscribers = new Set()
 
-// Price cache for real-time streaming (shared with Infoway service)
-const priceCache = infowayService.getPriceCache()
+// Price cache for real-time streaming (populated by Corecen LP pushes)
+const priceCache = lpPriceService.getPriceCache()
 
-// Infoway handles all asset classes: Forex, Crypto, Commodities
-
-// Infoway WebSocket price update handler - emit tick-to-tick updates
-infowayService.setOnPriceUpdate((symbol, price) => {
+lpPriceService.setOnPriceUpdate((symbol, price) => {
   if (priceSubscribers.size > 0) {
-    // Emit individual price update for tick-to-tick
     io.to('prices').emit('priceUpdate', { symbol, price })
-    // Also emit as priceStream for compatibility (single symbol update)
     io.to('prices').emit('priceStream', {
       prices: { [symbol]: price },
       updated: { [symbol]: true },
@@ -123,13 +118,12 @@ infowayService.setOnPriceUpdate((symbol, price) => {
   }
 })
 
-// Infoway connection status handler
-infowayService.setOnConnectionChange((connected) => {
-  console.log(`[Infoway] ${connected ? 'Connected' : 'Disconnected'}`)
+lpPriceService.setOnConnectionChange((connected) => {
+  console.log(`[LP Price Service] ${connected ? 'Ready' : 'Disconnected'}`)
 })
 
-// Start Infoway WebSocket connections
-infowayService.connect()
+lpPriceService.connect()
+console.log('[Market data] Corecen LP → POST /api/lp/prices/batch')
 
 // Background stop-out check every 5 seconds
 setInterval(async () => {
@@ -364,9 +358,6 @@ httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 
   // ─── Domain Auto-Recheck Cron (every 5 minutes) ───────────────────────────
-  // Automatically re-checks pending/mismatched domains so admins don't need
-  // to manually refresh. If DNS becomes correct, status stays pending_dns
-  // until the admin clicks "Verify & Connect" to finalize.
   cron.schedule('*/5 * * * *', async () => {
     try {
       const pendingDomains = await AdminDomainConnection.find({
@@ -389,8 +380,6 @@ httpServer.listen(PORT, () => {
               ? snapshot.errors.map((e) => `${e.record}: ${e.message}`).join('; ')
               : ''
           }
-          // Update status: dns_mismatch if checks ran and failed, pending_dns if still waiting
-          // We don't auto-connect — user must click Verify
           update.status = flags.fullyOk ? 'pending_dns' : 'dns_mismatch'
 
           await AdminDomainConnection.updateOne({ _id: connDoc._id }, { $set: update })
@@ -409,7 +398,6 @@ httpServer.listen(PORT, () => {
     }
   })
   console.log('[CRON] Domain auto-recheck scheduled every 5 minutes')
-  // ──────────────────────────────────────────────────────────────────────────
 
   // Schedule daily commission calculation for copy trading
   cron.schedule('59 23 * * *', async () => {

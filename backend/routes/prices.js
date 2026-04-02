@@ -3,10 +3,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 import express from 'express'
-
-import infowayService from '../services/infowayService.js'
-
-
+import lpPriceService from '../services/lpPriceService.js'
 
 const router = express.Router()
 
@@ -30,15 +27,9 @@ const POPULAR_INSTRUMENTS = {
 
 
 
-// Use Infoway service for categorization
-
-function categorizeSymbol(symbol) {
-
-  return infowayService.categorizeSymbol(symbol)
-
+function categorizeSymbol (symbol) {
+  return lpPriceService.categorizeSymbol(symbol)
 }
-
-
 
 // Default instruments fallback
 
@@ -86,61 +77,37 @@ router.get('/instruments', async (req, res) => {
 
   try {
 
-    console.log('[Infoway] Returning supported instruments')
+    console.log('[Corecen LP] Returning instruments from price cache')
 
-    
-
-    // Get price cache from Infoway service
-
-    const priceCache = infowayService.getPriceCache()
-
-    
-
-    // Only show symbols that have actual price data
-
-    const symbolsWithPrices = Array.from(priceCache.keys())
-
-    
-
-    const instruments = symbolsWithPrices.map(symbol => {
-
-      const category = categorizeSymbol(symbol)
-
-      const isPopular = POPULAR_INSTRUMENTS[category]?.includes(symbol) || false
-
-      return {
-
-        symbol,
-
-        name: getInstrumentName(symbol),
-
-        category,
-
-        digits: getDigits(symbol),
-
-        contractSize: getContractSize(symbol),
-
-        minVolume: 0.01,
-
-        maxVolume: 100,
-
-        volumeStep: 0.01,
-
-        popular: isPopular
-
-      }
-
+    const lpPrices = lpPriceService.getPriceCache()
+    const symbolsWithPrices = [...lpPrices.keys()].filter((sym) => {
+      const p = lpPrices.get(sym)
+      return p && p.bid != null && p.ask != null && Number(p.bid) > 0 && Number(p.ask) > 0
     })
 
-    
+    const instruments = symbolsWithPrices.map((symbol) => {
+      const category = categorizeSymbol(symbol)
+      const isPopular = POPULAR_INSTRUMENTS[category]?.includes(symbol) || false
+      return {
+        symbol,
+        name: getInstrumentName(symbol),
+        category,
+        digits: getDigits(symbol),
+        contractSize: getContractSize(symbol),
+        minVolume: 0.01,
+        maxVolume: 100,
+        volumeStep: 0.01,
+        popular: isPopular
+      }
+    })
 
-    console.log('[Infoway] Returning', instruments.length, 'instruments with live prices')
+    console.log('[Corecen LP]', instruments.length, 'instruments with live bid/ask')
 
-    res.json({ success: true, instruments })
+    res.json({ success: true, instruments, source: 'CORECEN_LP' })
 
   } catch (error) {
 
-    console.error('[Infoway] Error fetching instruments:', error)
+    console.error('[Prices] Error fetching instruments:', error)
 
     res.json({ success: true, instruments: getDefaultInstruments() })
 
@@ -290,49 +257,27 @@ router.get('/:symbol', async (req, res) => {
 
     const { symbol } = req.params
 
-    const SYMBOL_MAP = infowayService.SYMBOL_MAP
-
-    
-
-    // Check if symbol is supported (allow any symbol, will return null if not available)
-
-    if (!SYMBOL_MAP[symbol] && !symbol) {
-
-      return res.status(404).json({ success: false, message: `Symbol ${symbol} not supported` })
-
+    let priceResolved = lpPriceService.getPrice(symbol)
+    if (!priceResolved) {
+      priceResolved = await lpPriceService.fetchPriceREST(symbol)
     }
 
-    
-
-    // Try to get from cache first
-
-    let price = infowayService.getPrice(symbol)
-
-    
-
-    // If not in cache, fetch via REST API
-
-    if (!price) {
-
-      price = await infowayService.fetchPriceREST(symbol)
-
-    }
-
-    
-
-    if (price) {
-
-      res.json({ success: true, price: { bid: price.bid, ask: price.ask } })
-
+    if (priceResolved && priceResolved.bid != null && priceResolved.ask != null) {
+      res.json({
+        success: true,
+        price: { bid: priceResolved.bid, ask: priceResolved.ask },
+        source: 'CORECEN_LP'
+      })
     } else {
-
-      res.status(404).json({ success: false, message: 'Price not available' })
-
+      res.status(404).json({
+        success: false,
+        message: 'Price not available from LP. Ensure Corecen is pushing ticks to POST /api/lp/prices/batch.'
+      })
     }
 
   } catch (error) {
 
-    console.error('[Infoway] Error fetching price:', error)
+    console.error('[Prices] Error fetching price:', error)
 
     res.status(500).json({ success: false, message: error.message })
 
@@ -358,59 +303,21 @@ router.post('/batch', async (req, res) => {
 
     
 
-    const SYMBOL_MAP = infowayService.SYMBOL_MAP
-
     const prices = {}
-
-    const missingSymbols = []
-
-    
-
-    // Get prices from cache first
+    const cache = lpPriceService.getPriceCache()
 
     for (const symbol of symbols) {
-
-      // Allow any symbol, not just mapped ones
-
-      
-
-      const cached = infowayService.getPrice(symbol)
-
-      if (cached) {
-
+      const cached = cache.get(symbol)
+      if (cached && cached.bid != null && cached.ask != null) {
         prices[symbol] = { bid: cached.bid, ask: cached.ask }
-
-      } else {
-
-        missingSymbols.push(symbol)
-
       }
-
     }
 
-    
-
-    // Fetch missing prices via REST API
-
-    if (missingSymbols.length > 0) {
-
-      const batchPrices = await infowayService.fetchBatchPricesREST(missingSymbols)
-
-      for (const [symbol, price] of Object.entries(batchPrices)) {
-
-        prices[symbol] = { bid: price.bid, ask: price.ask }
-
-      }
-
-    }
-
-    
-
-    res.json({ success: true, prices })
+    res.json({ success: true, prices, source: 'CORECEN_LP' })
 
   } catch (error) {
 
-    console.error('[Infoway] Error fetching batch prices:', error)
+    console.error('[Prices] Error fetching batch prices:', error)
 
     res.status(500).json({ success: false, message: error.message })
 

@@ -220,7 +220,8 @@ const AdminProfile = () => {
     firstName: '',
     lastName: '',
     phone: '',
-    brandName: ''
+    brandName: '',
+    customDomain: ''
   })
 
   // ── Domain wizard state ──────────────────────────────────────────────────
@@ -259,7 +260,8 @@ const AdminProfile = () => {
         firstName: parsed.firstName || '',
         lastName: parsed.lastName || '',
         phone: parsed.phone || '',
-        brandName: parsed.brandName || ''
+        brandName: parsed.brandName || '',
+        customDomain: parsed.customDomain || ''
       })
       if (parsed.logo) setLogoPreview(`${API_BASE_URL}${parsed.logo}`)
     }
@@ -443,7 +445,8 @@ const AdminProfile = () => {
           firstName: a.firstName || '',
           lastName: a.lastName || '',
           phone: a.phone || '',
-          brandName: a.brandName || ''
+          brandName: a.brandName || '',
+          customDomain: a.customDomain || ''
         })
         if (a.logo) setLogoPreview(`${API_BASE_URL}${a.logo}`)
         localStorage.setItem('adminUser', JSON.stringify({ ...JSON.parse(localStorage.getItem('adminUser') || '{}'), ...a }))
@@ -485,6 +488,7 @@ const AdminProfile = () => {
           lastName: formData.lastName, 
           phone: formData.phone,
           brandName: formData.brandName,
+          customDomain: formData.customDomain,
           ...(data.admin || {})
         }
         localStorage.setItem('adminUser', JSON.stringify(updatedAdmin))
@@ -892,7 +896,6 @@ const AdminProfile = () => {
                     />
                   </div>
                 </div>
-
 
                 {/* ═══════════════════════════════════════════════════════════ */}
                 {/* CUSTOM DOMAIN — SHOPIFY-STYLE WIZARD                       */}

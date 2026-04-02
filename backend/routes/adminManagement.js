@@ -45,29 +45,19 @@ const router = express.Router()
 // Get JWT_SECRET dynamically to ensure env is loaded
 const getJwtSecret = () => process.env.JWT_SECRET || 'your-secret-key'
 
-// Middleware to verify admin token (payload: adminId from login; supports legacy id)
+// Middleware to verify admin token
 const verifyAdminToken = (req, res, next) => {
   const authHeader = req.headers.authorization
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, message: 'No token provided' })
   }
-
-  const token = authHeader.slice(7).trim()
-  if (!token) {
-    return res.status(401).json({ success: false, message: 'No token provided' })
-  }
+  
+  const token = authHeader.split(' ')[1]
   try {
     const decoded = jwt.verify(token, getJwtSecret())
-    const id = decoded.adminId || decoded.id
-    if (!id) {
-      return res.status(401).json({ success: false, message: 'Invalid token' })
-    }
-    req.adminId = id
+    req.adminId = decoded.adminId
     next()
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, message: 'Session expired. Please login again.' })
-    }
     return res.status(401).json({ success: false, message: 'Invalid token' })
   }
 }
@@ -329,13 +319,8 @@ router.post('/admin-login', async (req, res) => {
 // ==================== SUPER ADMIN - ADMIN MANAGEMENT ====================
 
 // GET /api/admin-mgmt/admins - Get all admins (super admin only)
-router.get('/admins', verifyAdminToken, async (req, res) => {
+router.get('/admins', async (req, res) => {
   try {
-    const requester = await Admin.findById(req.adminId).select('role')
-    if (!requester || requester.role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Access denied' })
-    }
-
     const admins = await Admin.find({ role: 'ADMIN' })
       .select('-password')
       .sort({ createdAt: -1 })
@@ -386,13 +371,8 @@ router.get('/admins/:id', async (req, res) => {
 })
 
 // POST /api/admin-mgmt/admins - Create new admin (super admin only)
-router.post('/admins', verifyAdminToken, async (req, res) => {
+router.post('/admins', async (req, res) => {
   try {
-    const requester = await Admin.findById(req.adminId).select('role')
-    if (!requester || requester.role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Access denied' })
-    }
-
     const {
       email,
       password,
@@ -662,13 +642,8 @@ router.put('/admins/:id/reset-password', async (req, res) => {
 })
 
 // GET /api/admin-mgmt/super-admin-stats - Get total commission stats for the super admin
-router.get('/super-admin-stats', verifyAdminToken, async (req, res) => {
+router.get('/super-admin-stats', async (req, res) => {
   try {
-    const requester = await Admin.findById(req.adminId).select('role')
-    if (!requester || requester.role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Access denied' })
-    }
-
     const admins = await Admin.find().select('_id commissionRate')
     let totalCommission = 0
 
