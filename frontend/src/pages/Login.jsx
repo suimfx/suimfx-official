@@ -25,6 +25,35 @@ const Login = () => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Dynamic favicon & title from admin branding (custom domain)
+  useEffect(() => {
+    if (!branding) return
+
+    const originalTitle = document.title
+    const linkEl = document.querySelector("link[rel~='icon']")
+    const originalFavicon = linkEl ? linkEl.href : '/suimfxLogo.png'
+
+    if (branding.brandName) {
+      document.title = `${branding.brandName} - Sign In`
+    }
+
+    if (branding.logo) {
+      if (linkEl) {
+        linkEl.href = branding.logo
+      } else {
+        const newLink = document.createElement('link')
+        newLink.rel = 'icon'
+        newLink.href = branding.logo
+        document.head.appendChild(newLink)
+      }
+    }
+
+    return () => {
+      document.title = originalTitle
+      if (linkEl) linkEl.href = originalFavicon
+    }
+  }, [branding])
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
     setError('')
