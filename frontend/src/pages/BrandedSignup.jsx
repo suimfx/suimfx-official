@@ -292,7 +292,3 @@ const BrandedSignup = () => {
 }
 
 export default BrandedSignup
-  )
-}
-
-export default BrandedSignup

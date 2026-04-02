@@ -248,9 +248,3 @@ const BrandedLogin = () => {
 }
 
 export default BrandedLogin
-      </div >
-    </div >
-  )
-}
-
-export default BrandedLogin
