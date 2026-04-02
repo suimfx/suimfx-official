@@ -53,8 +53,8 @@ import { BrandingProvider } from './context/BrandingContext'
 
 function App() {
   return (
-    <BrandingProvider>
-      <Router>
+    <Router>
+      <BrandingProvider>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Navigate to="/user/login" replace />} />
@@ -109,8 +109,8 @@ function App() {
           <Route path="/:slug/login" element={<BrandedLogin />} />
           <Route path="/:slug/signup" element={<BrandedSignup />} />
         </Routes>
-      </Router>
-    </BrandingProvider>
+      </BrandingProvider>
+    </Router>
   )
 }
 

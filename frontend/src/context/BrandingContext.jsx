@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useLocation } from 'react-router-dom'
 import { API_URL, API_BASE_URL } from '../config/api'
 import defaultLogo from '../assets/suimfxLogo.png'
 import { buildWlSessionHash, originForCustomDomain } from '../utils/wlSessionHandoff'
@@ -27,6 +28,11 @@ function isPlatformHost (hostname) {
   return h === 'suimfx.com' || h.endsWith('.suimfx.com')
 }
 
+/** Super Admin / Admin / Subadmin portal — always Suimfx tab title & favicon, never white-label. */
+function isAdminAppPath (pathname) {
+  return pathname.startsWith('/admin') || pathname.startsWith('/subadmin')
+}
+
 /** Do not hard-redirect off platform while user is still on login/signup (avoids wrong URL before client navigate). */
 function isUserAuthPath (pathname) {
   if (pathname.startsWith('/user/login') || pathname.startsWith('/user/signup') || pathname.startsWith('/user/forgot-password')) {
@@ -46,7 +52,7 @@ async function fetchMyBrandingAsUser () {
     const data = await res.json()
     if (!data.success || !data.branding) return null
     const b = data.branding
-    if (!b.brandName && !b.logo) return null
+    if (!b.brandName && !b.logo && !b.customDomain) return null
     return {
       brandName: b.brandName || '',
       logo: b.logo ? `${API_BASE_URL}${b.logo}` : null,
@@ -73,6 +79,7 @@ function applyFavicon (href) {
 }
 
 export const BrandingProvider = ({ children }) => {
+  const location = useLocation()
   const [branding, setBranding] = useState(null)
   const [brandingLoaded, setBrandingLoaded] = useState(false)
 
@@ -136,7 +143,7 @@ export const BrandingProvider = ({ children }) => {
     if (!isPlatformHost(hostname)) return
     const token = localStorage.getItem('token')
     if (!token) return
-    if (window.location.pathname.startsWith('/admin')) return
+    if (isAdminAppPath(window.location.pathname)) return
     if (isUserAuthPath(window.location.pathname)) return
 
     const cd = branding?.customDomain?.trim()
@@ -151,8 +158,14 @@ export const BrandingProvider = ({ children }) => {
     window.location.replace(url)
   }, [brandingLoaded, branding])
 
+  // User-facing app only: white-label title & favicon. Admin portal always Suimfx.
   useEffect(() => {
     if (!brandingLoaded) return
+    if (isAdminAppPath(location.pathname)) {
+      document.title = DEFAULT_TITLE
+      applyFavicon(DEFAULT_FAVICON)
+      return
+    }
     const name = (branding?.brandName || '').trim()
     if (name) {
       document.title = name
@@ -166,7 +179,7 @@ export const BrandingProvider = ({ children }) => {
     } else {
       applyFavicon(DEFAULT_FAVICON)
     }
-  }, [branding, brandingLoaded])
+  }, [branding, brandingLoaded, location.pathname])
 
   const setBrandingFromSlug = (brandData) => {
     setBranding(brandData)
