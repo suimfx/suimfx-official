@@ -25,6 +25,38 @@ const BrandedSignup = () => {
     fetchBrandInfo()
   }, [slug])
 
+  // Dynamic favicon & title from admin brand
+  useEffect(() => {
+    if (!brandInfo) return
+
+    const originalTitle = document.title
+    const linkEl = document.querySelector("link[rel~='icon']")
+    const originalFavicon = linkEl ? linkEl.href : '/suimfxLogo.png'
+
+    // Set title
+    if (brandInfo.brandName) {
+      document.title = `${brandInfo.brandName} - Sign Up`
+    }
+
+    // Set favicon from admin logo
+    if (brandInfo.logo) {
+      const faviconUrl = `${API_BASE_URL}${brandInfo.logo}`
+      if (linkEl) {
+        linkEl.href = faviconUrl
+      } else {
+        const newLink = document.createElement('link')
+        newLink.rel = 'icon'
+        newLink.href = faviconUrl
+        document.head.appendChild(newLink)
+      }
+    }
+
+    return () => {
+      document.title = originalTitle
+      if (linkEl) linkEl.href = originalFavicon
+    }
+  }, [brandInfo])
+
   const fetchBrandInfo = async () => {
     try {
       const res = await fetch(`${API_URL}/admin-mgmt/brand/${slug}`)
