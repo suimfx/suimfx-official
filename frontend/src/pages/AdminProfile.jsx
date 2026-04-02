@@ -902,8 +902,9 @@ const AdminProfile = () => {
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════════ */}
-                {/* CUSTOM DOMAIN — SHOPIFY-STYLE WIZARD                       */}
+                {/* CUSTOM DOMAIN — SHOPIFY-STYLE WIZARD (Admin only, not Super Admin) */}
                 {/* ═══════════════════════════════════════════════════════════ */}
+                {admin?.role !== 'SUPER_ADMIN' && (
                 <div className="rounded-xl border border-gray-700 bg-gradient-to-br from-dark-800 to-dark-700/50 p-5 space-y-5 mt-4">
                   {/* Header */}
                   <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1149,6 +1150,7 @@ const AdminProfile = () => {
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
               {/* Error/Success Messages */}

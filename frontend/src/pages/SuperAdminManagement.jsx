@@ -282,6 +282,7 @@ const SuperAdminManagement = () => {
   const openEditModal = (admin) => {
     setSelectedAdmin(admin)
     setNewAdmin({
+      email: admin.email || '',
       firstName: admin.firstName,
       lastName: admin.lastName,
       phone: admin.phone || '',
@@ -821,6 +822,16 @@ const SuperAdminManagement = () => {
               </button>
             </div>
             <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">Email</label>
+                <input
+                  type="email"
+                  value={newAdmin.email}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                  className="w-full px-3 py-2 bg-dark-700 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  placeholder="admin@example.com"
+                />
+              </div>
               <div>
                 <label className="block text-gray-400 text-sm mb-2">First Name</label>
                 <input

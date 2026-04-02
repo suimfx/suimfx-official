@@ -80,7 +80,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
     { name: 'KYC Verification', icon: FileCheck, path: '/admin/kyc', sidebarKey: 'kycVerification' },
     { name: 'Support Tickets', icon: HeadphonesIcon, path: '/admin/support', sidebarKey: 'supportTickets' },
     { name: 'My Profile', icon: User, path: '/admin/profile', sidebarKey: 'myProfile' },
-    { name: 'Connect Domain', icon: Globe2, path: '/admin/profile#domain', sidebarKey: 'myProfile' },
+    { name: 'Connect Domain', icon: Globe2, path: '/admin/profile#domain', sidebarKey: 'myProfile', adminOnly: true },
   ]
 
   // Check if user has sidebar permission (SUPER_ADMIN has all permissions)
@@ -137,7 +137,11 @@ const AdminLayout = ({ children, title, subtitle }) => {
   }
 
   // Filter menu items based on sidebar permissions
-  const menuItems = allMenuItems.filter(item => hasSidebarPermission(item.sidebarKey))
+  const menuItems = allMenuItems.filter(item => {
+    // Hide adminOnly items (like Connect Domain) from SUPER_ADMIN
+    if (item.adminOnly && admin?.role === 'SUPER_ADMIN') return false
+    return hasSidebarPermission(item.sidebarKey)
+  })
 
   useEffect(() => {
     const adminToken = localStorage.getItem('adminToken')

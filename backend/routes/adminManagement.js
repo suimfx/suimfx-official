@@ -481,6 +481,7 @@ router.post('/admins', async (req, res) => {
 router.put('/admins/:id', async (req, res) => {
   try {
     const {
+      email,
       firstName,
       lastName,
       phone,
@@ -493,6 +494,15 @@ router.put('/admins/:id', async (req, res) => {
     const admin = await Admin.findById(req.params.id)
     if (!admin) {
       return res.status(404).json({ message: 'Admin not found' })
+    }
+
+    // Update email (check for duplicates)
+    if (email && email !== admin.email) {
+      const existingAdmin = await Admin.findOne({ email: email.toLowerCase(), _id: { $ne: admin._id } })
+      if (existingAdmin) {
+        return res.status(400).json({ success: false, message: 'Email already in use by another admin' })
+      }
+      admin.email = email.toLowerCase()
     }
 
     // Update fields
