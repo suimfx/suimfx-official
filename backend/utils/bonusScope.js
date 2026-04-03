@@ -1,5 +1,6 @@
 import Bonus from '../models/Bonus.js'
 import User from '../models/User.js'
+import { isPlatformAdminScope } from './adminFilter.js'
 
 /**
  * Admin or employee's parent admin — owns bonus templates for this session.
@@ -15,7 +16,7 @@ export function getBonusOwnerAdminId (req) {
 export function bonusTemplateListFilter (req) {
   const ownerId = getBonusOwnerAdminId(req)
   if (!ownerId) return { _id: { $exists: false } } // no match
-  if (req.userType === 'SUPER_ADMIN') {
+  if (isPlatformAdminScope(req)) {
     return { $or: [{ createdBy: ownerId }, { createdBy: null }] }
   }
   return { createdBy: ownerId }
@@ -25,7 +26,7 @@ export function canMutateBonusTemplate (bonus, req) {
   const ownerId = getBonusOwnerAdminId(req)
   if (!ownerId || !bonus) return false
   if (!bonus.createdBy) {
-    return req.userType === 'SUPER_ADMIN'
+    return isPlatformAdminScope(req)
   }
   return String(bonus.createdBy) === String(ownerId)
 }
@@ -77,7 +78,7 @@ export function selectApplicableBonus (bonuses, depositAmount, isFirstDeposit) {
 
 /** UserBonus list: super admin sees all; others only users under their admin */
 export async function userBonusMongoFilter (req) {
-  if (req.userType === 'SUPER_ADMIN') {
+  if (isPlatformAdminScope(req)) {
     return {}
   }
   const ownerId = getBonusOwnerAdminId(req)

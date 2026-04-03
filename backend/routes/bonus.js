@@ -3,6 +3,7 @@ import Bonus from '../models/Bonus.js'
 import UserBonus from '../models/UserBonus.js'
 import User from '../models/User.js'
 import { verifyAdminToken } from '../middleware/rbac.js'
+import { isPlatformAdminScope } from '../utils/adminFilter.js'
 import {
   getBonusOwnerAdminId,
   bonusTemplateListFilter,
@@ -277,7 +278,7 @@ router.post('/activate-bonus', verifyAdminToken, async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
-    if (req.userType !== 'SUPER_ADMIN') {
+    if (!isPlatformAdminScope(req)) {
       const ownerId = getBonusOwnerAdminId(req)
       if (!user.assignedAdmin || String(user.assignedAdmin) !== String(ownerId)) {
         return res.status(403).json({ success: false, message: 'User is not assigned to your admin account' })

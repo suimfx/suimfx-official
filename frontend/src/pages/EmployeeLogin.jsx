@@ -25,15 +25,47 @@ const EmployeeLogin = () => {
     setError('')
     
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/admin-login`, {
+      let res = await fetch(`${API_URL}/admin-mgmt/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       })
-      const data = await res.json()
-      
+      let data = await res.json()
+
+      // Staff accounts live in Employee collection; older APIs only expose /employee/login
+      if (!data.success && res.status === 401) {
+        res = await fetch(`${API_URL}/employee/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        })
+        data = await res.json()
+        if (data.success && data.employee) {
+          const b = data.employerBranding || {}
+          const adminLike = {
+            _id: data.employee._id,
+            email: data.employee.email,
+            firstName: data.employee.firstName,
+            lastName: data.employee.lastName,
+            role: data.employee.role,
+            sessionKind: data.sessionKind || 'employee',
+            employerRole: data.employerRole,
+            employerId: data.employerId,
+            permissions: data.employee.permissions,
+            urlSlug: b.urlSlug,
+            brandName: b.brandName,
+            logo: b.logo,
+            customDomain: b.customDomain
+          }
+          localStorage.setItem('adminToken', data.token)
+          localStorage.setItem('adminUser', JSON.stringify(adminLike))
+          navigate('/admin/dashboard')
+          setLoading(false)
+          return
+        }
+      }
+
       if (data.success) {
-        // Store admin token and data
         localStorage.setItem('adminToken', data.token)
         localStorage.setItem('adminUser', JSON.stringify(data.admin))
         navigate('/admin/dashboard')

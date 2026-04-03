@@ -32,6 +32,72 @@ import {
 import defaultLogo from '../assets/suimfxLogo.png'
 import { API_BASE_URL } from '../config/api'
 
+/** UI labels for header badge — staff under Super Admin = platform scope; under white-label Admin = tenant only */
+function getSessionBadge (admin) {
+  if (!admin) {
+    return { title: 'Admin', subtitle: null, pillClass: 'bg-blue-500/20 text-blue-400', dotClass: 'bg-blue-500' }
+  }
+  const isRealSuperAdmin =
+    admin.sessionKind === 'super_admin' ||
+    (admin.role === 'SUPER_ADMIN' && !admin.permissions && admin.sessionKind !== 'employee')
+
+  if (isRealSuperAdmin) {
+    return {
+      title: 'Super Admin',
+      subtitle: 'Platform',
+      pillClass: 'bg-red-500/20 text-red-400',
+      dotClass: 'bg-red-500'
+    }
+  }
+
+  if (admin.sessionKind === 'employee') {
+    if (admin.employerRole === 'SUPER_ADMIN') {
+      return {
+        title: 'Platform staff',
+        subtitle: 'Same data scope as Super Admin · permissions apply',
+        pillClass: 'bg-amber-500/15 text-amber-400 border border-amber-500/25',
+        dotClass: 'bg-amber-400'
+      }
+    }
+    if (admin.employerRole === 'ADMIN') {
+      const brand = (admin.brandName || '').trim()
+      return {
+        title: 'Partner staff',
+        subtitle: brand ? `${brand} · white-label users only` : 'White-label users only',
+        pillClass: 'bg-blue-500/20 text-blue-400',
+        dotClass: 'bg-blue-500'
+      }
+    }
+    return {
+      title: 'Staff',
+      subtitle: 'Limited permissions',
+      pillClass: 'bg-slate-500/20 text-slate-400',
+      dotClass: 'bg-slate-400'
+    }
+  }
+
+  if (admin.sessionKind === 'admin' || admin.role === 'ADMIN') {
+    const brand = (admin.brandName || '').trim()
+    return {
+      title: 'Admin',
+      subtitle: brand || 'Partner dashboard',
+      pillClass: 'bg-blue-500/20 text-blue-400',
+      dotClass: 'bg-blue-500'
+    }
+  }
+
+  if (admin.permissions) {
+    return {
+      title: 'Staff',
+      subtitle: admin.employerRole === 'SUPER_ADMIN' ? 'Platform scope' : 'Partner scope',
+      pillClass: 'bg-slate-500/20 text-slate-400',
+      dotClass: 'bg-slate-400'
+    }
+  }
+
+  return { title: 'Admin', subtitle: null, pillClass: 'bg-blue-500/20 text-blue-400', dotClass: 'bg-blue-500' }
+}
+
 const AdminLayout = ({ children, title, subtitle }) => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -87,17 +153,17 @@ const AdminLayout = ({ children, title, subtitle }) => {
   const hasSidebarPermission = (sidebarKey) => {
     if (!admin) return false
     
-    // Debug: Log admin data on first check
-    if (sidebarKey === 'overviewDashboard') {
-      console.log('Admin data:', { role: admin.role, sidebarPermissions: admin.sidebarPermissions })
-    }
-    
-    // Super Admin Management is ONLY for SUPER_ADMIN
+    // Super Admin Management is ONLY for the real Super Admin account (not platform staff)
     if (sidebarKey === 'superAdminManagement') {
-      return admin.role === 'SUPER_ADMIN'
+      const isRealSuperAdmin =
+        admin.sessionKind === 'super_admin' ||
+        (admin.role === 'SUPER_ADMIN' && !admin.permissions && admin.sessionKind !== 'employee')
+      return isRealSuperAdmin
     }
-    
-    if (admin.role === 'SUPER_ADMIN') return true
+
+    if (admin.sessionKind === 'super_admin' || (admin.role === 'SUPER_ADMIN' && !admin.permissions && admin.sessionKind !== 'employee')) {
+      return true
+    }
     if (sidebarKey === 'overviewDashboard') return true // Dashboard always visible
     if (sidebarKey === 'myProfile') return true // My Profile always visible
     
@@ -138,8 +204,14 @@ const AdminLayout = ({ children, title, subtitle }) => {
 
   // Filter menu items based on sidebar permissions
   const menuItems = allMenuItems.filter(item => {
-    // Hide adminOnly items (like Connect Domain) from SUPER_ADMIN
-    if (item.adminOnly && admin?.role === 'SUPER_ADMIN') return false
+    // Connect Domain etc.: white-label admins + their staff only (not platform / Super Admin)
+    if (item.adminOnly) {
+      const tenantContext =
+        admin?.sessionKind === 'admin' ||
+        admin?.role === 'ADMIN' ||
+        (admin?.sessionKind === 'employee' && admin?.employerRole === 'ADMIN')
+      if (!tenantContext) return false
+    }
     return hasSidebarPermission(item.sidebarKey)
   })
 
@@ -170,11 +242,13 @@ const AdminLayout = ({ children, title, subtitle }) => {
     localStorage.removeItem('originalAdminToken')
     localStorage.removeItem('originalAdminUser')
     localStorage.removeItem('isImpersonating')
-    // Redirect based on role - ADMIN goes to /admin/login, SUPER_ADMIN goes to /admin
-    if (currentAdmin?.role === 'ADMIN') {
-      navigate('/admin/login')
-    } else {
+    const isSuperAdminPortalUser =
+      currentAdmin?.sessionKind === 'super_admin' ||
+      (currentAdmin?.role === 'SUPER_ADMIN' && !currentAdmin?.permissions && currentAdmin?.sessionKind !== 'employee')
+    if (isSuperAdminPortalUser) {
       navigate('/admin')
+    } else {
+      navigate('/admin/login')
     }
   }
 
@@ -279,18 +353,22 @@ const AdminLayout = ({ children, title, subtitle }) => {
               {subtitle && <p className="text-gray-500 text-sm hidden sm:block">{subtitle}</p>}
             </div>
           </div>
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm ${
-            admin?.role === 'ADMIN' 
-              ? 'bg-blue-500/20 text-blue-500' 
-              : 'bg-red-500/20 text-red-500'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${
-              admin?.role === 'ADMIN' ? 'bg-blue-500' : 'bg-red-500'
-            }`}></span>
-            <span className="hidden sm:inline">
-              {admin?.role === 'ADMIN' ? 'Admin Mode' : 'Super Admin Mode'}
-            </span>
-          </div>
+          {(() => {
+            const badge = getSessionBadge(admin)
+            return (
+              <div className={`flex flex-col items-end gap-0.5 max-w-[min(100%,14rem)] sm:max-w-xs`}>
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm ${badge.pillClass}`}>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${badge.dotClass}`} />
+                  <span className="font-medium truncate">{badge.title}</span>
+                </div>
+                {badge.subtitle && (
+                  <span className="text-[10px] sm:text-xs text-gray-500 text-right leading-tight line-clamp-2">
+                    {badge.subtitle}
+                  </span>
+                )}
+              </div>
+            )
+          })()}
         </header>
 
         {/* Impersonation Banner */}

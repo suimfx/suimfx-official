@@ -1,6 +1,7 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import Employee from '../models/Employee.js'
+import Admin from '../models/Admin.js'
 
 const router = express.Router()
 // Get JWT_SECRET dynamically to ensure env is loaded
@@ -67,6 +68,11 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Account is suspended or inactive' })
     }
 
+    const parentAdmin = await Admin.findById(employee.createdBy)
+    if (!parentAdmin || parentAdmin.status !== 'ACTIVE') {
+      return res.status(403).json({ success: false, message: 'Employer account is unavailable' })
+    }
+
     const isMatch = await employee.comparePassword(password)
     console.log('Password match result:', isMatch)
     
@@ -81,15 +87,17 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { employeeId: employee._id, role: employee.role, email: employee.email },
       getJwtSecret(),
-      { expiresIn: '12h' }
+      { expiresIn: '24h' }
     )
 
-    // Get allowed routes
     const allowedRoutes = employee.getAllowedRoutes()
 
     res.json({
       success: true,
       token,
+      sessionKind: 'employee',
+      employerRole: parentAdmin.role,
+      employerId: parentAdmin._id,
       employee: {
         _id: employee._id,
         email: employee.email,
@@ -98,6 +106,12 @@ router.post('/login', async (req, res) => {
         role: employee.role,
         permissions: employee.permissions,
         allowedRoutes
+      },
+      employerBranding: {
+        urlSlug: parentAdmin.urlSlug,
+        brandName: parentAdmin.brandName,
+        logo: parentAdmin.logo,
+        customDomain: parentAdmin.customDomain
       }
     })
   } catch (error) {

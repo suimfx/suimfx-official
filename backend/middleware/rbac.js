@@ -29,9 +29,17 @@ export const verifyAdminToken = async (req, res, next) => {
       if (employee.status !== 'ACTIVE') {
         return res.status(403).json({ success: false, message: 'Account is suspended or inactive' })
       }
+      const parentAdmin = await Admin.findById(employee.createdBy)
+      if (!parentAdmin) {
+        return res.status(403).json({ success: false, message: 'Employer account not found' })
+      }
+      if (parentAdmin.status !== 'ACTIVE') {
+        return res.status(403).json({ success: false, message: 'Employer account is suspended' })
+      }
       req.user = employee
       req.userType = 'EMPLOYEE'
       req.permissions = employee.permissions
+      req.admin = parentAdmin
       return next()
     }
     

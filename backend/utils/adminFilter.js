@@ -1,6 +1,15 @@
 import User from '../models/User.js'
 
 /**
+ * Session is scoped like Super Admin (platform / unassigned users) — either the Super Admin
+ * logged in directly, or staff (Employee) created by that Super Admin. White-label admins and
+ * their staff use tenant scope only (req.admin.role === 'ADMIN').
+ */
+export const isPlatformAdminScope = (req) => {
+  return !!(req?.admin && req.admin.role === 'SUPER_ADMIN')
+}
+
+/**
  * Get list of user IDs that belong to an admin
  * SUPER_ADMIN: returns only unassigned users (not belonging to any Admin)
  * ADMIN: returns only their assigned users

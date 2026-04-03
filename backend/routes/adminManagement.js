@@ -6,6 +6,7 @@ import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import Admin from '../models/Admin.js'
+import Employee from '../models/Employee.js'
 import AdminWallet from '../models/AdminWallet.js'
 import AdminWalletTransaction from '../models/AdminWalletTransaction.js'
 import User from '../models/User.js'
@@ -241,6 +242,7 @@ router.post('/login', async (req, res) => {
         firstName: admin.firstName,
         lastName: admin.lastName,
         role: admin.role,
+        sessionKind: 'super_admin',
         urlSlug: admin.urlSlug,
         brandName: admin.brandName,
         logo: admin.logo,
@@ -262,52 +264,99 @@ router.post('/admin-login', async (req, res) => {
 
     const admin = await Admin.findOne({ email: email.toLowerCase() })
     console.log('Admin found:', admin ? { id: admin._id, role: admin.role, sidebarPermissions: admin.sidebarPermissions } : null)
-    if (!admin) {
+
+    if (admin) {
+      if (admin.role !== 'ADMIN') {
+        return res.status(403).json({ success: false, message: 'Access denied. Use super admin login.' })
+      }
+
+      if (admin.status !== 'ACTIVE') {
+        return res.status(403).json({ success: false, message: 'Account is suspended or pending' })
+      }
+
+      const isMatch = await bcrypt.compare(password, admin.password)
+      if (isMatch) {
+        admin.lastLogin = new Date()
+        await admin.save()
+
+        const wallet = await AdminWallet.findOne({ adminId: admin._id })
+
+        const token = jwt.sign(
+          { adminId: admin._id, role: admin.role, email: admin.email },
+          getJwtSecret(),
+          { expiresIn: '24h' }
+        )
+
+        return res.json({
+          success: true,
+          token,
+          admin: {
+            _id: admin._id,
+            email: admin.email,
+            firstName: admin.firstName,
+            lastName: admin.lastName,
+            role: admin.role,
+            sessionKind: 'admin',
+            referralCode: admin.referralCode,
+            urlSlug: admin.urlSlug,
+            brandName: admin.brandName,
+            logo: admin.logo,
+            customDomain: admin.customDomain,
+            sidebarPermissions: admin.sidebarPermissions,
+            walletBalance: wallet?.balance || 0
+          }
+        })
+      }
+      // Wrong password for this Admin email — try Employee (same email can be confusing in support cases)
+    }
+
+    // Staff created under Employee Management live in Employee collection (not Admin)
+    const employee = await Employee.findOne({ email: email.toLowerCase() })
+    if (!employee) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' })
+    }
+    if (employee.status !== 'ACTIVE') {
+      return res.status(403).json({ success: false, message: 'Account is suspended or inactive' })
+    }
+
+    const parentAdmin = await Admin.findById(employee.createdBy)
+    if (!parentAdmin || parentAdmin.status !== 'ACTIVE') {
+      return res.status(403).json({ success: false, message: 'Employer account is unavailable' })
+    }
+
+    const employeePasswordOk = await employee.comparePassword(password)
+    if (!employeePasswordOk) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
-    // Only ADMIN (not SUPER_ADMIN) can login via this route
-    if (admin.role !== 'ADMIN') {
-      return res.status(403).json({ success: false, message: 'Access denied. Use super admin login.' })
-    }
-
-    if (admin.status !== 'ACTIVE') {
-      return res.status(403).json({ success: false, message: 'Account is suspended or pending' })
-    }
-
-    const isMatch = await bcrypt.compare(password, admin.password)
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' })
-    }
-
-    // Update last login
-    admin.lastLogin = new Date()
-    await admin.save()
-
-    // Get wallet info
-    const wallet = await AdminWallet.findOne({ adminId: admin._id })
+    employee.lastLogin = new Date()
+    await employee.save()
 
     const token = jwt.sign(
-      { adminId: admin._id, role: admin.role, email: admin.email },
+      { employeeId: employee._id, role: employee.role, email: employee.email },
       getJwtSecret(),
       { expiresIn: '24h' }
     )
+
+    const wallet = await AdminWallet.findOne({ adminId: parentAdmin._id })
 
     res.json({
       success: true,
       token,
       admin: {
-        _id: admin._id,
-        email: admin.email,
-        firstName: admin.firstName,
-        lastName: admin.lastName,
-        role: admin.role,
-        referralCode: admin.referralCode,
-        urlSlug: admin.urlSlug,
-        brandName: admin.brandName,
-        logo: admin.logo,
-        customDomain: admin.customDomain,
-        sidebarPermissions: admin.sidebarPermissions,
+        _id: employee._id,
+        email: employee.email,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        role: employee.role,
+        sessionKind: 'employee',
+        employerRole: parentAdmin.role,
+        employerId: parentAdmin._id,
+        permissions: employee.permissions,
+        urlSlug: parentAdmin.urlSlug,
+        brandName: parentAdmin.brandName,
+        logo: parentAdmin.logo,
+        customDomain: parentAdmin.customDomain,
         walletBalance: wallet?.balance || 0
       }
     })

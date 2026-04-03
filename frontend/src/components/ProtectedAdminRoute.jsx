@@ -31,8 +31,12 @@ const ProtectedAdminRoute = ({ children, requiredPermission, requireSuperAdmin }
 
       const admin = JSON.parse(adminUser)
 
-      // Super Admin has all permissions
-      if (admin.role === 'SUPER_ADMIN') {
+      const isRealSuperAdmin =
+        admin.sessionKind === 'super_admin' ||
+        (admin.role === 'SUPER_ADMIN' && !admin.permissions && admin.sessionKind !== 'employee')
+
+      // Only the real Super Admin account bypasses permission checks (not platform staff)
+      if (isRealSuperAdmin) {
         setIsAuthorized(true)
         setIsLoading(false)
         return
