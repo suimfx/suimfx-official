@@ -107,6 +107,7 @@ function App() {
           <Route path="/subadmin/login" element={<EmployeeLogin />} />
           <Route path="/buy-challenge" element={<BuyChallengePage />} />
           <Route path="/challenge-dashboard" element={<ChallengeDashboardPage />} />
+          <Route path="/employee-login" element={<BrandedEmployeeLogin />} />
           <Route path="/:slug/employee-login" element={<BrandedEmployeeLogin />} />
           <Route path="/:slug/login" element={<BrandedLogin />} />
           <Route path="/:slug/signup" element={<BrandedSignup />} />

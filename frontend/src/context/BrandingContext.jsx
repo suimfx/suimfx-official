@@ -39,6 +39,7 @@ function isUserAuthPath (pathname) {
     return true
   }
   if (/^\/[^/]+\/(login|signup)$/.test(pathname)) return true
+  if (pathname === '/employee-login' || /^\/[^/]+\/employee-login$/.test(pathname)) return true
   return false
 }
 
