@@ -6,37 +6,41 @@ import { API_URL, API_BASE_URL } from '../config/api'
 const isPlatformHost = (h) =>
   h === 'suimfx.com' || h.endsWith('.suimfx.com') || h === 'localhost' || h === '127.0.0.1'
 
+const fetchWithTimeout = (url, ms = 6000) => {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), ms)
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id))
+}
+
 const BrandedEmployeeLogin = () => {
-  const { slug } = useParams()  // defined for /:slug/employee-login, undefined for /employee-login
+  const { slug } = useParams()
   const navigate = useNavigate()
+  const hostname = window.location.hostname
+  const isCustomDomain = !isPlatformHost(hostname)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [brandInfo, setBrandInfo] = useState(null)
   const [brandFetchDone, setBrandFetchDone] = useState(false)
-  const [brandError, setBrandError] = useState('')
   const [formData, setFormData] = useState({ email: '', password: '' })
 
-  // Fetch brand info — by slug OR by hostname (custom domain)
+  // Fetch brand info — by slug OR by hostname (custom domain), with timeout
   useEffect(() => {
     const fetchBrand = async () => {
       try {
         let url
         if (slug) {
           url = `${API_URL}/admin-mgmt/brand/${slug}`
-        } else {
-          const hostname = window.location.hostname
-          if (isPlatformHost(hostname)) {
-            // Platform host with no slug — nothing to show
-            setBrandError('No admin found for this domain.')
-            setBrandFetchDone(true)
-            return
-          }
+        } else if (isCustomDomain) {
           url = `${API_URL}/admin-mgmt/branding?domain=${encodeURIComponent(hostname)}`
+        } else {
+          // Platform host with no slug — nothing to load
+          setBrandFetchDone(true)
+          return
         }
 
-        const res = await fetch(url)
+        const res = await fetchWithTimeout(url, 6000)
         const data = await res.json()
 
         if (data.success && (data.brand || data.admin)) {
@@ -46,32 +50,31 @@ const BrandedEmployeeLogin = () => {
             logo: b.logo || null,
             urlSlug: b.urlSlug || b.adminSlug || '',
           })
-        } else {
-          setBrandError(data.message || 'No brand found for this domain.')
         }
+        // No brand found is OK — we still show the form (login works via domain)
       } catch {
-        setBrandError('Failed to load brand information.')
+        // Timeout or network error — still show form so user can attempt login
       }
       setBrandFetchDone(true)
     }
 
     fetchBrand()
-  }, [slug])
+  }, [slug, hostname, isCustomDomain])
 
-  // Dynamic title & favicon
   const brandName = brandInfo?.brandName || ''
   const logoUrl = brandInfo?.logo ? `${API_BASE_URL}${brandInfo.logo}` : null
   const effectiveSlug = slug || brandInfo?.urlSlug || ''
+  // For custom domain login without a resolved slug, we send hostname as domain
+  const loginDomain = (!effectiveSlug && isCustomDomain) ? hostname : null
 
+  // Dynamic title & favicon
   useEffect(() => {
     if (!brandName) return
     const originalTitle = document.title
     const linkEl = document.querySelector("link[rel~='icon']")
     const originalFavicon = linkEl?.href || '/suimfxLogo.png'
-
     document.title = `${brandName} - Staff Login`
     if (logoUrl && linkEl) linkEl.href = logoUrl
-
     return () => {
       document.title = originalTitle
       if (linkEl) linkEl.href = originalFavicon
@@ -85,7 +88,7 @@ const BrandedEmployeeLogin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!effectiveSlug) {
+    if (!effectiveSlug && !loginDomain) {
       setError('Cannot determine admin. Please use the correct login link.')
       return
     }
@@ -93,10 +96,14 @@ const BrandedEmployeeLogin = () => {
     setError('')
 
     try {
+      const body = { ...formData }
+      if (effectiveSlug) body.adminSlug = effectiveSlug
+      else if (loginDomain) body.domain = loginDomain
+
       const res = await fetch(`${API_URL}/admin-mgmt/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, adminSlug: effectiveSlug })
+        body: JSON.stringify(body)
       })
       const data = await res.json()
 
@@ -113,21 +120,24 @@ const BrandedEmployeeLogin = () => {
     setLoading(false)
   }
 
+  // Loading state — only shown briefly (max 6s timeout)
   if (!brandFetchDone) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
+        <p className="text-slate-400 text-sm">Loading...</p>
       </div>
     )
   }
 
-  if (brandError && !brandInfo) {
+  // No brand AND not a custom domain = truly invalid URL
+  if (!brandInfo && !isCustomDomain && !slug) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <div className="text-center">
           <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
           <p className="text-white text-lg font-semibold mb-2">Invalid Login Link</p>
-          <p className="text-slate-400">{brandError}</p>
+          <p className="text-slate-400">No admin found for this URL.</p>
         </div>
       </div>
     )

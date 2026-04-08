@@ -259,15 +259,24 @@ router.post('/login', async (req, res) => {
 // POST /api/admin-mgmt/admin-login - Admin/Employee login only (for /admin-employee route)
 router.post('/admin-login', async (req, res) => {
   try {
-    const { email, password, adminSlug } = req.body
-    console.log('Admin login attempt:', email, adminSlug ? `(slug: ${adminSlug})` : '')
+    const { email, password, adminSlug, domain } = req.body
+    console.log('Admin login attempt:', email, adminSlug ? `(slug: ${adminSlug})` : domain ? `(domain: ${domain})` : '')
 
-    // If adminSlug provided (branded employee login), resolve that admin first
+    // Resolve the admin context: by slug OR by custom domain (fallback when branding fetch failed)
     let slugAdmin = null
     if (adminSlug) {
       slugAdmin = await Admin.findOne({ urlSlug: adminSlug.toLowerCase(), status: 'ACTIVE' })
       if (!slugAdmin) {
         return res.status(404).json({ success: false, message: 'Invalid login URL' })
+      }
+    } else if (domain) {
+      const domainClean = domain.toLowerCase().replace(/^www\./, '').replace(/^https?:\/\//, '').replace(/\/$/, '')
+      slugAdmin = await Admin.findOne({
+        customDomain: { $in: [domainClean, `www.${domainClean}`] },
+        status: 'ACTIVE'
+      })
+      if (!slugAdmin) {
+        return res.status(404).json({ success: false, message: 'No admin found for this domain' })
       }
     }
 
