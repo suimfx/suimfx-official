@@ -101,11 +101,15 @@ router.get('/', verifyAdminToken, async (req, res) => {
 })
 
 // GET /api/charges/:id - Get single charge
-router.get('/:id', async (req, res) => {
+router.get('/:id', verifyAdminToken, async (req, res) => {
   try {
     const charge = await Charges.findById(req.params.id)
     if (!charge) {
       return res.status(404).json({ success: false, message: 'Charge not found' })
+    }
+    // Admin can only view their own charges; Super Admin can view any
+    if (req.userType !== 'SUPER_ADMIN' && charge.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
     }
     res.json({ success: true, charge })
   } catch (error) {
@@ -129,6 +133,7 @@ router.post('/', verifyAdminToken, async (req, res) => {
       commissionOnBuy,
       commissionOnSell,
       commissionOnClose,
+      commissionOverride,
       swapLong,
       swapShort,
       swapType
@@ -137,6 +142,12 @@ router.post('/', verifyAdminToken, async (req, res) => {
     if (!level) {
       return res.status(400).json({ success: false, message: 'Level is required' })
     }
+
+    const parsedCommissionValue = commissionValue !== undefined ? Number(commissionValue) : 0
+    // Auto-enable commissionOverride when admin explicitly sets 0 on a specific level
+    const effectiveCommissionOverride = commissionOverride !== undefined
+      ? !!commissionOverride
+      : (commissionValue !== undefined && parsedCommissionValue === 0 && ['USER', 'INSTRUMENT'].includes(level))
 
     const charge = await Charges.create({
       level,
@@ -148,10 +159,11 @@ router.post('/', verifyAdminToken, async (req, res) => {
       spreadType: spreadType || 'FIXED',
       spreadValue: spreadValue || 0,
       commissionType: commissionType || 'PER_LOT',
-      commissionValue: commissionValue || 0,
+      commissionValue: parsedCommissionValue,
       commissionOnBuy: commissionOnBuy !== false,
       commissionOnSell: commissionOnSell !== false,
       commissionOnClose: commissionOnClose || false,
+      commissionOverride: effectiveCommissionOverride,
       swapLong: swapLong || 0,
       swapShort: swapShort || 0,
       swapType: swapType || 'POINTS',
@@ -190,6 +202,7 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
       commissionOnBuy,
       commissionOnSell,
       commissionOnClose,
+      commissionOverride,
       swapLong,
       swapShort,
       swapType,
@@ -200,6 +213,9 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
     if (!charge) {
       return res.status(404).json({ success: false, message: 'Charge not found' })
     }
+    if (req.userType !== 'SUPER_ADMIN' && charge.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
 
     if (level !== undefined) charge.level = level
     if (userId !== undefined) charge.userId = userId || null
@@ -209,7 +225,17 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
     if (spreadType !== undefined) charge.spreadType = spreadType
     if (spreadValue !== undefined) charge.spreadValue = spreadValue
     if (commissionType !== undefined) charge.commissionType = commissionType
-    if (commissionValue !== undefined) charge.commissionValue = commissionValue
+    if (commissionValue !== undefined) {
+      charge.commissionValue = Number(commissionValue)
+      // Auto-enable override when admin explicitly sets 0 on USER/INSTRUMENT level
+      if (commissionOverride !== undefined) {
+        charge.commissionOverride = !!commissionOverride
+      } else if (Number(commissionValue) === 0 && ['USER', 'INSTRUMENT'].includes(charge.level)) {
+        charge.commissionOverride = true
+      } else if (Number(commissionValue) > 0) {
+        charge.commissionOverride = false
+      }
+    }
     if (commissionOnBuy !== undefined) charge.commissionOnBuy = commissionOnBuy
     if (commissionOnSell !== undefined) charge.commissionOnSell = commissionOnSell
     if (commissionOnClose !== undefined) charge.commissionOnClose = commissionOnClose
@@ -245,6 +271,9 @@ router.delete('/:id', verifyAdminToken, async (req, res) => {
     const charge = await Charges.findById(req.params.id)
     if (!charge) {
       return res.status(404).json({ success: false, message: 'Charge not found' })
+    }
+    if (req.userType !== 'SUPER_ADMIN' && charge.adminId?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
     }
 
     await Charges.findByIdAndDelete(req.params.id)

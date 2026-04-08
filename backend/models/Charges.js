@@ -76,6 +76,11 @@ const chargesSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // When true, commissionValue=0 explicitly overrides higher-level commission (e.g. VIP users)
+  commissionOverride: {
+    type: Boolean,
+    default: false
+  },
   
   // ============ SWAP SETTINGS ============
   // Overnight fees (charged daily at rollover time)
@@ -173,12 +178,13 @@ chargesSchema.statics.getChargesForTrade = async function(userId, symbol, segmen
         // Both are admin-specific, keep existing (first found)
       } else {
         // Merge non-zero values from this charge into existing
-        if (charge.commissionValue > 0 && !existing.commissionValue) {
+        if ((charge.commissionValue > 0 || charge.commissionOverride) && !existing.commissionValue && !existing.commissionOverride) {
           existing.commissionValue = charge.commissionValue
           existing.commissionType = charge.commissionType
           existing.commissionOnBuy = charge.commissionOnBuy
           existing.commissionOnSell = charge.commissionOnSell
           existing.commissionOnClose = charge.commissionOnClose
+          existing.commissionOverride = charge.commissionOverride
         }
         if (charge.spreadValue > 0 && !existing.spreadValue) {
           existing.spreadValue = charge.spreadValue
@@ -225,7 +231,7 @@ chargesSchema.statics.getChargesForTrade = async function(userId, symbol, segmen
       result.spreadValue = charge.spreadValue
       result.spreadType = charge.spreadType
     }
-    if (charge.commissionValue > 0) {
+    if (charge.commissionValue > 0 || charge.commissionOverride) {
       result.commissionValue = charge.commissionValue
       result.commissionType = charge.commissionType
       result.commissionOnBuy = charge.commissionOnBuy
