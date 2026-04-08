@@ -98,8 +98,9 @@ const adminSchema = new mongoose.Schema({
     themeSettings: { type: Boolean, default: false },
     emailTemplates: { type: Boolean, default: false },
     bonusManagement: { type: Boolean, default: false },
+    bannerManagement: { type: Boolean, default: false },
     adminManagement: { type: Boolean, default: false },
-    employeeManagement: { type: Boolean, default: false },
+    employeeManagement: { type: Boolean, default: true },
     kycVerification: { type: Boolean, default: false },
     supportTickets: { type: Boolean, default: false }
   },

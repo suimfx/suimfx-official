@@ -12,7 +12,9 @@ import {
 
   Plus, Minus, Settings, RefreshCw, ChevronDown, Bell, User,
 
-  ArrowDownCircle, ArrowUpCircle, Check, Pencil, Trash2
+  ArrowDownCircle, ArrowUpCircle, Check, Pencil, Trash2,
+
+  FileCheck
 
 } from 'lucide-react'
 
@@ -21,6 +23,8 @@ import priceService from '../services/priceService'
 import priceStreamService from '../services/priceStream'
 
 import { API_URL } from '../config/api'
+
+import { requiresKycToTrade, isDemoTradingAccount } from '../utils/tradingKyc'
 
 
 
@@ -32,7 +36,7 @@ const MobileTradingApp = () => {
 
   const accountIdFromUrl = searchParams.get('account')
 
-  const [activeTab, setActiveTab] = useState(accountIdFromUrl ? 'trade' : 'home')
+  const [activeTab, setActiveTab] = useState('home')
 
   const [showMoreMenu, setShowMoreMenu] = useState(false)
 
@@ -255,6 +259,32 @@ const MobileTradingApp = () => {
     }
 
   }, [selectedAccount])
+
+
+
+  useEffect(() => {
+
+    if (loading) return
+
+    if (!accountIdFromUrl || !selectedAccount) return
+
+    if (selectedAccount._id !== accountIdFromUrl) return
+
+    const u = JSON.parse(localStorage.getItem('user') || '{}')
+
+    if (requiresKycToTrade(u, { isDemo: isDemoTradingAccount(selectedAccount) })) {
+
+      setShowKycModal(true)
+
+      setActiveTab('home')
+
+      return
+
+    }
+
+    setActiveTab('trade')
+
+  }, [loading, accountIdFromUrl, selectedAccount?._id])
 
 
 
@@ -533,6 +563,26 @@ const MobileTradingApp = () => {
     } catch (e) { }
 
     setLoading(false)
+
+  }
+
+
+
+  const goToTradeTab = () => {
+
+    if (!selectedAccount) return
+
+    const u = JSON.parse(localStorage.getItem('user') || '{}')
+
+    if (requiresKycToTrade(u, { isDemo: isDemoTradingAccount(selectedAccount) })) {
+
+      setShowKycModal(true)
+
+      return
+
+    }
+
+    setActiveTab('trade')
 
   }
 
@@ -1138,6 +1188,8 @@ const MobileTradingApp = () => {
 
   const [showAccountSelector, setShowAccountSelector] = useState(false)
 
+  const [showKycModal, setShowKycModal] = useState(false)
+
 
 
   const renderHome = () => (
@@ -1344,7 +1396,7 @@ const MobileTradingApp = () => {
 
         </button>
 
-        <button onClick={() => setActiveTab('trade')} className="flex flex-col items-center p-2.5 bg-dark-800 rounded-xl">
+        <button onClick={goToTradeTab} className="flex flex-col items-center p-2.5 bg-dark-800 rounded-xl">
 
           <TrendingUp size={20} className="text-yellow-500 mb-1" />
 
@@ -1450,7 +1502,7 @@ const MobileTradingApp = () => {
 
             {openTrades.length > 3 && (
 
-              <button onClick={() => setActiveTab('trade')} className="w-full text-accent-green text-sm py-2">
+              <button onClick={goToTradeTab} className="w-full text-accent-green text-sm py-2">
 
                 View all {openTrades.length} positions →
 
@@ -2773,6 +2825,10 @@ const MobileTradingApp = () => {
 
                   setShowMoreMenu(true)
 
+                } else if (item.id === 'trade') {
+
+                  goToTradeTab()
+
                 } else {
 
                   setActiveTab(item.id)
@@ -2798,6 +2854,70 @@ const MobileTradingApp = () => {
         </div>
 
       </nav>
+
+
+
+      {showKycModal && (
+
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+
+          <div className="rounded-xl p-6 w-full max-w-md border shadow-xl bg-dark-800 border-amber-500/40">
+
+            <div className="flex items-center gap-3 mb-4">
+
+              <div className="p-3 rounded-full bg-amber-500/20">
+
+                <FileCheck className="text-amber-400" size={28} />
+
+              </div>
+
+              <h3 className="text-lg font-bold text-white">Complete KYC to trade</h3>
+
+            </div>
+
+            <p className="text-sm mb-6 text-gray-400">
+
+              Live and challenge trading is available only after identity verification. Please complete KYC in your profile, then return here to open the trading terminal.
+
+            </p>
+
+            <div className="flex gap-3">
+
+              <button
+
+                type="button"
+
+                onClick={() => setShowKycModal(false)}
+
+                className="flex-1 py-3 rounded-lg font-medium bg-dark-700 text-white hover:bg-dark-600"
+
+              >
+
+                Cancel
+
+              </button>
+
+              <button
+
+                type="button"
+
+                onClick={() => { setShowKycModal(false); navigate('/profile') }}
+
+                className="flex-1 py-3 rounded-lg font-bold bg-accent-green text-black hover:bg-accent-green/90"
+
+              >
+
+                Go to KYC / Profile
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
 
 

@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { 
   Trophy, Target, TrendingUp, TrendingDown, Clock, AlertTriangle,
   ChevronRight, Activity, BarChart3, Shield, Calendar, XCircle,
-  CheckCircle, AlertCircle, RefreshCw
+  CheckCircle, AlertCircle, RefreshCw, FileCheck
 } from 'lucide-react'
 import { API_URL } from '../config/api'
+import { requiresKycToTrade } from '../utils/tradingKyc'
 
 export default function ChallengeDashboardPage() {
   const navigate = useNavigate()
@@ -13,6 +14,7 @@ export default function ChallengeDashboardPage() {
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showKycModal, setShowKycModal] = useState(false)
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
   useEffect(() => {
@@ -50,6 +52,20 @@ export default function ChallengeDashboardPage() {
       }
     } catch (error) {
       console.error('Error fetching dashboard:', error)
+    }
+  }
+
+  const startChallengeTrading = () => {
+    if (!selectedAccount) return
+    const u = JSON.parse(localStorage.getItem('user') || '{}')
+    if (requiresKycToTrade(u, { isDemo: false })) {
+      setShowKycModal(true)
+      return
+    }
+    if (window.innerWidth < 768) {
+      navigate(`/mobile?account=${selectedAccount._id}`)
+    } else {
+      navigate(`/trade/${selectedAccount._id}?type=challenge`)
     }
   }
 
@@ -403,7 +419,7 @@ export default function ChallengeDashboardPage() {
             {dashboard.account.status === 'ACTIVE' && (
               <div className="mt-6">
                 <button
-                  onClick={() => navigate('/trading')}
+                  onClick={startChallengeTrading}
                   className="w-full py-4 bg-primary-500 hover:bg-primary-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                   <TrendingUp size={20} />
@@ -414,6 +430,38 @@ export default function ChallengeDashboardPage() {
           </>
         )}
       </div>
+
+      {showKycModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="rounded-xl p-6 w-full max-w-md border shadow-xl bg-dark-800 border-amber-500/40">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 rounded-full bg-amber-500/20">
+                <FileCheck className="text-amber-400" size={28} />
+              </div>
+              <h3 className="text-lg font-bold text-white">Complete KYC to trade</h3>
+            </div>
+            <p className="text-sm mb-6 text-gray-400">
+              Live and challenge trading is available only after identity verification. Please complete KYC in your profile, then return here to open the trading terminal.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowKycModal(false)}
+                className="flex-1 py-3 rounded-lg font-medium bg-dark-700 text-white hover:bg-dark-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowKycModal(false); navigate('/profile') }}
+                className="flex-1 py-3 rounded-lg font-bold bg-accent-green text-black hover:bg-accent-green/90"
+              >
+                Go to KYC / Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

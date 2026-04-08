@@ -72,7 +72,7 @@ const ProtectedAdminRoute = ({ children, requiredPermission, requireSuperAdmin }
           'overviewDashboard': p.canViewDashboard,
           'userManagement': p.canViewUsers || p.canManageUsers,
           'tradeManagement': p.canViewTrades || p.canManageTrades,
-          'bookManagement': p.canViewTrades || p.canManageTrades,
+          'bookManagement': p.canViewBookManagement || p.canManageBookManagement,
           'fundManagement': p.canViewDeposits || p.canViewWithdrawals || p.canApproveDeposits || p.canApproveWithdrawals,
           'bankSettings': p.canManagePaymentMethods,
           'ibManagement': p.canViewIB || p.canManageIB,

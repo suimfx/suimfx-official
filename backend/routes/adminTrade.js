@@ -20,10 +20,32 @@ router.use(verifyAdminToken)
 // GET /api/admin/trade/all - Get all trades with pagination (filtered by admin role)
 router.get('/all', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MANAGEMENT), async (req, res) => {
   try {
-    const { status, limit = 20, offset = 0 } = req.query
+    const { status, limit = 20, offset = 0, dateFrom, dateTo, dateField = 'opened' } = req.query
 
     let query = {}
     if (status) query.status = status
+
+    const rangeKey = dateField === 'closed' ? 'closedAt' : 'createdAt'
+    if (dateFrom || dateTo) {
+      query[rangeKey] = {}
+      if (dateFrom) {
+        const start = new Date(String(dateFrom))
+        if (!isNaN(start.getTime())) {
+          start.setUTCHours(0, 0, 0, 0)
+          query[rangeKey].$gte = start
+        }
+      }
+      if (dateTo) {
+        const end = new Date(String(dateTo))
+        if (!isNaN(end.getTime())) {
+          end.setUTCHours(23, 59, 59, 999)
+          query[rangeKey].$lte = end
+        }
+      }
+      if (Object.keys(query[rangeKey]).length === 0) {
+        delete query[rangeKey]
+      }
+    }
     
     // Filter by admin's users (both ADMIN and SUPER_ADMIN)
     const userIds = await getAdminUserIds(req.admin)

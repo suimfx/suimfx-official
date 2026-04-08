@@ -4,8 +4,8 @@ import {
   TrendingUp,
   TrendingDown,
   Search,
-  Filter,
   RefreshCw,
+  ChevronDown,
   Eye,
   XCircle,
   CheckCircle,
@@ -24,6 +24,9 @@ import { getAdminHeaders } from '../utils/adminApi'
 const AdminTradeManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [dateFieldMode, setDateFieldMode] = useState('opened') // 'opened' | 'closed' — matches API dateField
   const [accountTypeFilter, setAccountTypeFilter] = useState('real') // 'real' or 'demo'
   const [trades, setTrades] = useState([])
   const [stats, setStats] = useState({ total: 0, open: 0, volume: 0, pnl: 0 })
@@ -66,7 +69,7 @@ const AdminTradeManagement = () => {
   useEffect(() => {
     fetchTrades()
     fetchUsers()
-  }, [filterStatus, currentPage, accountTypeFilter])
+  }, [filterStatus, currentPage, accountTypeFilter, dateFrom, dateTo, dateFieldMode])
 
   // Fetch live prices for open trades via WebSocket for institutional-grade streaming
   useEffect(() => {
@@ -383,7 +386,10 @@ const AdminTradeManagement = () => {
     try {
       const offset = (currentPage - 1) * tradesPerPage
       const statusParam = filterStatus !== 'all' ? `&status=${filterStatus.toUpperCase()}` : ''
-      const res = await fetch(`${API_URL}/admin/trade/all?limit=${tradesPerPage}&offset=${offset}${statusParam}`, { headers: getAdminHeaders() })
+      const fromParam = dateFrom ? `&dateFrom=${encodeURIComponent(dateFrom)}` : ''
+      const toParam = dateTo ? `&dateTo=${encodeURIComponent(dateTo)}` : ''
+      const fieldParam = `&dateField=${encodeURIComponent(dateFieldMode)}`
+      const res = await fetch(`${API_URL}/admin/trade/all?limit=${tradesPerPage}&offset=${offset}${statusParam}${fromParam}${toParam}${fieldParam}`, { headers: getAdminHeaders() })
       const data = await res.json()
       if (data.trades) {
         setTrades(data.trades)
@@ -480,7 +486,7 @@ const AdminTradeManagement = () => {
       {/* Account Type Tabs */}
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => setAccountTypeFilter('real')}
+          onClick={() => { setAccountTypeFilter('real'); setCurrentPage(1) }}
           className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
             accountTypeFilter === 'real' 
               ? 'bg-green-500/20 text-green-500 border border-green-500/30' 
@@ -491,7 +497,7 @@ const AdminTradeManagement = () => {
           Real Account Trades
         </button>
         <button
-          onClick={() => setAccountTypeFilter('demo')}
+          onClick={() => { setAccountTypeFilter('demo'); setCurrentPage(1) }}
           className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
             accountTypeFilter === 'demo' 
               ? 'bg-blue-500/20 text-blue-500 border border-blue-500/30' 
@@ -503,49 +509,97 @@ const AdminTradeManagement = () => {
         </button>
       </div>
 
-      {/* Trades Table */}
+      {/* Trades Table — toolbar matches All Trades + date row + actions */}
       <div className="bg-dark-800 rounded-xl border border-gray-800 overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 border-b border-gray-800">
-          <div>
-            <h2 className="text-white font-semibold text-lg">
-              {accountTypeFilter === 'real' ? 'Real Account Trades' : 'Demo Account Trades'}
-            </h2>
-            <p className="text-gray-500 text-sm">
-              {accountTypeFilter === 'real' 
-                ? 'Live trading with real funds' 
-                : 'Practice trades with virtual funds'}
+        <div className="flex flex-wrap items-end gap-x-5 gap-y-4 p-4 sm:p-5 border-b border-gray-800">
+          <div className="min-w-0 shrink-0">
+            <h2 className="text-white font-bold text-lg tracking-tight">All Trades</h2>
+            <p className="text-gray-500 text-xs mt-1">
+              {accountTypeFilter === 'real' ? 'Real accounts' : 'Demo & challenge accounts'}
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="flex flex-col gap-1.5 shrink-0">
+              <span className="text-xs text-gray-500">From:</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1) }}
+                className="w-[148px] sm:w-[158px] bg-[#0d0d0f] border border-gray-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-gray-500 [color-scheme:dark]"
+                title="From date"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 shrink-0">
+              <span className="text-xs text-gray-500">To:</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1) }}
+                className="w-[148px] sm:w-[158px] bg-[#0d0d0f] border border-gray-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-gray-500 [color-scheme:dark]"
+                title="To date"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 shrink-0 min-w-[120px]">
+              <span className="text-xs text-gray-500">Date by:</span>
+              <div className="relative">
+                <select
+                  value={dateFieldMode}
+                  onChange={(e) => { setDateFieldMode(e.target.value); setCurrentPage(1) }}
+                  className="appearance-none w-full cursor-pointer bg-[#0d0d0f] border border-gray-600 rounded-lg pl-3 pr-9 py-2.5 text-white text-sm focus:outline-none focus:border-gray-500"
+                  title="Use open time or close time for the range"
+                >
+                  <option value="opened">Open date</option>
+                  <option value="closed">Close date</option>
+                </select>
+                <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              </div>
+            </label>
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => { setDateFrom(''); setDateTo(''); setCurrentPage(1) }}
+                className="text-xs text-gray-400 hover:text-white underline underline-offset-2 pb-2 self-end"
+              >
+                Clear dates
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3 sm:gap-4 lg:ml-auto">
             <button
+              type="button"
               onClick={() => {
                 setShowCreateModal(true)
                 fetchMarketPrice('XAUUSD')
               }}
-              className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg flex items-center gap-2"
+              className="px-2 py-2.5 text-white font-medium hover:text-gray-300 transition-colors shrink-0 whitespace-nowrap"
             >
-              <Plus size={18} /> Create Trade
+              + Create Trade
             </button>
-            <div className="relative">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <div className="relative w-full min-[480px]:w-52 sm:w-56 shrink-0">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search trades..."
+                placeholder="Search trades."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-64 bg-dark-700 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
+                className="w-full bg-[#0d0d0f] border border-gray-600 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gray-500"
               />
             </div>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-dark-700 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-gray-600"
-            >
-              <option value="all">All Status</option>
-              <option value="open">Open</option>
-              <option value="closed">Closed</option>
-              <option value="pending">Pending</option>
-            </select>
+            <div className="relative shrink-0 w-full min-[480px]:w-auto">
+              <select
+                value={filterStatus}
+                onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1) }}
+                className="appearance-none w-full min-[480px]:w-[148px] cursor-pointer bg-[#0d0d0f] border border-gray-600 rounded-lg pl-4 pr-10 py-2.5 text-white text-sm focus:outline-none focus:border-gray-500"
+              >
+                <option value="all">All Status</option>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+                <option value="pending">Pending</option>
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            </div>
           </div>
         </div>
 

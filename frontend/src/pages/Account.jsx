@@ -27,10 +27,12 @@ import {
   ArrowLeft,
   Home,
   Sun,
-  Moon
+  Moon,
+  FileCheck
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { API_URL, API_BASE_URL } from '../config/api'
+import { requiresKycToTrade, isDemoTradingAccount } from '../utils/tradingKyc'
 import suimfxLogo from '../assets/suimfxLogo.png'
 
 const Account = () => {
@@ -65,6 +67,7 @@ const Account = () => {
   const [showAccountMenu, setShowAccountMenu] = useState(null)
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
+  const [showKycModal, setShowKycModal] = useState(false)
   const [pinSecurityEnabled, setPinSecurityEnabled] = useState(() => {
     const saved = localStorage.getItem('pinSecurityEnabled')
     return saved !== null ? JSON.parse(saved) : true
@@ -98,6 +101,25 @@ const Account = () => {
 
   const tabs = challengeModeEnabled ? ['Real', 'Demo', 'Challenge', 'Archived'] : ['Real', 'Demo', 'Archived']
   const user = JSON.parse(localStorage.getItem('user') || '{}')
+
+  const openTradingTerminal = (tradingAccount) => {
+    if (requiresKycToTrade(user, { isDemo: isDemoTradingAccount(tradingAccount) })) {
+      setShowKycModal(true)
+      return
+    }
+    if (isMobile) navigate(`/mobile?account=${tradingAccount._id}`)
+    else navigate(`/trade/${tradingAccount._id}`)
+  }
+
+  const openChallengeTradingTerminal = () => {
+    if (!selectedChallengeAccount) return
+    if (requiresKycToTrade(user, { isDemo: false })) {
+      setShowKycModal(true)
+      return
+    }
+    if (isMobile) navigate(`/mobile?account=${selectedChallengeAccount._id}`)
+    else navigate(`/trade/${selectedChallengeAccount._id}?type=challenge`)
+  }
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -1018,7 +1040,7 @@ const Account = () => {
                   {/* Card Footer - Actions */}
                   <div className={`flex border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
                     <button
-                      onClick={() => isMobile ? navigate(`/mobile?account=${account._id}`) : navigate(`/trade/${account._id}`)}
+                      onClick={() => openTradingTerminal(account)}
                       className={`flex-1 flex items-center justify-center gap-1 ${isMobile ? 'py-2 text-xs' : 'py-3'} bg-accent-green text-black font-medium hover:bg-accent-green/90 transition-colors`}
                     >
                       <ArrowRight size={isMobile ? 12 : 16} /> Trade
@@ -1825,11 +1847,7 @@ const Account = () => {
                   <button
                     onClick={() => {
                       setShowRulesModal(false)
-                      if (isMobile) {
-                        navigate(`/mobile?account=${selectedChallengeAccount._id}`)
-                      } else {
-                        navigate(`/trade/${selectedChallengeAccount._id}?type=challenge`)
-                      }
+                      openChallengeTradingTerminal()
                     }}
                     className="flex-1 py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2"
                   >
@@ -1837,6 +1855,39 @@ const Account = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KYC required before live / challenge trading */}
+      {showKycModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className={`rounded-xl p-6 w-full max-w-md border shadow-xl ${isDarkMode ? 'bg-dark-800 border-amber-500/40' : 'bg-white border-amber-200'}`}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`p-3 rounded-full ${isDarkMode ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                <FileCheck className={isDarkMode ? 'text-amber-400' : 'text-amber-700'} size={28} />
+              </div>
+              <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Complete KYC to trade</h3>
+            </div>
+            <p className={`text-sm mb-6 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Live and challenge trading is available only after identity verification. Please complete KYC in your profile, then return here to open the trading terminal.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowKycModal(false)}
+                className={`flex-1 py-3 rounded-lg font-medium ${isDarkMode ? 'bg-dark-700 text-white hover:bg-dark-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowKycModal(false); navigate('/profile') }}
+                className="flex-1 py-3 rounded-lg font-bold bg-accent-green text-black hover:bg-accent-green/90"
+              >
+                Go to KYC / Profile
+              </button>
             </div>
           </div>
         </div>

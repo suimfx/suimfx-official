@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
-import { Search, Star, X, Plus, Minus, Settings, Home, Wallet, LayoutGrid, BarChart3, Pencil, Trophy, AlertTriangle, Sun, Moon, Grid2X2, Download, RefreshCw } from 'lucide-react'
+import { Search, Star, X, Plus, Minus, Settings, Home, Wallet, LayoutGrid, BarChart3, Pencil, Trophy, AlertTriangle, Sun, Moon, Grid2X2, Download, RefreshCw, ChevronLeft, ChevronRight, FileCheck } from 'lucide-react'
 
 import priceService from '../services/priceService'
 
@@ -13,6 +13,11 @@ import priceStreamService from '../services/priceStream'
 import { useTheme } from '../context/ThemeContext'
 
 import { API_URL } from '../config/api'
+import { requiresKycToTrade, isDemoTradingAccount } from '../utils/tradingKyc'
+
+
+
+const HISTORY_PAGE_SIZE = 50
 
 
 
@@ -184,6 +189,18 @@ const TradingPage = () => {
 
   const [historyEndDate, setHistoryEndDate] = useState('')
 
+
+
+  const [historyPage, setHistoryPage] = useState(1)
+
+  const [historyTotal, setHistoryTotal] = useState(0)
+
+  const [historyTotalPnl, setHistoryTotalPnl] = useState(0)
+
+
+
+  const [showKycRequiredModal, setShowKycRequiredModal] = useState(false)
+
   
 
   // Modal states for iOS-style popups
@@ -255,6 +272,104 @@ const TradingPage = () => {
     setTradeNotifications(prev => prev.filter(n => n.id !== id))
 
   }
+
+
+
+  const buildHistoryDateQueryParams = useCallback(() => {
+
+    const params = new URLSearchParams()
+
+    const now = new Date()
+
+    if (historyStartDate && historyEndDate) {
+
+      params.set('startDate', historyStartDate)
+
+      params.set('endDate', historyEndDate)
+
+    } else if (historyFilter !== 'all') {
+
+      const endStr = now.toISOString().split('T')[0]
+
+      let start = null
+
+      if (historyFilter === 'today') {
+
+        start = new Date(now)
+
+        start.setHours(0, 0, 0, 0)
+
+      } else if (historyFilter === 'week') {
+
+        start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+      } else if (historyFilter === 'month') {
+
+        start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+      } else if (historyFilter === 'year') {
+
+        start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+
+      }
+
+      if (start) {
+
+        params.set('startDate', start.toISOString().split('T')[0])
+
+        params.set('endDate', endStr)
+
+      }
+
+    }
+
+    return params
+
+  }, [historyFilter, historyStartDate, historyEndDate])
+
+
+
+  const fetchTradeHistory = useCallback(async () => {
+
+    if (!accountId) return
+
+    try {
+
+      const params = buildHistoryDateQueryParams()
+
+      params.set('limit', String(HISTORY_PAGE_SIZE))
+
+      params.set('offset', String((historyPage - 1) * HISTORY_PAGE_SIZE))
+
+      const res = await fetch(`${API_URL}/trade/history/${accountId}?${params.toString()}`)
+
+      const data = await res.json()
+
+      if (data.success) {
+
+        setTradeHistory(data.trades || [])
+
+        setHistoryTotal(Number(data.total) || 0)
+
+        setHistoryTotalPnl(Number(data.totalRealizedPnl) || 0)
+
+      }
+
+    } catch (error) {
+
+      console.error('Error fetching trade history:', error)
+
+    }
+
+  }, [accountId, historyPage, buildHistoryDateQueryParams])
+
+
+
+  useEffect(() => {
+
+    setHistoryPage(1)
+
+  }, [accountId])
 
 
 
@@ -348,7 +463,7 @@ const TradingPage = () => {
 
     }
 
-  }, [accountId])
+  }, [accountId, fetchTradeHistory])
 
 
 
@@ -384,7 +499,7 @@ const TradingPage = () => {
 
     }
 
-  }, [accountId])
+  }, [accountId, fetchTradeHistory])
 
 
 
@@ -1116,119 +1231,57 @@ const TradingPage = () => {
 
 
 
-  // Fetch trade history (closed trades)
+  // Download full trade history for current filters (paginates API up to 50k rows)
 
-  const fetchTradeHistory = async () => {
+  const downloadHistoryCSV = async () => {
+
+    if (!accountId) return
+
+    const chunk = 200
+
+    let offset = 0
+
+    const all = []
+
+    let total = Infinity
 
     try {
 
-      const res = await fetch(`${API_URL}/trade/history/${accountId}`)
+      while (offset < total && all.length < 50000) {
 
-      const data = await res.json()
+        const params = buildHistoryDateQueryParams()
 
-      if (data.success) {
+        params.set('limit', String(chunk))
 
-        setTradeHistory(data.trades || [])
+        params.set('offset', String(offset))
+
+        const res = await fetch(`${API_URL}/trade/history/${accountId}?${params.toString()}`)
+
+        const data = await res.json()
+
+        if (!data.success || !data.trades?.length) break
+
+        all.push(...data.trades)
+
+        total = Number(data.total) || all.length
+
+        offset += data.trades.length
+
+        if (data.trades.length < chunk) break
 
       }
 
-    } catch (error) {
+    } catch (e) {
 
-      console.error('Error fetching trade history:', error)
+      console.error('CSV export failed:', e)
+
+      return
 
     }
 
-  }
-
-
-
-  // Filter trade history based on selected filter
-
-  const getFilteredHistory = () => {
-
-    const now = new Date()
-
-    return tradeHistory.filter(trade => {
-
-      const tradeDate = new Date(trade.closedAt)
-
-      
-
-      // Date range filter (takes priority if both dates are set)
-
-      if (historyStartDate && historyEndDate) {
-
-        const start = new Date(historyStartDate)
-
-        const end = new Date(historyEndDate)
-
-        end.setHours(23, 59, 59, 999)
-
-        return tradeDate >= start && tradeDate <= end
-
-      }
-
-      
-
-      if (historyFilter === 'all') return true
-
-      if (historyFilter === 'today') {
-
-        return tradeDate.toDateString() === now.toDateString()
-
-      }
-
-      if (historyFilter === 'week') {
-
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-
-        return tradeDate >= weekAgo
-
-      }
-
-      if (historyFilter === 'month') {
-
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-
-        return tradeDate >= monthAgo
-
-      }
-
-      if (historyFilter === 'year') {
-
-        const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
-
-        return tradeDate >= yearAgo
-
-      }
-
-      return true
-
-    })
-
-  }
-
-
-
-  // Calculate total P&L for filtered history
-
-  const getHistoryTotalPnl = () => {
-
-    return getFilteredHistory().reduce((sum, trade) => sum + (trade.realizedPnl || 0), 0)
-
-  }
-
-
-
-  // Download trade history as CSV
-
-  const downloadHistoryCSV = () => {
-
-    const filtered = getFilteredHistory()
-
     const headers = ['Date', 'Symbol', 'Side', 'Quantity', 'Open Price', 'Close Price', 'Commission', 'Swap', 'P&L', 'Closed By']
 
-    const rows = filtered.map(trade => [
+    const rows = all.map(trade => [
 
       new Date(trade.closedAt).toLocaleString(),
 
@@ -1251,8 +1304,6 @@ const TradingPage = () => {
       trade.closedBy || 'USER'
 
     ])
-
-
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
 
@@ -1564,6 +1615,18 @@ const TradingPage = () => {
 
       } else {
 
+        if (data.code === 'KYC_REQUIRED') {
+
+          setShowKycRequiredModal(true)
+
+          setTradeError(data.message || 'Complete KYC to trade.')
+
+          setIsExecutingTrade(false)
+
+          return
+
+        }
+
         // Check if account failed due to rule violations
 
         if (data.accountFailed) {
@@ -1716,7 +1779,17 @@ const TradingPage = () => {
 
       } else {
 
-        setTradeError(data.message || 'Failed to place order')
+        if (data.code === 'KYC_REQUIRED') {
+
+          setShowKycRequiredModal(true)
+
+          setTradeError(data.message || 'Complete KYC to trade.')
+
+        } else {
+
+          setTradeError(data.message || 'Failed to place order')
+
+        }
 
       }
 
@@ -2180,7 +2253,13 @@ const TradingPage = () => {
 
           setLeverage(`1:${challengeMaxLeverage}`)
 
+          const u = JSON.parse(localStorage.getItem('user') || '{}')
+
+          setShowKycRequiredModal(requiresKycToTrade(u, { isDemo: false }))
+
         } else {
+
+          setShowKycRequiredModal(false)
 
           navigate('/account')
 
@@ -2202,7 +2281,13 @@ const TradingPage = () => {
 
           setLeverage(acc.leverage || '1:100')
 
+          const u = JSON.parse(localStorage.getItem('user') || '{}')
+
+          setShowKycRequiredModal(requiresKycToTrade(u, { isDemo: isDemoTradingAccount(acc) }))
+
         } else {
+
+          setShowKycRequiredModal(false)
 
           navigate('/account')
 
@@ -2519,6 +2604,68 @@ const TradingPage = () => {
   return (
 
     <div className={`h-screen flex overflow-hidden text-sm transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
+
+      {showKycRequiredModal && (
+
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4">
+
+          <div className={`max-w-md w-full rounded-xl p-6 border shadow-2xl ${isDarkMode ? 'bg-[#141414] border-amber-500/40' : 'bg-white border-amber-200'}`}>
+
+            <div className="flex items-center gap-3 mb-3">
+
+              <div className={`p-2.5 rounded-full ${isDarkMode ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+
+                <FileCheck size={24} className={isDarkMode ? 'text-amber-400' : 'text-amber-700'} />
+
+              </div>
+
+              <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>KYC required</h2>
+
+            </div>
+
+            <p className={`text-sm mb-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+
+              You cannot place trades until identity verification is completed. Open your profile to submit or finish KYC.
+
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+
+              <button
+
+                type="button"
+
+                onClick={() => navigate('/account')}
+
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium ${isDarkMode ? 'bg-[#1a1a1a] text-gray-300 hover:bg-[#252525]' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+
+              >
+
+                Back to accounts
+
+              </button>
+
+              <button
+
+                type="button"
+
+                onClick={() => navigate('/profile')}
+
+                className="flex-1 py-2.5 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500"
+
+              >
+
+                Complete KYC
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
       {/* Left Sidebar */}
 
@@ -3282,7 +3429,7 @@ const TradingPage = () => {
 
                   { name: 'Pending', count: pendingOrders.length },
 
-                  { name: 'History', count: tradeHistory.length },
+                  { name: 'History', count: historyTotal },
 
                   { name: 'Cancelled', count: 0 }
 
@@ -3602,7 +3749,7 @@ const TradingPage = () => {
 
                       key={filter.key}
 
-                      onClick={() => { setHistoryFilter(filter.key); setHistoryStartDate(''); setHistoryEndDate('') }}
+                      onClick={() => { setHistoryPage(1); setHistoryFilter(filter.key); setHistoryStartDate(''); setHistoryEndDate('') }}
 
                       className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
 
@@ -3634,7 +3781,7 @@ const TradingPage = () => {
 
                       value={historyStartDate}
 
-                      onChange={(e) => setHistoryStartDate(e.target.value)}
+                      onChange={(e) => { setHistoryPage(1); setHistoryStartDate(e.target.value) }}
 
                       className={`px-2 py-1 rounded text-xs border ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
 
@@ -3648,7 +3795,7 @@ const TradingPage = () => {
 
                       value={historyEndDate}
 
-                      onChange={(e) => setHistoryEndDate(e.target.value)}
+                      onChange={(e) => { setHistoryPage(1); setHistoryEndDate(e.target.value) }}
 
                       className={`px-2 py-1 rounded text-xs border ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
 
@@ -3662,7 +3809,7 @@ const TradingPage = () => {
 
                   <span className={`ml-auto text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
 
-                    {getFilteredHistory().length} trades | P&L: <span className={getHistoryTotalPnl() >= 0 ? 'text-green-500' : 'text-red-500'}>${getHistoryTotalPnl().toFixed(2)}</span>
+                    {historyTotal} trades · Page {historyPage}/{Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE))} | Total P/L: <span className={historyTotalPnl >= 0 ? 'text-green-500' : 'text-red-500'}>${historyTotalPnl.toFixed(2)}</span>
 
                   </span>
 
@@ -3720,7 +3867,7 @@ const TradingPage = () => {
 
                   <tbody>
 
-                    {getFilteredHistory().length === 0 ? (
+                    {tradeHistory.length === 0 ? (
 
                       <tr>
 
@@ -3730,7 +3877,7 @@ const TradingPage = () => {
 
                     ) : (
 
-                      getFilteredHistory().map(trade => {
+                      tradeHistory.map(trade => {
 
                         const formatPrice = (price) => {
 
@@ -3787,6 +3934,52 @@ const TradingPage = () => {
                   </tbody>
 
                 </table>
+
+
+
+                <div className={`flex flex-wrap items-center justify-center gap-3 px-3 py-2 border-t ${isDarkMode ? 'border-gray-800 bg-[#0d0d0d]' : 'border-gray-200 bg-gray-50'}`}>
+
+                  <button
+
+                    type="button"
+
+                    disabled={historyPage <= 1}
+
+                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 ${isDarkMode ? 'bg-[#1a1a1a] text-gray-300 hover:bg-[#252525]' : 'bg-white border border-gray-300 text-gray-800 hover:bg-gray-100'}`}
+
+                  >
+
+                    <ChevronLeft size={14} /> Previous
+
+                  </button>
+
+                  <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+
+                    Page {historyPage} of {Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE))}
+
+                    {historyTotal > 0 ? ` (${HISTORY_PAGE_SIZE} per page)` : ''}
+
+                  </span>
+
+                  <button
+
+                    type="button"
+
+                    disabled={historyPage >= Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE))}
+
+                    onClick={() => setHistoryPage(p => p + 1)}
+
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40 ${isDarkMode ? 'bg-[#1a1a1a] text-gray-300 hover:bg-[#252525]' : 'bg-white border border-gray-300 text-gray-800 hover:bg-gray-100'}`}
+
+                  >
+
+                    Next <ChevronRight size={14} />
+
+                  </button>
+
+                </div>
 
               </div>
 

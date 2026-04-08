@@ -140,7 +140,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
     { name: 'Theme Settings', icon: Palette, path: '/admin/theme', sidebarKey: 'themeSettings' },
     { name: 'Email Templates', icon: Mail, path: '/admin/email-templates', sidebarKey: 'emailTemplates' },
     { name: 'Bonus Management', icon: Gift, path: '/admin/bonus-management', sidebarKey: 'bonusManagement' },
-    { name: 'Banner Management', icon: Image, path: '/admin/banners', sidebarKey: 'bonusManagement' },
+    { name: 'Banner Management', icon: Image, path: '/admin/banners', sidebarKey: 'bannerManagement' },
     { name: 'Employee Management', icon: Shield, path: '/admin/admin-management', sidebarKey: 'employeeManagement' },
     { name: 'Super Admin Management', icon: Shield, path: '/admin/super-admin-management', sidebarKey: 'superAdminManagement' },
     { name: 'KYC Verification', icon: FileCheck, path: '/admin/kyc', sidebarKey: 'kycVerification' },
@@ -178,7 +178,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
       const permissionMap = {
         'userManagement': p.canViewUsers || p.canManageUsers,
         'tradeManagement': p.canViewTrades || p.canManageTrades,
-        'bookManagement': p.canViewTrades || p.canManageTrades,
+        'bookManagement': p.canViewBookManagement || p.canManageBookManagement,
         'fundManagement': p.canViewDeposits || p.canViewWithdrawals || p.canApproveDeposits || p.canApproveWithdrawals,
         'bankSettings': p.canManagePaymentMethods,
         'ibManagement': p.canViewIB || p.canManageIB,

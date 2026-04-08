@@ -259,59 +259,75 @@ router.post('/login', async (req, res) => {
 // POST /api/admin-mgmt/admin-login - Admin/Employee login only (for /admin-employee route)
 router.post('/admin-login', async (req, res) => {
   try {
-    const { email, password } = req.body
-    console.log('Admin login attempt:', email)
+    const { email, password, adminSlug } = req.body
+    console.log('Admin login attempt:', email, adminSlug ? `(slug: ${adminSlug})` : '')
 
-    const admin = await Admin.findOne({ email: email.toLowerCase() })
-    console.log('Admin found:', admin ? { id: admin._id, role: admin.role, sidebarPermissions: admin.sidebarPermissions } : null)
-
-    if (admin) {
-      if (admin.role !== 'ADMIN') {
-        return res.status(403).json({ success: false, message: 'Access denied. Use super admin login.' })
+    // If adminSlug provided (branded employee login), resolve that admin first
+    let slugAdmin = null
+    if (adminSlug) {
+      slugAdmin = await Admin.findOne({ urlSlug: adminSlug.toLowerCase(), status: 'ACTIVE' })
+      if (!slugAdmin) {
+        return res.status(404).json({ success: false, message: 'Invalid login URL' })
       }
+    }
 
-      if (admin.status !== 'ACTIVE') {
-        return res.status(403).json({ success: false, message: 'Account is suspended or pending' })
+    // Only attempt admin (ADMIN role) lookup when no slug is provided (central login)
+    if (!adminSlug) {
+      const admin = await Admin.findOne({ email: email.toLowerCase() })
+      console.log('Admin found:', admin ? { id: admin._id, role: admin.role } : null)
+
+      if (admin) {
+        if (admin.role !== 'ADMIN') {
+          return res.status(403).json({ success: false, message: 'Access denied. Use super admin login.' })
+        }
+
+        if (admin.status !== 'ACTIVE') {
+          return res.status(403).json({ success: false, message: 'Account is suspended or pending' })
+        }
+
+        const isMatch = await bcrypt.compare(password, admin.password)
+        if (isMatch) {
+          admin.lastLogin = new Date()
+          await admin.save()
+
+          const wallet = await AdminWallet.findOne({ adminId: admin._id })
+
+          const token = jwt.sign(
+            { adminId: admin._id, role: admin.role, email: admin.email },
+            getJwtSecret(),
+            { expiresIn: '24h' }
+          )
+
+          return res.json({
+            success: true,
+            token,
+            admin: {
+              _id: admin._id,
+              email: admin.email,
+              firstName: admin.firstName,
+              lastName: admin.lastName,
+              role: admin.role,
+              sessionKind: 'admin',
+              referralCode: admin.referralCode,
+              urlSlug: admin.urlSlug,
+              brandName: admin.brandName,
+              logo: admin.logo,
+              customDomain: admin.customDomain,
+              sidebarPermissions: admin.sidebarPermissions,
+              walletBalance: wallet?.balance || 0
+            }
+          })
+        }
+        // Wrong password for this Admin email — fall through to Employee check
       }
-
-      const isMatch = await bcrypt.compare(password, admin.password)
-      if (isMatch) {
-        admin.lastLogin = new Date()
-        await admin.save()
-
-        const wallet = await AdminWallet.findOne({ adminId: admin._id })
-
-        const token = jwt.sign(
-          { adminId: admin._id, role: admin.role, email: admin.email },
-          getJwtSecret(),
-          { expiresIn: '24h' }
-        )
-
-        return res.json({
-          success: true,
-          token,
-          admin: {
-            _id: admin._id,
-            email: admin.email,
-            firstName: admin.firstName,
-            lastName: admin.lastName,
-            role: admin.role,
-            sessionKind: 'admin',
-            referralCode: admin.referralCode,
-            urlSlug: admin.urlSlug,
-            brandName: admin.brandName,
-            logo: admin.logo,
-            customDomain: admin.customDomain,
-            sidebarPermissions: admin.sidebarPermissions,
-            walletBalance: wallet?.balance || 0
-          }
-        })
-      }
-      // Wrong password for this Admin email — try Employee (same email can be confusing in support cases)
     }
 
     // Staff created under Employee Management live in Employee collection (not Admin)
-    const employee = await Employee.findOne({ email: email.toLowerCase() })
+    // If adminSlug provided, scope lookup to that admin's employees only (security)
+    const employeeQuery = { email: email.toLowerCase() }
+    if (slugAdmin) employeeQuery.createdBy = slugAdmin._id
+
+    const employee = await Employee.findOne(employeeQuery)
     if (!employee) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
@@ -319,7 +335,7 @@ router.post('/admin-login', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Account is suspended or inactive' })
     }
 
-    const parentAdmin = await Admin.findById(employee.createdBy)
+    const parentAdmin = slugAdmin || await Admin.findById(employee.createdBy)
     if (!parentAdmin || parentAdmin.status !== 'ACTIVE') {
       return res.status(403).json({ success: false, message: 'Employer account is unavailable' })
     }
@@ -463,8 +479,9 @@ router.post('/admins', async (req, res) => {
       themeSettings: false,
       emailTemplates: false,
       bonusManagement: false,
+      bannerManagement: false,
       adminManagement: false,
-      employeeManagement: false,
+      employeeManagement: true,
       kycVerification: false,
       supportTickets: false
     }
@@ -609,12 +626,13 @@ router.put('/admins/:id/permissions', async (req, res) => {
       themeSettings: false,
       emailTemplates: false,
       bonusManagement: false,
+      bannerManagement: false,
       adminManagement: false,
       employeeManagement: false,
       kycVerification: false,
       supportTickets: false
     }
-    
+
     // Replace permissions entirely (not merge) to ensure unchecked items become false
     admin.sidebarPermissions = { ...defaultPermissions, ...sidebarPermissions }
     await admin.save()
@@ -650,8 +668,9 @@ router.post('/fix-subadmin-permissions', async (req, res) => {
       themeSettings: false,
       emailTemplates: false,
       bonusManagement: false,
+      bannerManagement: false,
       adminManagement: false,
-      employeeManagement: false,
+      employeeManagement: true,
       kycVerification: false,
       supportTickets: false
     }

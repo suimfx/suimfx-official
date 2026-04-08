@@ -42,7 +42,9 @@ const roleTemplates = {
     canViewAccounts: true,
     canViewTrades: true,
     canManageTrades: true,
-    canCloseTrades: true
+    canCloseTrades: true,
+    canViewBookManagement: true,
+    canManageBookManagement: true
   },
   MANAGER: {
     canViewDashboard: true,
@@ -52,6 +54,8 @@ const roleTemplates = {
     canManageAccounts: true,
     canViewTrades: true,
     canManageTrades: true,
+    canViewBookManagement: true,
+    canManageBookManagement: true,
     canViewDeposits: true,
     canApproveDeposits: true,
     canRejectDeposits: true,

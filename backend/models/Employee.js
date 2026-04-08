@@ -49,6 +49,8 @@ const employeeSchema = new mongoose.Schema({
     canManageTrades: { type: Boolean, default: false },
     canCloseTrades: { type: Boolean, default: false },
     canModifyTrades: { type: Boolean, default: false },
+    canViewBookManagement: { type: Boolean, default: false },
+    canManageBookManagement: { type: Boolean, default: false },
     canViewDeposits: { type: Boolean, default: false },
     canApproveDeposits: { type: Boolean, default: false },
     canRejectDeposits: { type: Boolean, default: false },

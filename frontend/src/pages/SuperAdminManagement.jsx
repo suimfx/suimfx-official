@@ -62,6 +62,7 @@ const SuperAdminManagement = () => {
       themeSettings: true,
       emailTemplates: true,
       bonusManagement: true,
+      bannerManagement: true,
       employeeManagement: true,
       kycVerification: true,
       supportTickets: true
@@ -133,6 +134,7 @@ const SuperAdminManagement = () => {
             themeSettings: true,
             emailTemplates: true,
             bonusManagement: true,
+            bannerManagement: true,
             employeeManagement: true,
             kycVerification: true,
             supportTickets: true
@@ -304,7 +306,8 @@ const SuperAdminManagement = () => {
         themeSettings: false,
         emailTemplates: false,
         bonusManagement: false,
-        employeeManagement: false,
+        bannerManagement: false,
+        employeeManagement: true,
         kycVerification: false,
         supportTickets: false
       }
@@ -726,6 +729,7 @@ const SuperAdminManagement = () => {
                     { key: 'themeSettings', label: 'Theme Settings' },
                     { key: 'emailTemplates', label: 'Email Templates' },
                     { key: 'bonusManagement', label: 'Bonus Management' },
+                    { key: 'bannerManagement', label: 'Banner Management' },
                     { key: 'employeeManagement', label: 'Employee Management' },
                     { key: 'kycVerification', label: 'KYC Verification' },
                     { key: 'supportTickets', label: 'Support Tickets' }
@@ -899,6 +903,7 @@ const SuperAdminManagement = () => {
                     { key: 'themeSettings', label: 'Theme Settings' },
                     { key: 'emailTemplates', label: 'Email Templates' },
                     { key: 'bonusManagement', label: 'Bonus Management' },
+                    { key: 'bannerManagement', label: 'Banner Management' },
                     { key: 'employeeManagement', label: 'Employee Management' },
                     { key: 'kycVerification', label: 'KYC Verification' },
                     { key: 'supportTickets', label: 'Support Tickets' }

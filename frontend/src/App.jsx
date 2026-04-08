@@ -45,6 +45,7 @@ import AdminBonusManagement from './pages/AdminBonusManagement'
 import AdminBannerManagement from './pages/AdminBannerManagement'
 import LandingPage from './pages/LandingPage'
 import EmployeeLogin from './pages/EmployeeLogin'
+import BrandedEmployeeLogin from './pages/BrandedEmployeeLogin'
 import AdminProfile from './pages/AdminProfile'
 import AdminBookManagement from './pages/AdminBookManagement'
 import SuperAdminManagement from './pages/SuperAdminManagement'
@@ -100,12 +101,13 @@ function App() {
           <Route path="/admin/theme" element={<ProtectedAdminRoute requiredPermission="themeSettings"><AdminThemeSettings /></ProtectedAdminRoute>} />
           <Route path="/admin/email-templates" element={<ProtectedAdminRoute requiredPermission="emailTemplates"><AdminEmailTemplates /></ProtectedAdminRoute>} />
           <Route path="/admin/bonus-management" element={<ProtectedAdminRoute requiredPermission="bonusManagement"><AdminBonusManagement /></ProtectedAdminRoute>} />
-          <Route path="/admin/banners" element={<ProtectedAdminRoute requiredPermission="bonusManagement"><AdminBannerManagement /></ProtectedAdminRoute>} />
+          <Route path="/admin/banners" element={<ProtectedAdminRoute requiredPermission="bannerManagement"><AdminBannerManagement /></ProtectedAdminRoute>} />
           <Route path="/admin/profile" element={<ProtectedAdminRoute><AdminProfile /></ProtectedAdminRoute>} />
           <Route path="/admin/login" element={<EmployeeLogin />} />
           <Route path="/subadmin/login" element={<EmployeeLogin />} />
           <Route path="/buy-challenge" element={<BuyChallengePage />} />
           <Route path="/challenge-dashboard" element={<ChallengeDashboardPage />} />
+          <Route path="/:slug/employee-login" element={<BrandedEmployeeLogin />} />
           <Route path="/:slug/login" element={<BrandedLogin />} />
           <Route path="/:slug/signup" element={<BrandedSignup />} />
         </Routes>

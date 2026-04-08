@@ -1,4 +1,5 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
 import ChallengeAccount from '../models/ChallengeAccount.js'
@@ -10,6 +11,47 @@ import ibEngine from '../services/ibEngineNew.js'
 import MasterTrader from '../models/MasterTrader.js'
 import User from '../models/User.js'
 import lpPriceService from '../services/lpPriceService.js'
+
+/**
+ * Block live + prop challenge trading until KYC is approved. Demo trading accounts are allowed.
+ */
+async function assertUserMayOpenTrades (userId, tradingAccountId) {
+  const ta = await TradingAccount.findById(tradingAccountId).populate('accountTypeId')
+  if (ta) {
+    if (ta.userId.toString() !== userId.toString()) {
+      return { ok: false, status: 403, message: 'Trading account does not belong to this user.' }
+    }
+    const isDemo = ta.isDemo || ta.accountTypeId?.isDemo
+    if (isDemo) return { ok: true }
+    const user = await User.findById(userId).select('kycApproved')
+    if (!user?.kycApproved) {
+      return {
+        ok: false,
+        status: 403,
+        message: 'Complete KYC verification before trading on a live account.',
+        code: 'KYC_REQUIRED'
+      }
+    }
+    return { ok: true }
+  }
+  const ca = await ChallengeAccount.findById(tradingAccountId)
+  if (ca) {
+    if (ca.userId.toString() !== userId.toString()) {
+      return { ok: false, status: 403, message: 'Challenge account does not belong to this user.' }
+    }
+    const user = await User.findById(userId).select('kycApproved')
+    if (!user?.kycApproved) {
+      return {
+        ok: false,
+        status: 403,
+        message: 'Complete KYC verification before trading.',
+        code: 'KYC_REQUIRED'
+      }
+    }
+    return { ok: true }
+  }
+  return { ok: false, status: 404, message: 'Trading account not found' }
+}
 
 async function getFreshPrice (symbol) {
   try {
@@ -85,6 +127,15 @@ router.post('/open', async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         message: 'Invalid order type' 
+      })
+    }
+
+    const gate = await assertUserMayOpenTrades(userId, tradingAccountId)
+    if (!gate.ok) {
+      return res.status(gate.status).json({
+        success: false,
+        message: gate.message,
+        ...(gate.code ? { code: gate.code } : {})
       })
     }
 
@@ -472,31 +523,60 @@ router.get('/pending/:tradingAccountId', async (req, res) => {
   }
 })
 
-// GET /api/trade/history/:tradingAccountId - Get trade history for an account
+// GET /api/trade/history/:tradingAccountId - Get trade history for an account (paginated, optional date range)
 router.get('/history/:tradingAccountId', async (req, res) => {
   try {
     const { tradingAccountId } = req.params
-    const { limit = 50, offset = 0 } = req.query
+    const { limit = 50, offset = 0, startDate, endDate } = req.query
 
-    const trades = await Trade.find({ 
-      tradingAccountId, 
-      status: 'CLOSED' 
-    })
+    const tid = mongoose.Types.ObjectId.isValid(tradingAccountId)
+      ? new mongoose.Types.ObjectId(tradingAccountId)
+      : tradingAccountId
+
+    const query = {
+      tradingAccountId: tid,
+      status: 'CLOSED'
+    }
+
+    const closedRange = {}
+    if (startDate) {
+      const s = new Date(startDate)
+      if (!isNaN(s.getTime())) closedRange.$gte = s
+    }
+    if (endDate) {
+      const e = new Date(endDate)
+      if (!isNaN(e.getTime())) {
+        e.setHours(23, 59, 59, 999)
+        closedRange.$lte = e
+      }
+    }
+    if (Object.keys(closedRange).length > 0) {
+      query.closedAt = closedRange
+    }
+
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200)
+    const off = Math.max(parseInt(offset, 10) || 0, 0)
+
+    const trades = await Trade.find(query)
       .sort({ closedAt: -1 })
-      .skip(parseInt(offset))
-      .limit(parseInt(limit))
+      .skip(off)
+      .limit(lim)
 
-    const total = await Trade.countDocuments({ 
-      tradingAccountId, 
-      status: 'CLOSED' 
-    })
+    const total = await Trade.countDocuments(query)
+
+    const pnlAgg = await Trade.aggregate([
+      { $match: query },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$realizedPnl', 0] } } } }
+    ])
+    const totalRealizedPnl = pnlAgg[0]?.total ?? 0
 
     res.json({
       success: true,
       trades,
       total,
-      limit: parseInt(limit),
-      offset: parseInt(offset)
+      totalRealizedPnl,
+      limit: lim,
+      offset: off
     })
   } catch (error) {
     console.error('Error fetching trade history:', error)

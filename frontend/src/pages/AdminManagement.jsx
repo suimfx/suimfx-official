@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import AdminLayout from '../components/AdminLayout'
-import { 
+import {
   Users,
   Plus,
   Search,
@@ -13,7 +13,9 @@ import {
   AlertCircle,
   Lock,
   UserCog,
-  Briefcase
+  Briefcase,
+  Link,
+  Copy
 } from 'lucide-react'
 import { API_URL } from '../config/api'
 import { getAdminHeaders } from '../utils/adminApi'
@@ -34,6 +36,7 @@ const PERMISSION_GROUPS = [
   { title: 'Users', keys: ['canViewUsers', 'canManageUsers', 'canCreateUsers', 'canEditUsers', 'canDeleteUsers'] },
   { title: 'Accounts', keys: ['canViewAccounts', 'canManageAccounts', 'canCreateAccounts', 'canModifyLeverage'] },
   { title: 'Trades', keys: ['canViewTrades', 'canManageTrades', 'canCloseTrades', 'canModifyTrades'] },
+  { title: 'Book Management', keys: ['canViewBookManagement', 'canManageBookManagement'] },
   { title: 'Deposits', keys: ['canViewDeposits', 'canApproveDeposits', 'canRejectDeposits'] },
   { title: 'Withdrawals', keys: ['canViewWithdrawals', 'canApproveWithdrawals', 'canRejectWithdrawals'] },
   { title: 'KYC', keys: ['canViewKYC', 'canApproveKYC', 'canRejectKYC'] },
@@ -58,6 +61,10 @@ const AdminManagement = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [newPassword, setNewPassword] = useState('')
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [urlSlug] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('adminUser') || '{}').urlSlug || '' } catch { return '' }
+  })
   
   const [newEmployee, setNewEmployee] = useState({
     email: '',
@@ -232,7 +239,16 @@ const AdminManagement = () => {
     return Object.values(perms).filter(v => v === true).length
   }
 
-  const filteredEmployees = employees.filter(emp => 
+  const employeeLoginLink = urlSlug ? `${window.location.origin}/${urlSlug}/employee-login` : ''
+
+  const handleCopyLoginLink = () => {
+    if (!employeeLoginLink) return
+    navigator.clipboard.writeText(employeeLoginLink)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  const filteredEmployees = employees.filter(emp =>
     emp.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -241,6 +257,31 @@ const AdminManagement = () => {
 
   return (
     <AdminLayout title="Employee Management" subtitle="Manage employees and their permissions">
+      {/* Employee Login Link */}
+      {employeeLoginLink && (
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <Link size={20} className="text-blue-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-white font-medium text-sm">Employee Login Link</p>
+              <p className="text-blue-300 text-xs mt-0.5 break-all">{employeeLoginLink}</p>
+              <p className="text-slate-500 text-xs mt-1">Share this link with your employees so they can login with your branding</p>
+            </div>
+          </div>
+          <button
+            onClick={handleCopyLoginLink}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${
+              linkCopied
+                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                : 'bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30'
+            }`}
+          >
+            {linkCopied ? <Check size={16} /> : <Copy size={16} />}
+            {linkCopied ? 'Copied!' : 'Copy Link'}
+          </button>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
