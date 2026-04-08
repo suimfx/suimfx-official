@@ -840,8 +840,8 @@ const AdminProfile = () => {
                 </div>
               </div>
 
-              {/* Branding Section */}
-              <div className="border-t border-gray-700 pt-5 mt-2">
+              {/* Branding Section — hidden for employees */}
+              {admin?.sessionKind !== 'employee' && <div className="border-t border-gray-700 pt-5 mt-2">
                 <h4 className="text-white font-medium mb-4 flex items-center gap-2">
                   <Image size={18} className="text-purple-400" /> Branding Settings
                 </h4>
@@ -1151,7 +1151,7 @@ const AdminProfile = () => {
                   )}
                 </div>
                 )}
-              </div>
+              </div>}
 
               {/* Error/Success Messages */}
               {error && (

@@ -204,13 +204,11 @@ const AdminLayout = ({ children, title, subtitle }) => {
 
   // Filter menu items based on sidebar permissions
   const menuItems = allMenuItems.filter(item => {
-    // Connect Domain etc.: white-label admins + their staff only (not platform / Super Admin)
+    // Connect Domain: only actual admins (ADMIN role), never employees
     if (item.adminOnly) {
-      const tenantContext =
-        admin?.sessionKind === 'admin' ||
-        admin?.role === 'ADMIN' ||
-        (admin?.sessionKind === 'employee' && admin?.employerRole === 'ADMIN')
-      if (!tenantContext) return false
+      const isActualAdmin = admin?.sessionKind === 'admin' ||
+        (admin?.role === 'ADMIN' && admin?.sessionKind !== 'employee')
+      if (!isActualAdmin) return false
     }
     return hasSidebarPermission(item.sidebarKey)
   })
