@@ -3,60 +3,80 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowRight, AlertCircle } from 'lucide-react'
 import { API_URL, API_BASE_URL } from '../config/api'
 
+const isPlatformHost = (h) =>
+  h === 'suimfx.com' || h.endsWith('.suimfx.com') || h === 'localhost' || h === '127.0.0.1'
+
 const BrandedEmployeeLogin = () => {
-  const { slug } = useParams()
+  const { slug } = useParams()  // defined for /:slug/employee-login, undefined for /employee-login
   const navigate = useNavigate()
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [brandInfo, setBrandInfo] = useState(null)
-  const [brandLoading, setBrandLoading] = useState(true)
+  const [brandFetchDone, setBrandFetchDone] = useState(false)
   const [brandError, setBrandError] = useState('')
   const [formData, setFormData] = useState({ email: '', password: '' })
 
+  // Fetch brand info — by slug OR by hostname (custom domain)
   useEffect(() => {
-    fetchBrandInfo()
+    const fetchBrand = async () => {
+      try {
+        let url
+        if (slug) {
+          url = `${API_URL}/admin-mgmt/brand/${slug}`
+        } else {
+          const hostname = window.location.hostname
+          if (isPlatformHost(hostname)) {
+            // Platform host with no slug — nothing to show
+            setBrandError('No admin found for this domain.')
+            setBrandFetchDone(true)
+            return
+          }
+          url = `${API_URL}/admin-mgmt/branding?domain=${encodeURIComponent(hostname)}`
+        }
+
+        const res = await fetch(url)
+        const data = await res.json()
+
+        if (data.success && (data.brand || data.admin)) {
+          const b = data.brand || data.admin
+          setBrandInfo({
+            brandName: b.brandName || '',
+            logo: b.logo || null,
+            urlSlug: b.urlSlug || b.adminSlug || '',
+          })
+        } else {
+          setBrandError(data.message || 'No brand found for this domain.')
+        }
+      } catch {
+        setBrandError('Failed to load brand information.')
+      }
+      setBrandFetchDone(true)
+    }
+
+    fetchBrand()
   }, [slug])
 
-  // Dynamic favicon & title from admin brand
+  // Dynamic title & favicon
+  const brandName = brandInfo?.brandName || ''
+  const logoUrl = brandInfo?.logo ? `${API_BASE_URL}${brandInfo.logo}` : null
+  const effectiveSlug = slug || brandInfo?.urlSlug || ''
+
   useEffect(() => {
-    if (!brandInfo) return
+    if (!brandName) return
     const originalTitle = document.title
     const linkEl = document.querySelector("link[rel~='icon']")
-    const originalFavicon = linkEl ? linkEl.href : '/suimfxLogo.png'
+    const originalFavicon = linkEl?.href || '/suimfxLogo.png'
 
-    if (brandInfo.brandName) document.title = `${brandInfo.brandName} - Staff Login`
-    if (brandInfo.logo) {
-      const faviconUrl = `${API_BASE_URL}${brandInfo.logo}`
-      if (linkEl) linkEl.href = faviconUrl
-      else {
-        const newLink = document.createElement('link')
-        newLink.rel = 'icon'
-        newLink.href = faviconUrl
-        document.head.appendChild(newLink)
-      }
-    }
+    document.title = `${brandName} - Staff Login`
+    if (logoUrl && linkEl) linkEl.href = logoUrl
 
     return () => {
       document.title = originalTitle
       if (linkEl) linkEl.href = originalFavicon
     }
-  }, [brandInfo])
-
-  const fetchBrandInfo = async () => {
-    try {
-      const res = await fetch(`${API_URL}/admin-mgmt/brand/${slug}`)
-      const data = await res.json()
-      if (data.success) {
-        setBrandInfo(data.brand)
-      } else {
-        setBrandError(data.message || 'Brand not found')
-      }
-    } catch {
-      setBrandError('Failed to load brand information')
-    }
-    setBrandLoading(false)
-  }
+  }, [brandName, logoUrl])
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -65,6 +85,10 @@ const BrandedEmployeeLogin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!effectiveSlug) {
+      setError('Cannot determine admin. Please use the correct login link.')
+      return
+    }
     setLoading(true)
     setError('')
 
@@ -72,7 +96,7 @@ const BrandedEmployeeLogin = () => {
       const res = await fetch(`${API_URL}/admin-mgmt/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, adminSlug: slug })
+        body: JSON.stringify({ ...formData, adminSlug: effectiveSlug })
       })
       const data = await res.json()
 
@@ -89,7 +113,7 @@ const BrandedEmployeeLogin = () => {
     setLoading(false)
   }
 
-  if (brandLoading) {
+  if (!brandFetchDone) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
@@ -97,7 +121,7 @@ const BrandedEmployeeLogin = () => {
     )
   }
 
-  if (brandError) {
+  if (brandError && !brandInfo) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <div className="text-center">
@@ -109,12 +133,11 @@ const BrandedEmployeeLogin = () => {
     )
   }
 
-  const logoUrl = brandInfo?.logo ? `${API_BASE_URL}${brandInfo.logo}` : null
-  const brandName = brandInfo?.brandName || 'Admin Portal'
+  const displayName = brandName || 'Admin Portal'
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 py-8 relative overflow-hidden">
-      {/* Background Effects */}
+      {/* Background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#1e3a5f_0%,_transparent_50%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#312e81_0%,_transparent_50%)]" />
@@ -127,10 +150,10 @@ const BrandedEmployeeLogin = () => {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             {logoUrl ? (
-              <img src={logoUrl} alt={brandName} className="h-20 w-auto object-contain" />
+              <img src={logoUrl} alt={displayName} className="h-20 w-auto object-contain" />
             ) : (
               <div className="h-20 flex items-center justify-center">
-                <span className="text-white text-2xl font-bold">{brandName}</span>
+                <span className="text-white text-2xl font-bold">{displayName}</span>
               </div>
             )}
           </div>
@@ -139,7 +162,7 @@ const BrandedEmployeeLogin = () => {
           <div className="flex justify-center mb-6">
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
               <Shield size={14} />
-              Staff Portal · {brandName}
+              Staff Portal · {displayName}
             </span>
           </div>
 
