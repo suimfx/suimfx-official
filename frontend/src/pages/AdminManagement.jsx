@@ -62,9 +62,19 @@ const AdminManagement = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [newPassword, setNewPassword] = useState('')
   const [linkCopied, setLinkCopied] = useState(false)
-  const [urlSlug] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('adminUser') || '{}').urlSlug || '' } catch { return '' }
+  const [adminProfile, setAdminProfile] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('adminUser') || '{}') } catch { return {} }
   })
+
+  useEffect(() => {
+    fetch(`${API_URL}/admin-mgmt/my-profile`, { headers: getAdminHeaders() })
+      .then(r => r.json())
+      .then(data => { if (data.success && data.admin) setAdminProfile(data.admin) })
+      .catch(() => {})
+  }, [])
+
+  const urlSlug = adminProfile.urlSlug || ''
+  const customDomain = adminProfile.customDomain || ''
   
   const [newEmployee, setNewEmployee] = useState({
     email: '',
@@ -239,7 +249,10 @@ const AdminManagement = () => {
     return Object.values(perms).filter(v => v === true).length
   }
 
-  const employeeLoginLink = urlSlug ? `${window.location.origin}/${urlSlug}/employee-login` : ''
+  const cleanDomain = customDomain ? customDomain.replace(/^https?:\/\//, '').replace(/\/$/, '') : ''
+  const employeeLoginLink = cleanDomain
+    ? `https://${cleanDomain}/employee-login`
+    : urlSlug ? `${window.location.origin}/${urlSlug}/employee-login` : ''
 
   const handleCopyLoginLink = () => {
     if (!employeeLoginLink) return
