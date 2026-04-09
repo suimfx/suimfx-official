@@ -14,6 +14,7 @@ import { useTheme } from '../context/ThemeContext'
 
 import { API_URL } from '../config/api'
 import { requiresKycToTrade, isDemoTradingAccount } from '../utils/tradingKyc'
+import TradingViewChart from '../components/TradingViewChart'
 
 
 
@@ -3371,18 +3372,14 @@ const TradingPage = () => {
 
                 {fourChartTimeframes.map((interval, index) => (
 
-                  <div key={`chart-${index}-${interval}`} className="relative">
+                  <div key={`chart-${index}-${interval}`} className="relative w-full h-full">
 
-                    <iframe
-
-                      src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart_${index}&symbol=${encodeURIComponent(getSymbolForTradingView(selectedInstrument?.symbol))}&interval=${interval}&hidesidetoolbar=1&hidetoptoolbar=0&symboledit=0&saveimage=1&toolbarbg=${isDarkMode ? '0d0d0d' : 'ffffff'}&studies=[]&theme=${isDarkMode ? 'dark' : 'light'}&style=1&timezone=Etc%2FUTC&withdateranges=0&showpopupbutton=0&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=["left_toolbar","header_symbol_search","header_compare"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=1&allow_symbol_change=0&details=0&calendar=0&hotlist=0`}
-
-                      style={{ width: '100%', height: '100%', border: 'none' }}
-
-                      allowFullScreen
-
-                      title={`TradingView Chart ${interval}`}
-
+                    <TradingViewChart
+                      symbol={selectedInstrument?.symbol}
+                      interval={interval}
+                      isDarkMode={isDarkMode}
+                      containerId={`tv_chart_four_${index}`}
+                      style={{ width: '100%', height: '100%' }}
                     />
 
                   </div>
@@ -3395,18 +3392,12 @@ const TradingPage = () => {
 
               /* Single Chart View */
 
-              <iframe
-
-                key={`${selectedInstrument.symbol}-${isDarkMode}-${isMobile}`}
-
-                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${encodeURIComponent(getSymbolForTradingView(selectedInstrument?.symbol))}&interval=5&hidesidetoolbar=0&hidetoptoolbar=0&symboledit=1&saveimage=1&toolbarbg=${isDarkMode ? '0d0d0d' : 'ffffff'}&studies=[]&theme=${isDarkMode ? 'dark' : 'light'}&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies_overrides={}&overrides={}&enabled_features=["left_toolbar","header_widget","drawing_templates"]&disabled_features=["hide_left_toolbar_by_default"]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&hide_side_toolbar=0&allow_symbol_change=1&details=1&calendar=0&hotlist=0`}
-
-                style={{ width: '100%', height: '100%', border: 'none' }}
-
-                allowFullScreen
-
-                title="TradingView Chart"
-
+              <TradingViewChart
+                symbol={selectedInstrument?.symbol}
+                interval="5"
+                isDarkMode={isDarkMode}
+                containerId="tv_chart_main"
+                style={{ width: '100%', height: '100%' }}
               />
 
             )}
