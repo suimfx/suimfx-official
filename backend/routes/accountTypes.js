@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import AccountType from '../models/AccountType.js'
 import Charges from '../models/Charges.js'
 import User from '../models/User.js'
+import Admin from '../models/Admin.js'
 import { verifyAdminToken } from '../middleware/rbac.js'
 
 const router = express.Router()
@@ -13,11 +14,20 @@ router.get('/', async (req, res) => {
     const { userId } = req.query
     let atQuery = { isActive: true }
     
-    // Filter by user's assigned admin
+    // Scope account types to the user's assigned admin
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-      const user = await User.findById(userId)
-      if (user && user.assignedAdmin) {
-        atQuery.adminId = user.assignedAdmin
+      const user = await User.findById(userId).select('assignedAdmin')
+      if (user) {
+        if (user.assignedAdmin) {
+          // User belongs to a specific admin — show only that admin's account types
+          atQuery.adminId = user.assignedAdmin
+        } else {
+          // User belongs to Super Admin — show only Super Admin's account types
+          const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id')
+          if (superAdmin) {
+            atQuery.adminId = superAdmin._id
+          }
+        }
       }
     }
     
