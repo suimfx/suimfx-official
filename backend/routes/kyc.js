@@ -278,13 +278,19 @@ router.get('/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBA
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50))
     const searchRaw = (req.query.search || '').trim()
 
-    const filter = {}
-    
-    // Filter by admin's users (both ADMIN and SUPER_ADMIN)
-    const kycUserIds = await getAdminUserIds(req.admin)
-    if (kycUserIds) filter.userId = { $in: kycUserIds }
-    // SUPER_ADMIN sees all KYC requests
-    
+    // Base filter scoped to this admin's users (used for stats — no status/search applied)
+    const baseFilter = {}
+    if (req.admin.role === 'SUPER_ADMIN') {
+      // Super Admin sees all KYC across the entire platform
+    } else {
+      // ADMIN / EMPLOYEE: scope to only their assigned users
+      const kycUserIds = await getAdminUserIds(req.admin)
+      baseFilter.userId = { $in: kycUserIds || [] }
+    }
+
+    // Full filter — add status and search on top of base filter
+    const filter = { ...baseFilter }
+
     if (status && status !== 'all') {
       filter.status = status
     }
@@ -293,10 +299,10 @@ router.get('/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBA
       const searchFilter = { $or: [{ firstName: re }, { lastName: re }, { email: re }, { phone: re }] }
       let userQuery = {}
       // Add admin filter to user search
-      if (req.admin.role === 'ADMIN') {
-        userQuery = { ...searchFilter, assignedAdmin: req.admin._id }
+      if (req.admin.role === 'SUPER_ADMIN') {
+        userQuery = searchFilter  // Super Admin searches all users
       } else {
-        userQuery = { $and: [searchFilter, { $or: [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }] }] }
+        userQuery = { ...searchFilter, assignedAdmin: req.admin._id }
       }
       const matchingUsers = await User.find(userQuery)
         .select('_id')
@@ -320,10 +326,10 @@ router.get('/all', verifyAdminToken, requireSidebarPermission(PERMISSIONS.SIDEBA
         .limit(limit)
         .lean(),
       KYC.countDocuments(filter),
-      KYC.countDocuments(),
-      KYC.countDocuments({ status: 'pending' }),
-      KYC.countDocuments({ status: 'approved' }),
-      KYC.countDocuments({ status: 'rejected' })
+      KYC.countDocuments(baseFilter),
+      KYC.countDocuments({ ...baseFilter, status: 'pending' }),
+      KYC.countDocuments({ ...baseFilter, status: 'approved' }),
+      KYC.countDocuments({ ...baseFilter, status: 'rejected' })
     ])
 
     res.json({

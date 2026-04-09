@@ -20,11 +20,3 @@ export function hostsMatchBrandDomain (currentHostname, brandCustomDomain) {
   const d = normalizeHost(raw)
   return Boolean(d && h === d)
 }
-
-/** Use dedicated short landing on custom domain when branding loaded for that host. */
-export function isWhiteLabelLandingPage (branding, hostname) {
-  if (!branding?.adminSlug) return false
-  if (isPlatformHost(hostname)) return false
-  if (!branding.customDomain) return false
-  return hostsMatchBrandDomain(hostname, branding.customDomain)
-}

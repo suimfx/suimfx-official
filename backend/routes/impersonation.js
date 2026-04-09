@@ -106,6 +106,7 @@ router.post('/admin/:adminId', verifyAdminToken, async (req, res) => {
         firstName: targetAdmin.firstName,
         lastName: targetAdmin.lastName,
         role: targetAdmin.role,
+        sessionKind: 'admin',
         referralCode: targetAdmin.referralCode,
         urlSlug: targetAdmin.urlSlug,
         brandName: targetAdmin.brandName,

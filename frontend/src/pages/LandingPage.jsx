@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import suimfxLogo from '../assets/suimfxLogo.png'
 import { useBranding } from '../context/BrandingContext'
-import { isPlatformHost, isLocalDevHost, isWhiteLabelLandingPage } from '../utils/whiteLabelHost'
-import WhiteLabelLandingRouter from './landings/WhiteLabelLandingRouter'
-import { 
+import { isPlatformHost, isLocalDevHost } from '../utils/whiteLabelHost'
+import {
   CheckCircle2, Users, TrendingUp, Shield, Zap, Globe, BarChart3,
   Menu, X, Download, ArrowRight, Star, Clock, Headphones, Award,
   ChevronDown, ChevronUp, Smartphone, Monitor, Server
@@ -14,6 +13,10 @@ const Navbar = () => {
   const { branding } = useBranding()
   const [isScrolled, setIsScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const slug = branding?.adminSlug
+  const loginUrl = slug ? `/${slug}/login` : 'https://trade.suimfx.com/user/login'
+  const signupUrl = slug ? `/${slug}/signup` : 'https://trade.suimfx.com/user/signup'
 
   const menuItems = [
     { name: 'Markets', href: '#markets' },
@@ -56,8 +59,8 @@ const Navbar = () => {
               <a href="/suimfx.apk" download className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/10 transition-all">
                 <Download className="w-4 h-4" /> APK
               </a>
-              <a href="https://trade.suimfx.com/user/login" className="px-4 py-2 text-sm font-medium text-white hover:text-slate-300 transition-colors">Sign In</a>
-              <a href="https://trade.suimfx.com/user/signup" className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25">
+              <a href={loginUrl} className="px-4 py-2 text-sm font-medium text-white hover:text-slate-300 transition-colors">Sign In</a>
+              <a href={signupUrl} className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25">
                 Get Started
               </a>
             </div>
@@ -82,8 +85,8 @@ const Navbar = () => {
               <a href="/suimfx.apk" download className="flex items-center justify-center gap-2 py-3 text-emerald-400 border border-emerald-500/30 rounded-xl">
                 <Download className="w-5 h-5" /> Download APK
               </a>
-              <a href="https://trade.suimfx.com/user/login" className="py-3 text-center text-white border border-slate-700 rounded-xl">Sign In</a>
-              <a href="https://trade.suimfx.com/user/signup" className="py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl">Get Started</a>
+              <a href={loginUrl} className="py-3 text-center text-white border border-slate-700 rounded-xl">Sign In</a>
+              <a href={signupUrl} className="py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl">Get Started</a>
             </div>
           </div>
         </div>
@@ -94,6 +97,10 @@ const Navbar = () => {
 
 // ============ HERO COMPONENT ============
 const Hero = () => {
+  const { branding } = useBranding()
+  const brandName = branding?.brandName || 'Suimfx'
+  const slug = branding?.adminSlug
+  const signupUrl = slug ? `/${slug}/signup` : 'https://trade.suimfx.com/user/signup'
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-950">
       {/* Animated Background */}
@@ -121,7 +128,7 @@ const Hero = () => {
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight mb-6">
             Trade Smarter
             <span className="block bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              With Suimfx
+              With {brandName}
             </span>
             Your Gateway to Global Markets
           </h1>
@@ -133,7 +140,7 @@ const Hero = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <a href="https://trade.suimfx.com/user/signup" className="w-full sm:w-auto px-8 py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2">
+            <a href={signupUrl} className="w-full sm:w-auto px-8 py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2">
               Open Account <ArrowRight className="w-5 h-5" />
             </a>
             <a href="#markets" className="w-full sm:w-auto px-8 py-4 text-lg font-semibold text-white border border-slate-700 rounded-xl hover:bg-slate-800/50 transition-all flex items-center justify-center gap-2">
@@ -289,6 +296,9 @@ const HowToStart = () => {
 
 // ============ ACCOUNT TYPES ============
 const AccountTypes = () => {
+  const { branding } = useBranding()
+  const slug = branding?.adminSlug
+  const signupUrl = slug ? `/${slug}/signup` : 'https://trade.suimfx.com/user/signup'
   return (
     <section id="accounts" className="py-20 md:py-32 bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -318,7 +328,7 @@ const AccountTypes = () => {
                 </li>
               ))}
             </ul>
-            <a href="https://trade.suimfx.com/user/signup" className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
+            <a href={signupUrl} className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
               Open Account
             </a>
           </div>
@@ -339,7 +349,7 @@ const AccountTypes = () => {
                 </li>
               ))}
             </ul>
-            <a href="https://trade.suimfx.com/user/signup" className="block w-full py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all">
+            <a href={signupUrl} className="block w-full py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all">
               Open Account
             </a>
           </div>
@@ -357,7 +367,7 @@ const AccountTypes = () => {
                 </li>
               ))}
             </ul>
-            <a href="https://trade.suimfx.com/user/signup" className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
+            <a href={signupUrl} className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
               Open Account
             </a>
           </div>
@@ -369,12 +379,14 @@ const AccountTypes = () => {
 
 // ============ FAQ SECTION COMPONENT ============
 const FAQSection = () => {
+  const { branding } = useBranding()
+  const brandName = branding?.brandName || 'Suimfx'
   const [openIndex, setOpenIndex] = useState(0)
 
   const faqData = [
     {
-      question: "What markets can I trade on Suimfx?",
-      answer: "Suimfx offers access to forex (50+ currency pairs), stocks, commodities, indices, metals, and cryptocurrencies - all from a single trading account."
+      question: `What markets can I trade on ${brandName}?`,
+      answer: `${brandName} offers access to forex (50+ currency pairs), stocks, commodities, indices, metals, and cryptocurrencies - all from a single trading account.`
     },
     {
       question: "What is the minimum deposit to start trading?",
@@ -389,7 +401,7 @@ const FAQSection = () => {
       answer: "Withdrawal requests are typically processed within 24 hours. The actual time to receive funds depends on your payment method - e-wallets are instant, bank transfers take 2-5 business days."
     },
     {
-      question: "Is my money safe with Suimfx?",
+      question: `Is my money safe with ${brandName}?`,
       answer: "Yes. We use segregated accounts to keep client funds separate from company funds. We also employ bank-level encryption and security measures to protect your account."
     },
     {
@@ -409,7 +421,7 @@ const FAQSection = () => {
             Frequently Asked Questions
           </h2>
           <p className="text-lg text-slate-400">
-            Everything you need to know about trading with Suimfx.
+            Everything you need to know about trading with {brandName}.
           </p>
         </div>
 
@@ -493,7 +505,7 @@ const Footer = () => {
         </div>
 
         <div className="pt-8 border-t border-slate-800 text-center">
-          <p className="text-slate-500 text-sm">© {new Date().getFullYear()} Suimfx. All rights reserved.</p>
+          <p className="text-slate-500 text-sm">© {new Date().getFullYear()} {branding?.brandName || 'Suimfx'}. All rights reserved.</p>
         </div>
       </div>
     </footer>
@@ -522,10 +534,6 @@ const LandingPage = () => {
         </p>
       </div>
     )
-  }
-
-  if (isWhiteLabelLandingPage(branding, hostname)) {
-    return <WhiteLabelLandingRouter branding={branding} />
   }
 
   return (
