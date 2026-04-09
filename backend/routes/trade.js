@@ -249,11 +249,19 @@ router.post('/close', async (req, res) => {
     }
 
     const tradeToClose = await Trade.findById(tradeId)
-    
+
     if (!tradeToClose) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Trade not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Trade not found'
+      })
+    }
+
+    if (tradeToClose.status !== 'OPEN') {
+      return res.status(400).json({
+        success: false,
+        message: 'Trade is already closed',
+        trade: tradeToClose
       })
     }
 
