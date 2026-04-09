@@ -73,7 +73,7 @@ const BrandedEmployeeLogin = () => {
     const originalTitle = document.title
     const linkEl = document.querySelector("link[rel~='icon']")
     const originalFavicon = linkEl?.href || '/suimfxLogo.png'
-    document.title = `${brandName} - Staff Login`
+    document.title = `${brandName} - FX SRadmin`
     if (logoUrl && linkEl) linkEl.href = logoUrl
     return () => {
       document.title = originalTitle
@@ -177,7 +177,7 @@ const BrandedEmployeeLogin = () => {
           </div>
 
           <div className="text-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Staff Login</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">FX SRadmin</h1>
             <p className="text-slate-400 text-sm">Login with your staff credentials</p>
           </div>
 

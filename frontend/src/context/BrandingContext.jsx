@@ -159,10 +159,12 @@ export const BrandingProvider = ({ children }) => {
     window.location.replace(url)
   }, [brandingLoaded, branding])
 
-  // User-facing app only: white-label title & favicon. Admin portal always Suimfx.
+  // Title & favicon: on platform host (suimfx.com) admin paths always show Suimfx.
+  // On custom domains, admin/employee dashboards use the admin's branding.
   useEffect(() => {
     if (!brandingLoaded) return
-    if (isAdminAppPath(location.pathname)) {
+    const onPlatform = isPlatformHost(window.location.hostname)
+    if (isAdminAppPath(location.pathname) && onPlatform) {
       document.title = DEFAULT_TITLE
       applyFavicon(DEFAULT_FAVICON)
       return

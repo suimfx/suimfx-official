@@ -76,11 +76,21 @@ const AdminOverview = () => {
     if (isAdmin) fetchReferralCode()
   }, [])
 
+  const buildRegOrigin = () => {
+    const cd = getAdminInfo()?.customDomain?.trim()
+    if (cd) {
+      const clean = cd.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+      return `https://${clean}`
+    }
+    return window.location.origin
+  }
+
   const fetchReferralCode = async () => {
+    const origin = buildRegOrigin()
     // First check localStorage
     const stored = getAdminInfo()
     if (stored?.referralCode) {
-      setRegLink(`${window.location.origin}/register?ref=${stored.referralCode}`)
+      setRegLink(`${origin}/register?ref=${stored.referralCode}`)
       return
     }
     // Fallback: fetch from API
@@ -94,7 +104,7 @@ const AdminOverview = () => {
         const data = await res.json()
         const code = data.admin?.referralCode || data.referralCode
         if (code) {
-          setRegLink(`${window.location.origin}/register?ref=${code}`)
+          setRegLink(`${origin}/register?ref=${code}`)
           // Update localStorage so it's available next time
           const current = getAdminInfo()
           if (current) {
