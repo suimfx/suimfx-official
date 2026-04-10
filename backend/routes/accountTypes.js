@@ -1,6 +1,7 @@
 import express from 'express'
 import mongoose from 'mongoose'
 import AccountType from '../models/AccountType.js'
+import TradingAccount from '../models/TradingAccount.js'
 import Charges from '../models/Charges.js'
 import User from '../models/User.js'
 import Admin from '../models/Admin.js'
@@ -143,6 +144,15 @@ router.delete('/:id', verifyAdminToken, async (req, res) => {
     if (existing.adminId?.toString() !== req.admin._id.toString()) {
       return res.status(403).json({ message: 'Access denied' })
     }
+
+    // Block deletion if any trading accounts use this account type
+    const linkedAccounts = await TradingAccount.countDocuments({ accountTypeId: req.params.id })
+    if (linkedAccounts > 0) {
+      return res.status(400).json({
+        message: `Cannot delete "${existing.name}" — ${linkedAccounts} trading account(s) are using it. Disable it instead.`
+      })
+    }
+
     await AccountType.findByIdAndDelete(req.params.id)
     res.json({ message: 'Account type deleted' })
   } catch (error) {

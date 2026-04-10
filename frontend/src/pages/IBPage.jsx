@@ -25,6 +25,7 @@ const IBPage = () => {
   const [challengeModeEnabled, setChallengeModeEnabled] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [levelProgress, setLevelProgress] = useState(null)
+  const [adminBranding, setAdminBranding] = useState(null)
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
@@ -43,10 +44,28 @@ const IBPage = () => {
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) return
+    const originalTitle = document.title
+    const linkEl = document.querySelector("link[rel~='icon']")
+    const originalFavicon = linkEl?.href
     fetch(`${API_URL}/auth/my-branding`, { headers: { 'Authorization': `Bearer ${token}` } })
       .then(r => r.json())
-      .then(data => { if (data.success && data.branding && data.branding.logo) setLogoImage(`${API_BASE_URL}${data.branding.logo}`) })
+      .then(data => {
+        if (data.success && data.branding) {
+          if (data.branding.logo) {
+            const logoFullUrl = `${API_BASE_URL}${data.branding.logo}`
+            setLogoImage(logoFullUrl)
+            if (linkEl) linkEl.href = logoFullUrl
+          }
+          if (data.branding.brandName) {
+            document.title = `${data.branding.brandName} - IB Program`
+          }
+        }
+      })
       .catch(() => {})
+    return () => {
+      document.title = originalTitle
+      if (linkEl && originalFavicon) linkEl.href = originalFavicon
+    }
   }, [])
 
   useEffect(() => {
@@ -95,6 +114,10 @@ const IBPage = () => {
         // Set level progress data
         if (data.levelProgress) {
           setLevelProgress(data.levelProgress)
+        }
+        // Set admin branding for referral link
+        if (data.adminBranding) {
+          setAdminBranding(data.adminBranding)
         }
         // Check both status and ibStatus for compatibility
         if (data.ibUser.status === 'ACTIVE' || data.ibUser.ibStatus === 'ACTIVE') {
@@ -199,8 +222,20 @@ const IBPage = () => {
     }
   }
 
+  // Build referral link using admin's custom domain if available
+  const getReferralLink = () => {
+    if (adminBranding?.customDomain) {
+      const protocol = adminBranding.customDomain.includes('localhost') ? 'http' : 'https'
+      return `${protocol}://${adminBranding.customDomain}/signup?ref=${ibProfile?.referralCode}`
+    }
+    if (adminBranding?.urlSlug) {
+      return `${window.location.origin}/${adminBranding.urlSlug}/signup?ref=${ibProfile?.referralCode}`
+    }
+    return `${window.location.origin}/user/signup?ref=${ibProfile?.referralCode}`
+  }
+
   const copyReferralLink = async () => {
-    const link = `${window.location.origin}/user/signup?ref=${ibProfile?.referralCode}`
+    const link = getReferralLink()
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(link)
@@ -451,7 +486,7 @@ const IBPage = () => {
                 <div className="bg-gradient-to-r from-purple-600 to-pink-500 rounded-xl p-5">
                   <p className="text-white/80 text-sm mb-1">Your Referral Link</p>
                   <p className="text-white text-sm font-mono mb-1 truncate">
-                    {window.location.origin}/user/signup?ref={ibProfile.referralCode}
+                    {getReferralLink()}
                   </p>
                   <p className="text-white/60 text-xs mb-3">Code: <span className="text-white font-bold">{ibProfile.referralCode}</span></p>
                   <div className="flex gap-2">

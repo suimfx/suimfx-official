@@ -5,6 +5,7 @@ import IBCommission from '../models/IBCommissionNew.js'
 import IBWallet from '../models/IBWallet.js'
 import IBLevel from '../models/IBLevel.js'
 import IBSettings from '../models/IBSettings.js'
+import Admin from '../models/Admin.js'
 import ibEngine from '../services/ibEngineNew.js'
 import mongoose from 'mongoose'
 import { verifyAdminToken } from '../middleware/rbac.js'
@@ -97,6 +98,20 @@ router.get('/my-profile/:userId', async (req, res) => {
       await ibEngine.checkAndUpgradeLevel(userId)
     }
 
+    // Fetch admin branding for referral link
+    let adminBranding = null
+    if (user.assignedAdmin) {
+      const admin = await Admin.findById(user.assignedAdmin).select('brandName logo urlSlug customDomain')
+      if (admin) {
+        adminBranding = {
+          brandName: admin.brandName || '',
+          logo: admin.logo || '',
+          urlSlug: admin.urlSlug || '',
+          customDomain: admin.customDomain || null
+        }
+      }
+    }
+
     res.json({
       success: true,
       isIB: true,
@@ -114,7 +129,8 @@ router.get('/my-profile/:userId', async (req, res) => {
       },
       wallet,
       stats: stats.stats,
-      levelProgress
+      levelProgress,
+      adminBranding
     })
   } catch (error) {
     console.error('Error fetching IB profile:', error)
@@ -510,10 +526,12 @@ router.get('/admin/commissions', verifyAdminToken, async (req, res) => {
 
 // ==================== PLAN ROUTES ====================
 
-// GET /api/ib/plans - Get all active plans
+// GET /api/ib/plans - Get all active plans (optionally scoped by adminId)
 router.get('/plans', async (req, res) => {
   try {
-    const plans = await IBPlan.find({ isActive: true }).sort({ createdAt: -1 })
+    const query = { isActive: true }
+    if (req.query.adminId) query.adminId = req.query.adminId
+    const plans = await IBPlan.find(query).sort({ createdAt: -1 })
     res.json({ success: true, plans })
   } catch (error) {
     console.error('Error fetching plans:', error)
@@ -521,10 +539,10 @@ router.get('/plans', async (req, res) => {
   }
 })
 
-// GET /api/ib/admin/plans - Get all plans (admin)
+// GET /api/ib/admin/plans - Get all plans (admin-scoped)
 router.get('/admin/plans', verifyAdminToken, async (req, res) => {
   try {
-    const plans = await IBPlan.find().sort({ createdAt: -1 })
+    const plans = await IBPlan.find({ adminId: req.admin._id }).sort({ createdAt: -1 })
     
     // Transform plans to include levelCommissions format for frontend compatibility
     const transformedPlans = plans.map(plan => {
@@ -566,16 +584,17 @@ router.post('/admin/plans', verifyAdminToken, async (req, res) => {
 
     const plan = await IBPlan.create({
       name,
+      adminId: req.admin._id,
       maxLevels: maxLevels || 3,
       commissionType: commissionType || 'PER_LOT',
       levels,
       source: commissionSources || { spread: true, tradeCommission: true, swap: false }
     })
 
-    // If this is default, unset other defaults
+    // If this is default, unset other defaults for this admin only
     if (isDefault) {
       await IBPlan.updateMany(
-        { _id: { $ne: plan._id } },
+        { _id: { $ne: plan._id }, adminId: req.admin._id },
         { $set: { isDefault: false } }
       )
     }
@@ -597,7 +616,7 @@ router.put('/admin/plans/:planId', verifyAdminToken, async (req, res) => {
     const { planId } = req.params
     const { name, description, maxLevels, commissionType, levelCommissions, commissionSources, minWithdrawalAmount, isActive, isDefault } = req.body
 
-    const plan = await IBPlan.findById(planId)
+    const plan = await IBPlan.findOne({ _id: planId, adminId: req.admin._id })
     if (!plan) throw new Error('Plan not found')
 
     if (name) plan.name = name
@@ -612,10 +631,10 @@ router.put('/admin/plans/:planId', verifyAdminToken, async (req, res) => {
 
     await plan.save()
 
-    // If this is default, unset other defaults
+    // If this is default, unset other defaults for this admin only
     if (isDefault) {
       await IBPlan.updateMany(
-        { _id: { $ne: plan._id } },
+        { _id: { $ne: plan._id }, adminId: req.admin._id },
         { $set: { isDefault: false } }
       )
     }
@@ -641,7 +660,7 @@ router.delete('/admin/plans/:planId', verifyAdminToken, async (req, res) => {
       })
     }
 
-    await IBPlan.findByIdAndDelete(planId)
+    await IBPlan.findOneAndDelete({ _id: planId, adminId: req.admin._id })
     res.json({ success: true, message: 'Plan deleted successfully' })
   } catch (error) {
     console.error('Error deleting plan:', error)
@@ -968,10 +987,10 @@ router.post('/admin/init-levels', verifyAdminToken, async (req, res) => {
 
 // ==================== SETTINGS ROUTES ====================
 
-// GET /api/ib/admin/settings - Get IB settings
+// GET /api/ib/admin/settings - Get IB settings (admin-scoped)
 router.get('/admin/settings', verifyAdminToken, async (req, res) => {
   try {
-    const settings = await IBSettings.getSettings()
+    const settings = await IBSettings.getSettings(req.admin._id)
     res.json({ success: true, settings })
   } catch (error) {
     console.error('Error fetching IB settings:', error)
@@ -979,10 +998,10 @@ router.get('/admin/settings', verifyAdminToken, async (req, res) => {
   }
 })
 
-// PUT /api/ib/admin/settings - Update IB settings
+// PUT /api/ib/admin/settings - Update IB settings (admin-scoped)
 router.put('/admin/settings', verifyAdminToken, async (req, res) => {
   try {
-    const settings = await IBSettings.getSettings()
+    const settings = await IBSettings.getSettings(req.admin._id)
     const { 
       ibRequirements, 
       commissionSettings, 

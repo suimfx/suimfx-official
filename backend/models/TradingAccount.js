@@ -11,6 +11,10 @@ const tradingAccountSchema = new mongoose.Schema({
     ref: 'AccountType',
     required: true
   },
+  accountTypeName: {
+    type: String,
+    default: ''
+  },
   accountId: {
     type: String,
     unique: true,

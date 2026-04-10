@@ -60,6 +60,7 @@ router.post('/', async (req, res) => {
     const tradingAccount = new TradingAccount({
       userId,
       accountTypeId,
+      accountTypeName: accountType.name,
       accountId,
       balance: initialBalance,
       credit: accountType.isDemo ? initialBalance : 0, // Demo balance is non-refundable (credit)

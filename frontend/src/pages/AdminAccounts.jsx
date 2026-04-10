@@ -230,7 +230,7 @@ const AdminAccounts = () => {
                           <p className="text-gray-500 text-sm">{account.userId?.email}</p>
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-gray-400">{account.accountTypeId?.name || 'N/A'}</td>
+                      <td className="py-4 px-4 text-gray-400">{account.accountTypeId?.name || account.accountTypeName || 'N/A'}</td>
                       <td className="py-4 px-4 text-white font-medium">${account.balance?.toLocaleString() || 0}</td>
                       <td className="py-4 px-4 text-gray-400">{account.leverage}</td>
                       <td className="py-4 px-4">

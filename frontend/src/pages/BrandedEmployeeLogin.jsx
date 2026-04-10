@@ -73,7 +73,7 @@ const BrandedEmployeeLogin = () => {
     const originalTitle = document.title
     const linkEl = document.querySelector("link[rel~='icon']")
     const originalFavicon = linkEl?.href || '/suimfxLogo.png'
-    document.title = `${brandName} - FX SRadmin`
+    document.title = `${brandName} - FX Admin Portal`
     if (logoUrl && linkEl) linkEl.href = logoUrl
     return () => {
       document.title = originalTitle
@@ -168,17 +168,17 @@ const BrandedEmployeeLogin = () => {
             )}
           </div>
 
-          {/* Staff Badge */}
+          {/* Admin Badge */}
           <div className="flex justify-center mb-6">
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
               <Shield size={14} />
-              Staff Portal · {displayName}
+              FX Admin Portal · {displayName}
             </span>
           </div>
 
           <div className="text-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">FX SRadmin</h1>
-            <p className="text-slate-400 text-sm">Login with your staff credentials</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">FX Admin Portal</h1>
+            <p className="text-slate-400 text-sm">Login with your credentials</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

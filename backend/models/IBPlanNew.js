@@ -3,8 +3,12 @@ import mongoose from 'mongoose'
 const ibPlanSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true,
-    unique: true
+    required: true
+  },
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
   },
   maxLevels: {
     type: Number,
@@ -53,12 +57,18 @@ const ibPlanSchema = new mongoose.Schema({
   }
 })
 
-// Get default plan
-ibPlanSchema.statics.getDefaultPlan = async function() {
-  let plan = await this.findOne({ name: 'Default', isActive: true })
+// Unique plan name per admin
+ibPlanSchema.index({ name: 1, adminId: 1 }, { unique: true })
+
+// Get default plan (scoped to admin)
+ibPlanSchema.statics.getDefaultPlan = async function(adminId = null) {
+  const query = { name: 'Default', isActive: true }
+  if (adminId) query.adminId = adminId
+  let plan = await this.findOne(query)
   if (!plan) {
     plan = await this.create({
       name: 'Default',
+      adminId: adminId || null,
       maxLevels: 3,
       commissionType: 'PER_LOT',
       levels: [

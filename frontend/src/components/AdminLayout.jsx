@@ -62,7 +62,7 @@ function getSessionBadge (admin) {
     if (admin.employerRole === 'ADMIN') {
       const brand = (admin.brandName || '').trim()
       return {
-        title: 'FX SRadmin',
+        title: 'FX Admin',
         subtitle: brand ? `${brand} · white-label users only` : 'White-label users only',
         pillClass: 'bg-blue-500/20 text-blue-400',
         dotClass: 'bg-blue-500'

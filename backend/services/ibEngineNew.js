@@ -88,11 +88,11 @@ class IBEngine {
     if (!user.isIB) throw new Error('User is not an IB applicant')
 
     user.ibStatus = 'ACTIVE'
-    
+
     if (planId) {
       user.ibPlanId = planId
     } else {
-      const defaultPlan = await IBPlan.getDefaultPlan()
+      const defaultPlan = await IBPlan.getDefaultPlan(user.assignedAdmin || null)
       user.ibPlanId = defaultPlan._id
     }
 
@@ -190,7 +190,7 @@ class IBEngine {
         // Get IB's plan - always fetch fresh from DB
         let plan = await IBPlan.findById(ibUser.ibPlanId)
         if (!plan) {
-          plan = await IBPlan.getDefaultPlan()
+          plan = await IBPlan.getDefaultPlan(ibUser.assignedAdmin || null)
         }
         if (!plan) {
           console.log(`No plan found for IB ${ibUser.firstName}`)

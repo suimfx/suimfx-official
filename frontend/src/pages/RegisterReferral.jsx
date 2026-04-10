@@ -19,8 +19,8 @@ const RegisterReferral = () => {
         const data = await res.json()
         
         if (data.success && data.admin.urlSlug) {
-          // Redirect to the admin's branded signup page
-          navigate(`/${data.admin.urlSlug}/signup`, { replace: true })
+          // Redirect to the admin's branded signup page with referral code
+          navigate(`/${data.admin.urlSlug}/signup?ref=${referralCode}`, { replace: true })
         } else {
           // If admin not found, redirect to generic signup
           navigate('/user/signup', { replace: true })

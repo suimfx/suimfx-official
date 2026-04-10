@@ -286,6 +286,41 @@ mongoose.connect(process.env.MONGODB_URI)
     } catch (e) {
       console.warn('[MongoDB] Transaction.syncIndexes:', e.message)
     }
+    // Sync IBPlan indexes (drop old unique on name, add compound name+adminId)
+    try {
+      const IBPlan = (await import('./models/IBPlanNew.js')).default
+      await IBPlan.syncIndexes()
+    } catch (e) {
+      console.warn('[MongoDB] IBPlan.syncIndexes:', e.message)
+    }
+    // Sync IBSettings indexes (drop old unique on settingsType, add compound settingsType+adminId)
+    try {
+      const IBSettings = (await import('./models/IBSettings.js')).default
+      await IBSettings.syncIndexes()
+    } catch (e) {
+      console.warn('[MongoDB] IBSettings.syncIndexes:', e.message)
+    }
+    // One-time migration: backfill accountTypeName for existing trading accounts
+    try {
+      const TradingAccount = (await import('./models/TradingAccount.js')).default
+      const AccountType = (await import('./models/AccountType.js')).default
+      // Find accounts missing accountTypeName
+      const orphaned = await TradingAccount.find({ $or: [{ accountTypeName: '' }, { accountTypeName: { $exists: false } }] })
+      let filled = 0
+      for (const acc of orphaned) {
+        const at = await AccountType.findById(acc.accountTypeId)
+        if (at) {
+          acc.accountTypeName = at.name
+          await acc.save()
+          filled++
+        }
+      }
+      if (filled > 0) {
+        console.log(`[Migration] Backfilled accountTypeName for ${filled} trading account(s)`)
+      }
+    } catch (e) {
+      console.warn('[Migration] accountTypeName backfill:', e.message)
+    }
     // One-time migration: ensure all ADMINs have bankSettings enabled
     try {
       const Admin = (await import('./models/Admin.js')).default

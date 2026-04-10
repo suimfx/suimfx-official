@@ -1267,36 +1267,49 @@ router.post('/init-super-admin', async (req, res) => {
   }
 })
 
-// GET /api/admin-mgmt/admin-by-referral/:referralCode - Get admin by referral code
+// GET /api/admin-mgmt/admin-by-referral/:referralCode - Get admin by referral code (supports both Admin and IB referral codes)
 router.get('/admin-by-referral/:referralCode', async (req, res) => {
   try {
     const { referralCode } = req.params
-    
-    const admin = await Admin.findOne({ 
+
+    // First check if it's an Admin's referral code
+    let admin = await Admin.findOne({
       referralCode: referralCode.toUpperCase(),
       status: 'ACTIVE'
-    }).select('urlSlug brandName logo')
-    
+    }).select('urlSlug brandName logo customDomain')
+
+    // If not found, check if it's an IB user's referral code and resolve their admin
     if (!admin) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Admin not found with this referral code' 
+      const ibUser = await User.findOne({
+        referralCode: referralCode.toUpperCase(),
+        isIB: true
+      }).select('assignedAdmin')
+      if (ibUser && ibUser.assignedAdmin) {
+        admin = await Admin.findById(ibUser.assignedAdmin).select('urlSlug brandName logo customDomain')
+      }
+    }
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found with this referral code'
       })
     }
-    
+
     res.json({
       success: true,
       admin: {
         urlSlug: admin.urlSlug,
         brandName: admin.brandName,
-        logo: admin.logo
+        logo: admin.logo,
+        customDomain: admin.customDomain || null
       }
     })
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error fetching admin', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching admin',
+      error: error.message
     })
   }
 })

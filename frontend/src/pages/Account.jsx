@@ -943,7 +943,7 @@ const Account = () => {
                         <div>
                           <h3 className={`font-semibold ${isMobile ? 'text-sm' : ''} ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{account.accountId}</h3>
                           <p className="text-gray-500 text-xs uppercase flex items-center gap-2 flex-wrap">
-                            {account.accountTypeId?.name || 'STANDARD'}
+                            {account.accountTypeId?.name || account.accountTypeName || 'STANDARD'}
                             {(account.isDemo || account.accountTypeId?.isDemo) && (
                               <span className="normal-case px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-medium">DEMO</span>
                             )}

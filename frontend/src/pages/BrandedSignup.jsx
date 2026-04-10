@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { X, Mail, Lock, Eye, EyeOff, User, Phone, AlertCircle } from 'lucide-react'
 import { API_URL, API_BASE_URL } from '../config/api'
 import { useBranding } from '../context/BrandingContext'
@@ -7,6 +7,8 @@ import { useBranding } from '../context/BrandingContext'
 const BrandedSignup = () => {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const referralCode = searchParams.get('ref')
   const { refreshBranding } = useBranding()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -103,7 +105,8 @@ const BrandedSignup = () => {
           phone: formData.phone,
           password: formData.password,
           adminSlug: slug,
-          adminId: brandInfo?.adminId
+          adminId: brandInfo?.adminId,
+          referralCode: referralCode || undefined
         })
       })
       const data = await response.json()

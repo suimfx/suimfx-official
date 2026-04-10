@@ -105,11 +105,15 @@ const AdminAccountTypes = () => {
         method: 'DELETE',
         headers: getAuthHeaders()
       })
-      
+      const data = await res.json()
+
       if (res.ok) {
         setSuccess('Account type deleted!')
         fetchAccountTypes()
         setTimeout(() => setSuccess(''), 3000)
+      } else {
+        setError(data.message || 'Cannot delete account type')
+        setTimeout(() => setError(''), 5000)
       }
     } catch (error) {
       setError('Error deleting account type')

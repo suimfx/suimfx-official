@@ -175,7 +175,8 @@ router.post('/signup', async (req, res) => {
       }
 
       // Second: Check if referral code belongs to an IB user
-      if (!assignedAdmin) {
+      // Always check IB referral even if admin is already assigned (from slug)
+      if (!parentIBId) {
         const referringIB = await User.findOne({
           referralCode: referralCode,
           isIB: true,
@@ -184,8 +185,8 @@ router.post('/signup', async (req, res) => {
         if (referringIB) {
           parentIBId = referringIB._id
           referredBy = referralCode
-          // Inherit the IB's assigned admin so referred user belongs to the same admin
-          if (referringIB.assignedAdmin) {
+          // If admin not yet assigned, inherit the IB's assigned admin
+          if (!assignedAdmin && referringIB.assignedAdmin) {
             assignedAdmin = referringIB.assignedAdmin
             const ibAdmin = await Admin.findById(referringIB.assignedAdmin)
             if (ibAdmin) {

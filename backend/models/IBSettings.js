@@ -3,8 +3,12 @@ import mongoose from 'mongoose'
 const ibSettingsSchema = new mongoose.Schema({
   settingsType: {
     type: String,
-    default: 'GLOBAL',
-    unique: true
+    default: 'GLOBAL'
+  },
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
   },
   // IB Requirements
   ibRequirements: {
@@ -33,11 +37,16 @@ const ibSettingsSchema = new mongoose.Schema({
   }
 }, { timestamps: true })
 
-// Static method to get settings
-ibSettingsSchema.statics.getSettings = async function() {
-  let settings = await this.findOne({ settingsType: 'GLOBAL' })
+// Unique settings per admin
+ibSettingsSchema.index({ settingsType: 1, adminId: 1 }, { unique: true })
+
+// Static method to get settings (scoped to admin)
+ibSettingsSchema.statics.getSettings = async function(adminId = null) {
+  const query = { settingsType: 'GLOBAL' }
+  if (adminId) query.adminId = adminId
+  let settings = await this.findOne(query)
   if (!settings) {
-    settings = await this.create({ settingsType: 'GLOBAL' })
+    settings = await this.create({ settingsType: 'GLOBAL', adminId: adminId || null })
   }
   return settings
 }
