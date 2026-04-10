@@ -59,7 +59,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Navigate to="/user/login" replace />} />
-          <Route path="/signup" element={<Navigate to="/user/signup" replace />} />
+          <Route path="/signup" element={<RegisterReferral />} />
           <Route path="/register" element={<RegisterReferral />} />
           <Route path="/user/signup" element={<Signup />} />
           <Route path="/user/login" element={<Login />} />

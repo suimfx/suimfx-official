@@ -231,7 +231,7 @@ const IBPage = () => {
     if (adminBranding?.urlSlug) {
       return `${window.location.origin}/${adminBranding.urlSlug}/signup?ref=${ibProfile?.referralCode}`
     }
-    return `${window.location.origin}/user/signup?ref=${ibProfile?.referralCode}`
+    return `${window.location.origin}/signup?ref=${ibProfile?.referralCode}`
   }
 
   const copyReferralLink = async () => {
