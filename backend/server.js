@@ -47,6 +47,7 @@ import propTradingEngine from './services/propTradingEngine.js'
 import lpPriceService from './services/lpPriceService.js'
 import AdminDomainConnection from './models/AdminDomainConnection.js'
 import { refreshDnsCheck } from './services/domainDnsService.js'
+import { renderBrandedHtml } from './services/htmlBrandingService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -383,9 +384,34 @@ app.get('/downloads/Suimfx.apk', (req, res) => {
   })
 })
 
-// Health check
-app.get('/', (req, res) => {
+// Health check / dynamic branded HTML fallback.
+// Nginx proxies HTML page requests here (root, /register, /login, etc.) so that
+// link-preview crawlers (WhatsApp, Telegram, FB, Twitter) see per-tenant <title>
+// and Open Graph tags instead of the hardcoded "Suimfx" in the static index.html.
+app.get('/api-health', (req, res) => {
   res.json({ message: 'Suimfx API is running' })
+})
+
+app.get('*', (req, res, next) => {
+  // Let anything under /api, /socket.io, /uploads continue to the real handlers.
+  if (req.path.startsWith('/api/')) return next()
+  if (req.path.startsWith('/socket.io')) return next()
+  if (req.path.startsWith('/uploads/')) return next()
+
+  // Requests for static assets (have a file extension like .js/.css/.png) — 404
+  // so Nginx knows to serve them from the dist folder directly, not us.
+  if (/\.[a-zA-Z0-9]+$/.test(req.path)) return next()
+
+  const acceptsHtml = (req.headers.accept || '').includes('text/html')
+  if (!acceptsHtml && req.path === '/') {
+    return res.json({ message: 'Suimfx API is running' })
+  }
+
+  const html = renderBrandedHtml(req)
+  if (!html) return next()
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+  return res.send(html)
 })
 
 const PORT = process.env.PORT || 5000

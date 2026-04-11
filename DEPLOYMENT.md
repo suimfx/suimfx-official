@@ -189,13 +189,27 @@ Nginx configuration:
 server {
     listen 80;
     server_name YOUR_VPS_IP;
-    
-    # Frontend
+
+    root /home/suimfx/setup/frontend/dist;
+
+    # Static assets (js/css/images/fonts) served directly from disk.
+    # Anything that looks like a real file goes to disk; anything else falls
+    # through to the backend (@app) so page HTML is rendered with per-tenant
+    # <title>/Open Graph tags — required for WhatsApp/Telegram link previews
+    # on admin custom domains to show the admin's brand instead of "Suimfx".
     location / {
-        root /home/suimfx/setup/frontend/dist;
-        try_files $uri $uri/ /index.html;
+        try_files $uri @app;
     }
-    
+
+    location @app {
+        proxy_pass http://localhost:5001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # Backend API proxy
     location /api {
         proxy_pass http://localhost:5001;
@@ -205,7 +219,7 @@ server {
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
     }
-    
+
     # WebSocket for real-time prices
     location /socket.io {
         proxy_pass http://localhost:5001;
