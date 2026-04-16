@@ -403,7 +403,9 @@ const OrderBook = () => {
               >
                 <option value="all">All Accounts</option>
                 {accounts.map(acc => (
-                  <option key={acc._id} value={acc._id}>{acc.accountId}</option>
+                  <option key={acc._id} value={acc._id}>
+                    {acc.accountId} — {acc.isDemo ? 'Demo' : 'Real'}
+                  </option>
                 ))}
               </select>
             </div>

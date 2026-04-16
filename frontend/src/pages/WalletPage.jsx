@@ -45,6 +45,7 @@ const WalletPage = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [wallet, setWallet] = useState(null)
   const [transactions, setTransactions] = useState([])
+  const [txnTab, setTxnTab] = useState('real') // 'real' | 'demo'
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [paymentMethods, setPaymentMethods] = useState([])
   const [loading, setLoading] = useState(true)
@@ -105,10 +106,19 @@ const WalletPage = () => {
     }
   }
 
-  // Download transactions as CSV
+  const isDemoTxn = (tx) => {
+    const tp = (tx?.type || '').toLowerCase()
+    return tp === 'demo_credit' || tp === 'demo_reset'
+  }
+
+  const visibleTransactions = transactions.filter(tx =>
+    txnTab === 'demo' ? isDemoTxn(tx) : !isDemoTxn(tx)
+  )
+
+  // Download transactions as CSV (current tab only)
   const downloadTransactionsCSV = () => {
     const headers = ['Date', 'Type', 'Amount', 'Method', 'Status', 'Reference']
-    const rows = transactions.map(tx => [
+    const rows = visibleTransactions.map(tx => [
       new Date(tx.createdAt).toLocaleString(),
       tx.type,
       tx.amount.toFixed(2),
@@ -720,17 +730,41 @@ const WalletPage = () => {
 
           {/* Transaction History */}
           <div className={`${isDarkMode ? 'bg-dark-800 border-gray-800' : 'bg-white border-gray-200 shadow-sm'} rounded-xl ${isMobile ? 'p-4' : 'p-5'} border`}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={`font-semibold text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Transaction History</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className={`font-semibold text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Transaction History</h2>
+                <div className={`inline-flex rounded-lg p-1 border ${isDarkMode ? 'bg-dark-700 border-gray-700' : 'bg-gray-100 border-gray-200'}`}>
+                  <button
+                    onClick={() => setTxnTab('real')}
+                    className={`px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                      txnTab === 'real'
+                        ? 'bg-accent-green text-black'
+                        : isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Real Account
+                  </button>
+                  <button
+                    onClick={() => setTxnTab('demo')}
+                    className={`px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                      txnTab === 'demo'
+                        ? 'bg-accent-green text-black'
+                        : isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Demo Account
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
-                <button 
+                <button
                   onClick={downloadTransactionsCSV}
-                  disabled={transactions.length === 0}
+                  disabled={visibleTransactions.length === 0}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm disabled:opacity-50 ${isDarkMode ? 'bg-dark-700 hover:bg-dark-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'}`}
                 >
                   <Download size={14} /> Download
                 </button>
-                <button 
+                <button
                   onClick={fetchTransactions}
                   className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-dark-700' : 'hover:bg-gray-100'}`}
                 >
@@ -743,10 +777,12 @@ const WalletPage = () => {
               <div className="flex items-center justify-center py-8">
                 <RefreshCw size={24} className="text-gray-500 animate-spin" />
               </div>
-            ) : transactions.length === 0 ? (
+            ) : visibleTransactions.length === 0 ? (
               <div className="text-center py-8">
                 <Wallet size={48} className="text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-500">No transactions yet</p>
+                <p className="text-gray-500">
+                  {txnTab === 'demo' ? 'No demo account transactions yet' : 'No transactions yet'}
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -763,7 +799,7 @@ const WalletPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.map((tx) => (
+                    {visibleTransactions.map((tx) => (
                       <tr key={tx._id} className={`border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">

@@ -31,11 +31,16 @@ function resolveDepositScreenshotSrc(value) {
   return `${API_BASE_URL.replace(/\/$/, '')}${path}`
 }
 
+const isDemoTxn = (t) => {
+  const tp = (t?.type || '').toLowerCase()
+  return tp === 'demo_credit' || tp === 'demo_reset'
+}
+
 const AdminFundManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState('all')
-  const [transactions, setTransactions] = useState([])
-  const [stats, setStats] = useState({ deposits: 0, withdrawals: 0, pending: 0, net: 0 })
+  const [accountTab, setAccountTab] = useState('real') // 'real' | 'demo'
+  const [rawTransactions, setRawTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTxn, setSelectedTxn] = useState(null)
   const [userDetails, setUserDetails] = useState(null)
@@ -43,39 +48,47 @@ const AdminFundManagement = () => {
 
   useEffect(() => {
     fetchTransactions()
-  }, [filterType])
+  }, [])
 
   const fetchTransactions = async () => {
     setLoading(true)
     try {
       const res = await fetch(`${API_URL}/wallet/admin/transactions`, { headers: getAdminHeaders() })
       const data = await res.json()
-      if (data.transactions) {
-        let filtered = data.transactions
-        if (filterType !== 'all') {
-          filtered = data.transactions.filter(t => t.type?.toLowerCase() === filterType)
-        }
-        setTransactions(filtered)
-        
-        // Calculate stats
-        const deposits = data.transactions.filter(t => t.type?.toUpperCase() === 'DEPOSIT' && t.status?.toUpperCase() === 'APPROVED')
-          .reduce((sum, t) => sum + (t.amount || 0), 0)
-        const withdrawals = data.transactions.filter(t => t.type?.toUpperCase() === 'WITHDRAWAL' && t.status?.toUpperCase() === 'APPROVED')
-          .reduce((sum, t) => sum + (t.amount || 0), 0)
-        const pending = data.transactions.filter(t => t.status?.toUpperCase() === 'PENDING').length
-        
-        setStats({
-          deposits,
-          withdrawals,
-          pending,
-          net: deposits - withdrawals
-        })
-      }
+      if (data.transactions) setRawTransactions(data.transactions)
     } catch (error) {
       console.error('Error fetching transactions:', error)
     }
     setLoading(false)
   }
+
+  // Partition by account tab (demo vs real)
+  const tabTransactions = rawTransactions.filter(t => accountTab === 'demo' ? isDemoTxn(t) : !isDemoTxn(t))
+
+  // Apply type filter (deposits/withdrawals) only on real tab
+  const transactions = (accountTab === 'real' && filterType !== 'all')
+    ? tabTransactions.filter(t => t.type?.toLowerCase() === filterType)
+    : tabTransactions
+
+  // Stats per tab
+  const realDeposits = rawTransactions.filter(t => t.type?.toUpperCase() === 'DEPOSIT' && t.status?.toUpperCase() === 'APPROVED')
+    .reduce((sum, t) => sum + (t.amount || 0), 0)
+  const realWithdrawals = rawTransactions.filter(t => t.type?.toUpperCase() === 'WITHDRAWAL' && t.status?.toUpperCase() === 'APPROVED')
+    .reduce((sum, t) => sum + (t.amount || 0), 0)
+  const realPending = rawTransactions.filter(t => !isDemoTxn(t) && t.status?.toUpperCase() === 'PENDING').length
+  const demoCredits = rawTransactions.filter(t => t.type?.toLowerCase() === 'demo_credit')
+    .reduce((sum, t) => sum + (t.amount || 0), 0)
+  const demoResets = rawTransactions.filter(t => t.type?.toLowerCase() === 'demo_reset').length
+  const demoAccounts = new Set(
+    rawTransactions
+      .filter(isDemoTxn)
+      .map(t => (t.tradingAccountId?._id || t.tradingAccountId || t.userId?._id || t.userId)?.toString())
+      .filter(Boolean)
+  ).size
+
+  const stats = accountTab === 'demo'
+    ? { credits: demoCredits, resets: demoResets, accounts: demoAccounts, count: tabTransactions.length }
+    : { deposits: realDeposits, withdrawals: realWithdrawals, pending: realPending, net: realDeposits - realWithdrawals }
 
   const handleApprove = async (txnId) => {
     try {
@@ -159,42 +172,97 @@ const AdminFundManagement = () => {
 
   return (
     <AdminLayout title="Fund Management" subtitle="Manage deposits and withdrawals">
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
-            <ArrowDownRight size={18} className="text-green-500" />
-            <p className="text-gray-500 text-sm">Total Deposits</p>
-          </div>
-          <p className="text-white text-2xl font-bold">${stats.deposits.toLocaleString()}</p>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
-            <ArrowUpRight size={18} className="text-red-500" />
-            <p className="text-gray-500 text-sm">Total Withdrawals</p>
-          </div>
-          <p className="text-white text-2xl font-bold">${stats.withdrawals.toLocaleString()}</p>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock size={18} className="text-yellow-500" />
-            <p className="text-gray-500 text-sm">Pending Requests</p>
-          </div>
-          <p className="text-white text-2xl font-bold">{stats.pending}</p>
-        </div>
-        <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
-            <Wallet size={18} className="text-purple-500" />
-            <p className="text-gray-500 text-sm">Net Balance</p>
-          </div>
-          <p className="text-white text-2xl font-bold">${stats.net.toLocaleString()}</p>
-        </div>
+      {/* Account Tabs: Real vs Demo */}
+      <div className="mb-5 inline-flex bg-dark-800 border border-gray-800 rounded-xl p-1">
+        <button
+          onClick={() => setAccountTab('real')}
+          className={`px-4 sm:px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
+            accountTab === 'real' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Real Account
+        </button>
+        <button
+          onClick={() => setAccountTab('demo')}
+          className={`px-4 sm:px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
+            accountTab === 'demo' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Demo Account
+        </button>
       </div>
+
+      {/* Stats */}
+      {accountTab === 'real' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <ArrowDownRight size={18} className="text-green-500" />
+              <p className="text-gray-500 text-sm">Total Deposits</p>
+            </div>
+            <p className="text-white text-2xl font-bold">${stats.deposits.toLocaleString()}</p>
+          </div>
+          <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <ArrowUpRight size={18} className="text-red-500" />
+              <p className="text-gray-500 text-sm">Total Withdrawals</p>
+            </div>
+            <p className="text-white text-2xl font-bold">${stats.withdrawals.toLocaleString()}</p>
+          </div>
+          <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock size={18} className="text-yellow-500" />
+              <p className="text-gray-500 text-sm">Pending Requests</p>
+            </div>
+            <p className="text-white text-2xl font-bold">{stats.pending}</p>
+          </div>
+          <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Wallet size={18} className="text-purple-500" />
+              <p className="text-gray-500 text-sm">Net Balance</p>
+            </div>
+            <p className="text-white text-2xl font-bold">${stats.net.toLocaleString()}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <ArrowDownRight size={18} className="text-green-500" />
+              <p className="text-gray-500 text-sm">Total Demo Credits</p>
+            </div>
+            <p className="text-white text-2xl font-bold">${stats.credits.toLocaleString()}</p>
+          </div>
+          <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <RefreshCw size={18} className="text-blue-500" />
+              <p className="text-gray-500 text-sm">Demo Resets</p>
+            </div>
+            <p className="text-white text-2xl font-bold">{stats.resets}</p>
+          </div>
+          <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Wallet size={18} className="text-purple-500" />
+              <p className="text-gray-500 text-sm">Demo Accounts</p>
+            </div>
+            <p className="text-white text-2xl font-bold">{stats.accounts}</p>
+          </div>
+          <div className="bg-dark-800 rounded-xl p-5 border border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Filter size={18} className="text-gray-400" />
+              <p className="text-gray-500 text-sm">Total Records</p>
+            </div>
+            <p className="text-white text-2xl font-bold">{stats.count}</p>
+          </div>
+        </div>
+      )}
 
       {/* Transactions Table */}
       <div className="bg-dark-800 rounded-xl border border-gray-800 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 border-b border-gray-800">
-          <h2 className="text-white font-semibold text-lg">All Transactions</h2>
+          <h2 className="text-white font-semibold text-lg">
+            {accountTab === 'demo' ? 'Demo Account Transactions' : 'Real Account Transactions'}
+          </h2>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -206,15 +274,17 @@ const AdminFundManagement = () => {
                 className="w-full sm:w-64 bg-dark-700 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-gray-600"
               />
             </div>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="bg-dark-700 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-gray-600"
-            >
-              <option value="all">All Types</option>
-              <option value="deposit">Deposits</option>
-              <option value="withdrawal">Withdrawals</option>
-            </select>
+            {accountTab === 'real' && (
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="bg-dark-700 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-gray-600"
+              >
+                <option value="all">All Types</option>
+                <option value="deposit">Deposits</option>
+                <option value="withdrawal">Withdrawals</option>
+              </select>
+            )}
           </div>
         </div>
 
