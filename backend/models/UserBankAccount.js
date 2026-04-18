@@ -8,7 +8,7 @@ const userBankAccountSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Bank Transfer', 'UPI'],
+    enum: ['Bank Transfer', 'UPI', 'Crypto'],
     required: true
   },
   // Bank Transfer fields
@@ -34,6 +34,21 @@ const userBankAccountSchema = new mongoose.Schema({
   },
   // UPI fields
   upiId: {
+    type: String,
+    default: ''
+  },
+  // Crypto fields (mirror ManualCryptoWallet enums)
+  cryptoCurrency: {
+    type: String,
+    enum: ['', 'USDT', 'BTC', 'ETH', 'BNB', 'TRX', 'LTC', 'DOGE', 'SOL'],
+    default: ''
+  },
+  cryptoNetwork: {
+    type: String,
+    enum: ['', 'TRC20', 'ERC20', 'BEP20', 'Bitcoin', 'Ethereum', 'Solana', 'Litecoin', 'Dogecoin'],
+    default: ''
+  },
+  walletAddress: {
     type: String,
     default: ''
   },

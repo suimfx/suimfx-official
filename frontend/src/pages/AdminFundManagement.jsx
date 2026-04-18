@@ -559,11 +559,13 @@ const AdminFundManagement = () => {
                   <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
                     {selectedTxn.bankAccountDetails?.type === 'UPI' ? (
                       <><Smartphone size={16} /> UPI Details</>
+                    ) : selectedTxn.bankAccountDetails?.type === 'Crypto' ? (
+                      <><Smartphone size={16} /> Crypto Wallet Details</>
                     ) : (
                       <><Building2 size={16} /> Bank Details</>
                     )}
                   </h3>
-                  
+
                   {/* Show bank details from transaction if available */}
                   {selectedTxn.bankAccountDetails?.type === 'Bank' ? (
                     <div className="bg-dark-700 rounded-lg p-4 space-y-2 text-sm">
@@ -585,6 +587,21 @@ const AdminFundManagement = () => {
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">UPI ID</span>
                         <span className="text-purple-400 font-mono">{selectedTxn.bankAccountDetails.upiId}</span>
+                      </div>
+                    </div>
+                  ) : selectedTxn.bankAccountDetails?.type === 'Crypto' ? (
+                    <div className="bg-dark-700 rounded-lg p-4 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Currency</span>
+                        <span className="text-white">{selectedTxn.bankAccountDetails.cryptoCurrency || '-'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Network</span>
+                        <span className="text-white">{selectedTxn.bankAccountDetails.cryptoNetwork || '-'}</span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-500 shrink-0">Wallet Address</span>
+                        <span className="text-orange-400 font-mono text-right break-all">{selectedTxn.bankAccountDetails.walletAddress || '-'}</span>
                       </div>
                     </div>
                   ) : userDetails?.bankDetails?.accountNumber ? (

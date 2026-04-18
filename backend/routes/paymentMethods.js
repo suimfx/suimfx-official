@@ -332,23 +332,46 @@ router.get('/user-banks/:userId/approved', async (req, res) => {
   }
 })
 
-// POST /api/payment-methods/user-banks - Submit bank account for approval
+// POST /api/payment-methods/user-banks - Submit withdrawal account for approval
 router.post('/user-banks', async (req, res) => {
   try {
-    const { userId, type, bankName, accountNumber, accountHolderName, ifscCode, branchName, upiId } = req.body
+    const {
+      userId, type,
+      bankName, accountNumber, accountHolderName, ifscCode, branchName,
+      upiId,
+      cryptoCurrency, cryptoNetwork, walletAddress
+    } = req.body
 
     if (!userId || !type) {
       return res.status(400).json({ message: 'User ID and type are required' })
     }
 
-    // Check for duplicate
+    // Per-type required-field validation
+    if (type === 'Bank Transfer') {
+      if (!bankName || !accountNumber || !accountHolderName || !ifscCode) {
+        return res.status(400).json({ message: 'Bank name, account number, holder name and IFSC are required' })
+      }
+    } else if (type === 'UPI') {
+      if (!upiId) return res.status(400).json({ message: 'UPI ID is required' })
+    } else if (type === 'Crypto') {
+      if (!cryptoCurrency || !cryptoNetwork || !walletAddress) {
+        return res.status(400).json({ message: 'Currency, network and wallet address are required' })
+      }
+    } else {
+      return res.status(400).json({ message: 'Invalid account type' })
+    }
+
+    // Duplicate check — unique identifier differs per type
+    const duplicateMatch =
+      type === 'Bank Transfer' ? { accountNumber } :
+      type === 'UPI'           ? { upiId } :
+                                 { cryptoCurrency, cryptoNetwork, walletAddress }
     const existing = await UserBankAccount.findOne({
       userId,
       type,
-      ...(type === 'Bank Transfer' ? { accountNumber } : { upiId }),
+      ...duplicateMatch,
       status: { $ne: 'Rejected' }
     })
-
     if (existing) {
       return res.status(400).json({ message: 'This account is already submitted or approved' })
     }
@@ -356,25 +379,28 @@ router.post('/user-banks', async (req, res) => {
     const account = new UserBankAccount({
       userId,
       type,
-      bankName,
-      accountNumber,
-      accountHolderName,
-      ifscCode,
-      branchName,
-      upiId,
+      bankName: bankName || '',
+      accountNumber: accountNumber || '',
+      accountHolderName: accountHolderName || '',
+      ifscCode: ifscCode || '',
+      branchName: branchName || '',
+      upiId: upiId || '',
+      cryptoCurrency: cryptoCurrency || '',
+      cryptoNetwork: cryptoNetwork || '',
+      walletAddress: walletAddress || '',
       status: 'Approved',
       isActive: true,
       approvedAt: new Date()
     })
 
     await account.save()
-    res.status(201).json({ 
+    res.status(201).json({
       success: true,
-      message: 'Bank account added successfully',
-      account 
+      message: 'Withdrawal account added successfully',
+      account
     })
   } catch (error) {
-    res.status(500).json({ message: 'Error submitting bank account', error: error.message })
+    res.status(500).json({ message: 'Error submitting withdrawal account', error: error.message })
   }
 })
 

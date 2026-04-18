@@ -73,7 +73,10 @@ const ProfilePage = () => {
     accountHolderName: '',
     ifscCode: '',
     branchName: '',
-    upiId: ''
+    upiId: '',
+    cryptoCurrency: 'USDT',
+    cryptoNetwork: 'TRC20',
+    walletAddress: ''
   })
   const [bankLoading, setBankLoading] = useState(false)
 
@@ -109,16 +112,21 @@ const ProfilePage = () => {
     }
   }
 
-  // Submit bank account for approval
+  // Submit withdrawal account for approval
   const handleBankSubmit = async () => {
     if (bankFormType === 'Bank Transfer') {
       if (!bankForm.bankName || !bankForm.accountNumber || !bankForm.accountHolderName || !bankForm.ifscCode) {
         alert('Please fill all required bank details')
         return
       }
-    } else {
+    } else if (bankFormType === 'UPI') {
       if (!bankForm.upiId) {
         alert('Please enter UPI ID')
+        return
+      }
+    } else if (bankFormType === 'Crypto') {
+      if (!bankForm.cryptoCurrency || !bankForm.cryptoNetwork || !bankForm.walletAddress) {
+        alert('Please select currency, network and enter wallet address')
         return
       }
     }
@@ -136,7 +144,7 @@ const ProfilePage = () => {
       })
       const data = await res.json()
       if (data.success) {
-        alert('Bank account submitted for approval!')
+        alert('Withdrawal account submitted!')
         setShowBankForm(false)
         setBankForm({
           bankName: '',
@@ -144,15 +152,18 @@ const ProfilePage = () => {
           accountHolderName: '',
           ifscCode: '',
           branchName: '',
-          upiId: ''
+          upiId: '',
+          cryptoCurrency: 'USDT',
+          cryptoNetwork: 'TRC20',
+          walletAddress: ''
         })
         fetchUserBankAccounts()
       } else {
-        alert(data.message || 'Failed to submit bank account')
+        alert(data.message || 'Failed to submit withdrawal account')
       }
     } catch (error) {
-      console.error('Error submitting bank account:', error)
-      alert('Failed to submit bank account')
+      console.error('Error submitting withdrawal account:', error)
+      alert('Failed to submit withdrawal account')
     }
     setBankLoading(false)
   }
@@ -883,13 +894,19 @@ const ProfilePage = () => {
                         <div className="flex items-center gap-3">
                           {acc.type === 'Bank Transfer' ? (
                             <Building2 size={20} className="text-blue-500" />
-                          ) : (
+                          ) : acc.type === 'UPI' ? (
                             <Smartphone size={20} className="text-purple-500" />
+                          ) : (
+                            <CreditCard size={20} className="text-orange-500" />
                           )}
                           <div>
                             <div className="flex items-center gap-2">
                               <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                {acc.type === 'Bank Transfer' ? acc.bankName : 'UPI'}
+                                {acc.type === 'Bank Transfer'
+                                  ? acc.bankName
+                                  : acc.type === 'UPI'
+                                    ? 'UPI'
+                                    : `${acc.cryptoCurrency} (${acc.cryptoNetwork})`}
                               </span>
                               <span className={`px-2 py-0.5 rounded text-xs ${
                                 acc.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-500' :
@@ -903,8 +920,10 @@ const ProfilePage = () => {
                               <p className="text-gray-500 text-sm">
                                 A/C: {acc.accountNumber} | IFSC: {acc.ifscCode}
                               </p>
-                            ) : (
+                            ) : acc.type === 'UPI' ? (
                               <p className="text-purple-400 text-sm font-mono">{acc.upiId}</p>
+                            ) : (
+                              <p className="text-orange-400 text-xs font-mono break-all">{acc.walletAddress}</p>
                             )}
                             {acc.rejectionReason && (
                               <p className="text-red-400 text-xs mt-1">Reason: {acc.rejectionReason}</p>
@@ -938,7 +957,7 @@ const ProfilePage = () => {
                   </div>
                   <div className="p-4 space-y-4">
                     {/* Type Selection */}
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         onClick={() => setBankFormType('Bank Transfer')}
                         className={`p-3 rounded-lg border flex items-center justify-center gap-2 ${
@@ -958,6 +977,16 @@ const ProfilePage = () => {
                         }`}
                       >
                         <Smartphone size={18} /> UPI
+                      </button>
+                      <button
+                        onClick={() => setBankFormType('Crypto')}
+                        className={`p-3 rounded-lg border flex items-center justify-center gap-2 ${
+                          bankFormType === 'Crypto'
+                            ? 'border-orange-500 bg-orange-500/20 text-orange-500'
+                            : 'border-gray-700 text-gray-400'
+                        }`}
+                      >
+                        <CreditCard size={18} /> Crypto
                       </button>
                     </div>
 
@@ -1014,7 +1043,7 @@ const ProfilePage = () => {
                           />
                         </div>
                       </>
-                    ) : (
+                    ) : bankFormType === 'UPI' ? (
                       <div>
                         <label className="text-gray-400 text-sm block mb-1">UPI ID *</label>
                         <input
@@ -1025,6 +1054,54 @@ const ProfilePage = () => {
                           className="w-full bg-dark-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
                         />
                       </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="text-gray-400 text-sm block mb-1">Currency *</label>
+                          <select
+                            value={bankForm.cryptoCurrency}
+                            onChange={(e) => setBankForm({...bankForm, cryptoCurrency: e.target.value})}
+                            className="w-full bg-dark-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                          >
+                            <option value="USDT">USDT</option>
+                            <option value="BTC">BTC</option>
+                            <option value="ETH">ETH</option>
+                            <option value="BNB">BNB</option>
+                            <option value="TRX">TRX</option>
+                            <option value="LTC">LTC</option>
+                            <option value="DOGE">DOGE</option>
+                            <option value="SOL">SOL</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-gray-400 text-sm block mb-1">Network *</label>
+                          <select
+                            value={bankForm.cryptoNetwork}
+                            onChange={(e) => setBankForm({...bankForm, cryptoNetwork: e.target.value})}
+                            className="w-full bg-dark-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                          >
+                            <option value="TRC20">TRC20</option>
+                            <option value="ERC20">ERC20</option>
+                            <option value="BEP20">BEP20</option>
+                            <option value="Bitcoin">Bitcoin</option>
+                            <option value="Ethereum">Ethereum</option>
+                            <option value="Solana">Solana</option>
+                            <option value="Litecoin">Litecoin</option>
+                            <option value="Dogecoin">Dogecoin</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-gray-400 text-sm block mb-1">Wallet Address *</label>
+                          <input
+                            type="text"
+                            value={bankForm.walletAddress}
+                            onChange={(e) => setBankForm({...bankForm, walletAddress: e.target.value.trim()})}
+                            placeholder="Paste your wallet address"
+                            className="w-full bg-dark-700 border border-gray-600 rounded-lg px-3 py-2 text-white font-mono text-sm break-all"
+                          />
+                          <p className="text-gray-500 text-xs mt-1">Double-check the address — crypto withdrawals cannot be reversed.</p>
+                        </div>
+                      </>
                     )}
 
                     <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">

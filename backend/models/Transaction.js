@@ -74,12 +74,16 @@ const transactionSchema = new mongoose.Schema({
   bankAccountDetails: {
     type: {
       type: String,
-      enum: ['Bank', 'UPI']
+      enum: ['Bank', 'UPI', 'Crypto']
     },
     bankName: String,
     accountNumber: String,
     ifscCode: String,
-    upiId: String
+    upiId: String,
+    // Crypto snapshot fields (captured at withdraw-request time)
+    cryptoCurrency: String,
+    cryptoNetwork: String,
+    walletAddress: String
   },
   status: {
     type: String,

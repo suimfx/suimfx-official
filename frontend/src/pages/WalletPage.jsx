@@ -31,7 +31,8 @@ import {
   BookOpen,
   Sun,
   Moon,
-  Gift
+  Gift,
+  CreditCard
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { API_URL, API_BASE_URL } from '../config/api'
@@ -536,11 +537,27 @@ const WalletPage = () => {
         body: JSON.stringify({
           userId: user._id,
           amount: parseFloat(amount),
-          paymentMethod: selectedBankAccount.type === 'UPI' ? 'UPI' : 'Bank Transfer',
+          paymentMethod:
+            selectedBankAccount.type === 'UPI' ? 'UPI' :
+            selectedBankAccount.type === 'Crypto' ? 'Manual Crypto' :
+            'Bank Transfer',
           bankAccountId: selectedBankAccount._id,
-          bankAccountDetails: selectedBankAccount.type === 'UPI' 
-            ? { type: 'UPI', upiId: selectedBankAccount.upiId }
-            : { type: 'Bank', bankName: selectedBankAccount.bankName, accountNumber: selectedBankAccount.accountNumber, ifscCode: selectedBankAccount.ifscCode }
+          bankAccountDetails:
+            selectedBankAccount.type === 'UPI'
+              ? { type: 'UPI', upiId: selectedBankAccount.upiId }
+              : selectedBankAccount.type === 'Crypto'
+                ? {
+                    type: 'Crypto',
+                    cryptoCurrency: selectedBankAccount.cryptoCurrency,
+                    cryptoNetwork: selectedBankAccount.cryptoNetwork,
+                    walletAddress: selectedBankAccount.walletAddress
+                  }
+                : {
+                    type: 'Bank',
+                    bankName: selectedBankAccount.bankName,
+                    accountNumber: selectedBankAccount.accountNumber,
+                    ifscCode: selectedBankAccount.ifscCode
+                  }
         })
       })
       const data = await res.json()
@@ -1310,15 +1327,23 @@ const WalletPage = () => {
                     >
                       {account.type === 'UPI' ? (
                         <Smartphone size={20} className="text-blue-400" />
+                      ) : account.type === 'Crypto' ? (
+                        <CreditCard size={20} className="text-orange-400" />
                       ) : (
                         <Building size={20} className="text-purple-400" />
                       )}
                       <div className="flex-1">
-                        <p className="text-white font-medium">{account.bankName || 'UPI'}</p>
-                        <p className="text-gray-400 text-sm">
-                          {account.type === 'UPI' 
-                            ? account.upiId 
-                            : `A/C: ${account.accountNumber} | IFSC: ${account.ifscCode}`}
+                        <p className="text-white font-medium">
+                          {account.type === 'Crypto'
+                            ? `${account.cryptoCurrency} (${account.cryptoNetwork})`
+                            : account.bankName || 'UPI'}
+                        </p>
+                        <p className="text-gray-400 text-sm break-all">
+                          {account.type === 'UPI'
+                            ? account.upiId
+                            : account.type === 'Crypto'
+                              ? account.walletAddress
+                              : `A/C: ${account.accountNumber} | IFSC: ${account.ifscCode}`}
                         </p>
                       </div>
                     </button>
