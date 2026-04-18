@@ -392,7 +392,7 @@ app.get('/api-health', (req, res) => {
   res.json({ message: 'Suimfx API is running' })
 })
 
-app.get('*', (req, res, next) => {
+app.get('*', async (req, res, next) => {
   // Let anything under /api, /socket.io, /uploads continue to the real handlers.
   if (req.path.startsWith('/api/')) return next()
   if (req.path.startsWith('/socket.io')) return next()
@@ -407,11 +407,16 @@ app.get('*', (req, res, next) => {
     return res.json({ message: 'Suimfx API is running' })
   }
 
-  const html = renderBrandedHtml(req)
-  if (!html) return next()
-  res.setHeader('Content-Type', 'text/html; charset=utf-8')
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-  return res.send(html)
+  try {
+    const html = await renderBrandedHtml(req)
+    if (!html) return next()
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    return res.send(html)
+  } catch (err) {
+    console.error('[BrandedHtml] render error:', err.message)
+    return next()
+  }
 })
 
 const PORT = process.env.PORT || 5000

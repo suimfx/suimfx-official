@@ -1,6 +1,8 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import Admin from '../models/Admin.js'
+import User from '../models/User.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -34,16 +36,86 @@ function escapeHtmlAttr(str) {
     .replace(/'/g, '&#39;')
 }
 
+// Short-lived cache so a burst of crawler hits doesn't hammer Mongo.
+const adminCache = new Map() // key -> { admin, expiresAt }
+const ADMIN_CACHE_TTL_MS = 60 * 1000
+
+function cacheGet(key) {
+  const entry = adminCache.get(key)
+  if (!entry) return null
+  if (entry.expiresAt < Date.now()) { adminCache.delete(key); return null }
+  return entry.admin
+}
+function cacheSet(key, admin) {
+  adminCache.set(key, { admin, expiresAt: Date.now() + ADMIN_CACHE_TTL_MS })
+}
+
+// Resolve the branding admin when no custom-domain tenant was matched, by
+// looking at the URL the crawler requested:
+//   1. ?ref=<code> — a referring user's code → their assignedAdmin
+//   2. /<slug>/...  — first path segment matches an Admin.urlSlug
+// Returns null if neither resolves.
+async function resolveAdminFromUrl(req) {
+  try {
+    const query = req.query || {}
+    const refCode = typeof query.ref === 'string' ? query.ref.trim() : ''
+    if (refCode) {
+      const key = `ref:${refCode.toLowerCase()}`
+      const hit = cacheGet(key)
+      if (hit !== null) return hit
+
+      const refUser = await User.findOne({ referralCode: refCode })
+        .select('assignedAdmin')
+        .lean()
+      if (refUser?.assignedAdmin) {
+        const admin = await Admin.findById(refUser.assignedAdmin)
+          .select('brandName urlSlug customDomain')
+          .lean()
+        if (admin) { cacheSet(key, admin); return admin }
+      }
+      cacheSet(key, null) // negative cache to avoid repeat lookups
+    }
+
+    const firstSeg = (req.path || '/').split('/').filter(Boolean)[0]
+    if (firstSeg) {
+      // Skip segments that are obviously app routes, not admin slugs.
+      const reserved = new Set([
+        'signup', 'login', 'register', 'admin-login', 'employee-login',
+        'dashboard', 'admin', 'employee', 'wallet', 'trade', 'trading',
+        'ib', 'kyc', 'profile', 'settings', 'reset-password', 'forgot-password',
+        'verify', 'assets', 'static', 'public', 'uploads'
+      ])
+      const slug = firstSeg.toLowerCase()
+      if (!reserved.has(slug) && /^[a-z0-9-]+$/.test(slug)) {
+        const key = `slug:${slug}`
+        const hit = cacheGet(key)
+        if (hit !== null) return hit
+        const admin = await Admin.findOne({ urlSlug: slug })
+          .select('brandName urlSlug customDomain')
+          .lean()
+        cacheSet(key, admin || null)
+        if (admin) return admin
+      }
+    }
+  } catch (err) {
+    console.error('[htmlBranding] resolveAdminFromUrl error:', err.message)
+  }
+  return null
+}
+
 /**
  * Returns HTML for a page request, with <title> and Open Graph meta tags
- * rewritten based on the host the request came in on. This is what link-preview
- * crawlers (WhatsApp, Telegram, Facebook, Twitter) read — they do not execute JS,
- * so per-tenant branding must be baked into the response HTML.
+ * rewritten based on the request. Link-preview crawlers (WhatsApp, Telegram,
+ * Facebook, Twitter) don't execute JS, so per-tenant branding must be baked
+ * into the response HTML.
  *
- * Relies on the multi-tenant middleware in server.js which attaches req.tenantAdmin
- * and req.tenantDomain when the request host matches a connected custom domain.
+ * Admin is resolved in this order:
+ *  1. req.tenantAdmin — attached by the custom-domain middleware in server.js
+ *  2. ?ref=<code>     — referral code → referring user's assignedAdmin
+ *  3. /<slug>/...     — Admin.urlSlug on the first path segment
+ *  4. hostname fallback so previews never leak "Suimfx" on a non-suimfx host
  */
-export function renderBrandedHtml(req) {
+export async function renderBrandedHtml(req) {
   const template = loadTemplate()
   if (!template) return null
 
@@ -53,9 +125,14 @@ export function renderBrandedHtml(req) {
   let siteName = 'Suimfx'
   let description = 'Suimfx — Trading platform'
 
-  if (req.tenantAdmin) {
-    const brand = (req.tenantAdmin.brandName || '').trim()
-    const domain = req.tenantAdmin.customDomain || hostHeader
+  let brandingAdmin = req.tenantAdmin || null
+  if (!brandingAdmin) {
+    brandingAdmin = await resolveAdminFromUrl(req)
+  }
+
+  if (brandingAdmin) {
+    const brand = (brandingAdmin.brandName || '').trim()
+    const domain = brandingAdmin.customDomain || hostHeader
     siteName = brand || domain
     titleText = brand || domain
     description = `${siteName} — Trading platform`
