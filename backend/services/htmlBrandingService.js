@@ -160,10 +160,22 @@ export async function renderBrandedHtml(req) {
     <meta name="twitter:title" content="${t}" />
     <meta name="twitter:description" content="${d}" />`
 
-  // Replace the hardcoded <title>...</title> with the dynamic meta block.
-  // If there is no <title> tag (shouldn't happen), fall back to injecting before </head>.
-  if (/<title>[^<]*<\/title>/i.test(template)) {
-    return template.replace(/<title>[^<]*<\/title>/i, metaBlock)
+  // Strip ALL hardcoded branding meta tags from the template first.
+  // The static frontend/index.html ships with og:title / og:site_name /
+  // og:description / twitter:* / description already set to "Suimfx".
+  // If we only replaced <title>, those duplicate tags survived and WhatsApp
+  // / Facebook crawlers picked the static "Suimfx" values over our dynamic
+  // ones, so custom-domain previews still leaked the super-admin brand.
+  let html = template
+    .replace(/<title>[\s\S]*?<\/title>/i, '')
+    .replace(/<meta[^>]+name=["']description["'][^>]*>\s*/gi, '')
+    .replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>\s*/gi, '')
+    .replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>\s*/gi, '')
+
+  // Inject the dynamic branded block once, right before </head>.
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `    ${metaBlock}\n  </head>`)
   }
-  return template.replace(/<\/head>/i, `${metaBlock}\n  </head>`)
+  // Extremely unlikely: no </head>. Prepend to <body> as a last resort.
+  return html.replace(/<body/i, `${metaBlock}\n  <body`)
 }
