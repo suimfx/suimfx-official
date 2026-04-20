@@ -985,6 +985,18 @@ const Account = () => {
                                   <X size={14} /> Delete Permanently
                                 </button>
                               </>
+                            ) : account.isDemo ? (
+                              // Demo accounts: skip archive, go straight to delete
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setShowAccountMenu(null)
+                                  setShowDeleteConfirm(account)
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-dark-600 rounded-lg flex items-center gap-2"
+                              >
+                                <X size={14} /> Delete Account
+                              </button>
                             ) : (
                               <button
                                 onClick={(e) => {

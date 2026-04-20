@@ -420,33 +420,31 @@ router.put('/:id/unarchive', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const account = await TradingAccount.findById(req.params.id)
-    
+
     if (!account) {
       return res.status(404).json({ success: false, message: 'Account not found' })
     }
 
-    // Only allow deletion of archived accounts
-    if (account.status !== 'Archived') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Only archived accounts can be permanently deleted. Archive the account first.' 
+    // Demo accounts can be deleted directly (no archive step required) —
+    // balance is virtual, and any open trades are simply discarded with
+    // the account. Real accounts still require Archived status first.
+    if (!account.isDemo && account.status !== 'Archived') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only archived accounts can be permanently deleted. Archive the account first.'
       })
     }
 
-    // Check for any trades
+    // Delete all trades for this account (open or closed — trade history
+    // is meaningless once the account is gone).
     const Trade = (await import('../models/Trade.js')).default
-    const tradeCount = await Trade.countDocuments({ tradingAccountId: account._id })
-    
-    if (tradeCount > 0) {
-      // Delete all trades for this account
-      await Trade.deleteMany({ tradingAccountId: account._id })
-    }
+    await Trade.deleteMany({ tradingAccountId: account._id })
 
     // Delete the account
     await TradingAccount.findByIdAndDelete(req.params.id)
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Account deleted permanently'
     })
   } catch (error) {
