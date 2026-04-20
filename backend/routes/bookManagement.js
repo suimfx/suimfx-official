@@ -725,17 +725,21 @@ router.put('/users/:id/transfer', async (req, res) => {
       try {
         const lpService = (await import('../services/lpService.js')).default
 
-        // Find all open A-Book trades for this user
+        // Find all open A-Book trades for this user on REAL accounts only.
+        // Demo-account trades must never reach LP, so skip them here even if
+        // an older record somehow got stored with bookType='A'.
         const openTrades = await Trade.find({
           userId: user._id,
           bookType: 'A',
           status: 'OPEN'
-        })
+        }).populate('tradingAccountId', 'isDemo')
 
-        console.log(`[Book Management] Found ${openTrades.length} open A-Book trades to close on Corecen`)
+        const realOpenTrades = openTrades.filter(t => !t.tradingAccountId?.isDemo)
+
+        console.log(`[Book Management] Found ${realOpenTrades.length} real open A-Book trades to close on Corecen (skipped ${openTrades.length - realOpenTrades.length} demo)`)
 
         // Close each trade on Corecen LP
-        for (const trade of openTrades) {
+        for (const trade of realOpenTrades) {
           try {
             // Set close data for LP sync
             trade.closePrice = trade.currentPrice || trade.openPrice

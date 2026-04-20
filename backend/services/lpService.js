@@ -31,6 +31,23 @@ class LPService {
     return !!(config.apiKey && config.apiSecret && config.apiUrl)
   }
 
+  // Hard guarantee: LP must never see demo trades. Callers already guard,
+  // but we re-check here so a future caller can't accidentally leak demo
+  // volume to Corecen. Accepts populated trade.tradingAccountId or lazily
+  // loads isDemo if only an ObjectId is present.
+  async _isDemoTrade(trade) {
+    try {
+      const acc = trade?.tradingAccountId
+      if (acc && typeof acc === 'object' && 'isDemo' in acc) return !!acc.isDemo
+      if (!acc) return false
+      const TradingAccount = (await import('../models/TradingAccount.js')).default
+      const loaded = await TradingAccount.findById(acc).select('isDemo').lean()
+      return !!loaded?.isDemo
+    } catch (_) {
+      return false
+    }
+  }
+
   // Get contract size based on symbol type (for P/L calculation sync with LP)
   getContractSize(symbol) {
     // Metals
@@ -63,6 +80,11 @@ class LPService {
     if (!config.apiKey || !config.apiSecret) {
       console.log('[LP Service] Corecen API credentials not configured, skipping trade push')
       return { success: false, message: 'LP credentials not configured' }
+    }
+
+    if (await this._isDemoTrade(trade)) {
+      console.log(`[LP Service] Refusing to push demo-account trade ${trade.tradeId} to LP`)
+      return { success: false, message: 'Demo-account trades are not routed to LP' }
     }
 
     const timestamp = Date.now().toString()
@@ -135,6 +157,12 @@ class LPService {
       return { success: false, message: 'LP credentials not configured' }
     }
 
+    if (await this._isDemoTrade(trade)) {
+      console.log(`[LP Service] Refusing to close demo-account trade ${trade.tradeId} on LP`)
+      console.log(`[LP Service] ==========================================`)
+      return { success: false, message: 'Demo-account trades are not routed to LP' }
+    }
+
     const timestamp = Date.now().toString()
     const method = 'POST'
     const path = '/api/v1/broker-api/trades/close'
@@ -201,6 +229,11 @@ class LPService {
 
     if (!config.apiKey || !config.apiSecret) {
       return { success: false, message: 'LP credentials not configured' }
+    }
+
+    if (await this._isDemoTrade(trade)) {
+      console.log(`[LP Service] Refusing to update demo-account trade ${trade.tradeId} on LP`)
+      return { success: false, message: 'Demo-account trades are not routed to LP' }
     }
 
     const timestamp = Date.now().toString()
@@ -298,15 +331,19 @@ class LPService {
   // Called before deleting user or trades locally
   async closeAllUserTrades(userId) {
     try {
-      // Find all open A-Book trades for this user
+      // Find all open A-Book trades for this user — real accounts only.
+      // Demo-account trades must never be routed to LP.
       const Trade = (await import('../models/Trade.js')).default
-      const openTrades = await Trade.find({
+      const allOpenTrades = await Trade.find({
         userId,
         status: 'OPEN',
         bookType: 'A'
-      })
+      }).populate('tradingAccountId', 'isDemo')
 
-      console.log(`[LP Service] Found ${openTrades.length} open A-Book trades for user ${userId}`)
+      const openTrades = allOpenTrades.filter(t => !t.tradingAccountId?.isDemo)
+      const skippedDemo = allOpenTrades.length - openTrades.length
+
+      console.log(`[LP Service] Found ${openTrades.length} real open A-Book trades for user ${userId}` + (skippedDemo ? ` (skipped ${skippedDemo} demo)` : ''))
 
       const results = []
       for (const trade of openTrades) {

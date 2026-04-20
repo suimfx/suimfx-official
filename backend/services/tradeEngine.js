@@ -335,7 +335,10 @@ class TradeEngine {
     const tradeId = await Trade.generateTradeId()
 
     const userForBook = await User.findById(userId).select('bookType firstName email')
-    const userBookType = userForBook?.bookType || 'B'
+    // Demo accounts can NEVER be A-book — LP must not see demo volume regardless
+    // of what User.bookType says. Force B-book at creation so the stored trade
+    // can't be routed to LP by any later path.
+    const userBookType = account.isDemo ? 'B' : (userForBook?.bookType || 'B')
 
     // Create trade
     const trade = await Trade.create({
@@ -371,7 +374,7 @@ class TradeEngine {
       await account.save()
     }
 
-    if (orderType === 'MARKET' && userBookType === 'A' && lpService.isConfigured() && userForBook) {
+    if (orderType === 'MARKET' && userBookType === 'A' && !account.isDemo && lpService.isConfigured() && userForBook) {
       try {
         const lpResult = await lpService.pushTradeToCorecen(trade, userForBook)
         if (lpResult.success) {
@@ -480,7 +483,8 @@ class TradeEngine {
       console.error('Error processing IB commission:', ibError)
     }
 
-    if (trade.bookType === 'A' && lpService.isConfigured()) {
+    // Demo-account trades must never reach LP — even if somehow stored with bookType='A'
+    if (trade.bookType === 'A' && !trade.tradingAccountId?.isDemo && lpService.isConfigured()) {
       try {
         const lpResult = await lpService.closeTradeOnCorecen(trade)
         if (lpResult.success) {
@@ -790,17 +794,21 @@ class TradeEngine {
           await trade.save()
 
           if (trade.bookType === 'A' && lpService.isConfigured()) {
-            const u = await User.findById(trade.userId).select('bookType firstName email')
-            if (u) {
-              try {
-                const lpResult = await lpService.pushTradeToCorecen(trade, u)
-                if (lpResult.success) {
-                  trade.lpPushed = true
-                  trade.lpPushedAt = new Date()
-                  await trade.save()
+            // Demo-account trades must never reach LP
+            const pendingAccount = await TradingAccount.findById(trade.tradingAccountId).select('isDemo')
+            if (pendingAccount && !pendingAccount.isDemo) {
+              const u = await User.findById(trade.userId).select('bookType firstName email')
+              if (u) {
+                try {
+                  const lpResult = await lpService.pushTradeToCorecen(trade, u)
+                  if (lpResult.success) {
+                    trade.lpPushed = true
+                    trade.lpPushedAt = new Date()
+                    await trade.save()
+                  }
+                } catch (e) {
+                  console.error('[TradeEngine] LP push after pending fill:', e)
                 }
-              } catch (e) {
-                console.error('[TradeEngine] LP push after pending fill:', e)
               }
             }
           }
