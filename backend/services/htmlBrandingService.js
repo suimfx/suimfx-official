@@ -55,6 +55,8 @@ function cacheSet(key, admin) {
 //   1. ?ref=<code> — a referring user's code → their assignedAdmin
 //   2. /<slug>/...  — first path segment matches an Admin.urlSlug
 // Returns null if neither resolves.
+const ADMIN_FIELDS = 'brandName urlSlug customDomain logo'
+
 async function resolveAdminFromUrl(req) {
   try {
     const query = req.query || {}
@@ -69,11 +71,28 @@ async function resolveAdminFromUrl(req) {
         .lean()
       if (refUser?.assignedAdmin) {
         const admin = await Admin.findById(refUser.assignedAdmin)
-          .select('brandName urlSlug customDomain')
+          .select(ADMIN_FIELDS)
           .lean()
         if (admin) { cacheSet(key, admin); return admin }
       }
       cacheSet(key, null) // negative cache to avoid repeat lookups
+    }
+
+    // Custom-domain fallback: if tenant middleware didn't resolve (e.g.
+    // because the hostname reached Node as localhost due to missing
+    // trust-proxy), try the forwarded host directly.
+    const fwdHost = (req.headers['x-forwarded-host'] || '').split(',')[0].split(':')[0].toLowerCase().trim()
+    const rawHost = (req.headers.host || '').split(':')[0].toLowerCase().trim()
+    const hostname = fwdHost || rawHost
+    if (hostname && !hostname.endsWith('suimfx.com') && hostname !== 'localhost') {
+      const key = `host:${hostname}`
+      const hit = cacheGet(key)
+      if (hit !== null) return hit
+      const admin = await Admin.findOne({ customDomain: hostname })
+        .select(ADMIN_FIELDS)
+        .lean()
+      cacheSet(key, admin || null)
+      if (admin) return admin
     }
 
     const firstSeg = (req.path || '/').split('/').filter(Boolean)[0]
@@ -91,7 +110,7 @@ async function resolveAdminFromUrl(req) {
         const hit = cacheGet(key)
         if (hit !== null) return hit
         const admin = await Admin.findOne({ urlSlug: slug })
-          .select('brandName urlSlug customDomain')
+          .select(ADMIN_FIELDS)
           .lean()
         cacheSet(key, admin || null)
         if (admin) return admin
@@ -115,20 +134,31 @@ async function resolveAdminFromUrl(req) {
  *  3. /<slug>/...     — Admin.urlSlug on the first path segment
  *  4. hostname fallback so previews never leak "Suimfx" on a non-suimfx host
  */
-export async function renderBrandedHtml(req) {
-  const template = loadTemplate()
-  if (!template) return null
-
-  const hostHeader = (req.headers.host || '').split(':')[0].toLowerCase().trim()
-
-  let titleText = 'Suimfx'
-  let siteName = 'Suimfx'
-  let description = 'Suimfx — Trading platform'
-
+// Resolve which admin (if any) should brand this request, trying every
+// signal available. Exported so a diagnostic endpoint can reuse it.
+export async function resolveBrandingAdmin(req) {
   let brandingAdmin = req.tenantAdmin || null
   if (!brandingAdmin) {
     brandingAdmin = await resolveAdminFromUrl(req)
   }
+  return brandingAdmin
+}
+
+export async function renderBrandedHtml(req) {
+  const template = loadTemplate()
+  if (!template) return null
+
+  // Prefer X-Forwarded-Host from Nginx; fall back to raw Host header.
+  const fwdHost = (req.headers['x-forwarded-host'] || '').split(',')[0].split(':')[0].toLowerCase().trim()
+  const rawHost = (req.headers.host || '').split(':')[0].toLowerCase().trim()
+  const hostHeader = fwdHost || rawHost
+
+  let titleText = 'Suimfx'
+  let siteName = 'Suimfx'
+  let description = 'Suimfx — Trading platform'
+  let logoPath = '/suimfxLogo.png'
+
+  const brandingAdmin = await resolveBrandingAdmin(req)
 
   if (brandingAdmin) {
     const brand = (brandingAdmin.brandName || '').trim()
@@ -136,6 +166,18 @@ export async function renderBrandedHtml(req) {
     siteName = brand || domain
     titleText = brand || domain
     description = `${siteName} — Trading platform`
+    // Prefer the admin's uploaded logo for the preview image so WhatsApp /
+    // Facebook stop pulling the default Suimfx favicon on custom domains.
+    if (brandingAdmin.logo) {
+      const raw = String(brandingAdmin.logo).trim()
+      if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) {
+        logoPath = raw
+      } else if (raw.startsWith('/')) {
+        logoPath = raw
+      } else {
+        logoPath = '/' + raw
+      }
+    }
   } else if (hostHeader && !hostHeader.endsWith('suimfx.com') && hostHeader !== 'localhost') {
     // Custom domain hit but admin record not found — at least use the hostname
     // instead of the hardcoded "Suimfx" so link previews never leak the wrong brand.
@@ -148,6 +190,16 @@ export async function renderBrandedHtml(req) {
   const s = escapeHtmlAttr(siteName)
   const d = escapeHtmlAttr(description)
   const url = escapeHtmlAttr(`https://${hostHeader}${req.originalUrl || '/'}`)
+  const absoluteLogo = /^https?:\/\/|^data:/i.test(logoPath)
+    ? logoPath
+    : `https://${hostHeader}${logoPath}`
+  const img = escapeHtmlAttr(absoluteLogo)
+
+  // One-line diagnostic so tailing the server log reveals exactly what brand
+  // was resolved for each crawler hit. Crucial when WhatsApp is still showing
+  // a stale preview — you can confirm the server is now returning the right
+  // OG tags even before WhatsApp refreshes its cache.
+  console.log(`[htmlBranding] host=${hostHeader} path=${req.path} ref=${req.query?.ref || '-'} tenantAdmin=${req.tenantAdmin ? 'yes' : 'no'} resolvedBrand="${titleText}"`)
 
   const metaBlock = `<title>${t}</title>
     <meta name="description" content="${d}" />
@@ -156,9 +208,11 @@ export async function renderBrandedHtml(req) {
     <meta property="og:description" content="${d}" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="${url}" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="${img}" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${t}" />
-    <meta name="twitter:description" content="${d}" />`
+    <meta name="twitter:description" content="${d}" />
+    <meta name="twitter:image" content="${img}" />`
 
   // Strip ALL hardcoded branding meta tags from the template first.
   // The static frontend/index.html ships with og:title / og:site_name /

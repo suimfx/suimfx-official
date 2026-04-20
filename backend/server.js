@@ -47,7 +47,7 @@ import propTradingEngine from './services/propTradingEngine.js'
 import lpPriceService from './services/lpPriceService.js'
 import AdminDomainConnection from './models/AdminDomainConnection.js'
 import { refreshDnsCheck } from './services/domainDnsService.js'
-import { renderBrandedHtml } from './services/htmlBrandingService.js'
+import { renderBrandedHtml, resolveBrandingAdmin } from './services/htmlBrandingService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -235,6 +235,13 @@ io.on('connection', (socket) => {
 // Make io accessible to routes
 app.set('io', io)
 
+// Trust the Nginx reverse proxy in front of us so req.hostname / req.ip /
+// req.protocol respect the X-Forwarded-* headers. Without this, a request
+// to https://admin-custom-domain.com arriving via Nginx can leave
+// req.hostname as an internal value and the tenant-admin lookup (and all
+// per-tenant branding that depends on it) silently fails back to Suimfx.
+app.set('trust proxy', true)
+
 // Middleware
 app.use(compression())
 app.use(cors(corsOptions))
@@ -390,6 +397,37 @@ app.get('/downloads/Suimfx.apk', (req, res) => {
 // and Open Graph tags instead of the hardcoded "Suimfx" in the static index.html.
 app.get('/api-health', (req, res) => {
   res.json({ message: 'Suimfx API is running' })
+})
+
+// Diagnostic: returns exactly what the OG/title tags would be for the current
+// request, so you can verify per-tenant branding is working without fighting
+// WhatsApp / Facebook preview caches. Hit it the same way a crawler would:
+//   curl https://admin-custom-domain.com/api-health/branding?ref=IBHO18OW
+app.get('/api-health/branding', async (req, res) => {
+  try {
+    const admin = await resolveBrandingAdmin(req)
+    const fwdHost = (req.headers['x-forwarded-host'] || '').split(',')[0].split(':')[0]
+    res.json({
+      hostHeader: req.headers.host || null,
+      forwardedHost: fwdHost || null,
+      reqHostname: req.hostname || null,
+      ref: req.query?.ref || null,
+      tenantAdminFromMiddleware: req.tenantAdmin ? {
+        id: req.tenantAdmin._id,
+        brandName: req.tenantAdmin.brandName,
+        customDomain: req.tenantAdmin.customDomain
+      } : null,
+      resolvedAdmin: admin ? {
+        id: admin._id,
+        brandName: admin.brandName,
+        urlSlug: admin.urlSlug,
+        customDomain: admin.customDomain,
+        logo: admin.logo ? '(set)' : '(empty)'
+      } : null
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 app.get('*', async (req, res, next) => {
