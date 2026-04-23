@@ -288,6 +288,13 @@ app.use(async (req, res, next) => {
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('Connected to MongoDB')
+    // Start OHLC candle flusher now that Mongoose is ready
+    try {
+      const { startPeriodicFlush } = await import('./services/candleAggregator.js')
+      startPeriodicFlush()
+    } catch (e) {
+      console.warn('[candleAggregator] startPeriodicFlush failed:', e.message)
+    }
     try {
       const Transaction = (await import('./models/Transaction.js')).default
       await Transaction.syncIndexes()

@@ -113,6 +113,32 @@ async function fetchBinanceKlines(symbol, resolution, from, to) {
   }
 }
 
+// ===== Backend OHLC history (primary source — real candles from LP ticks) =====
+
+async function fetchBackendHistory(symbol, resolution, from, to) {
+  try {
+    const url = `${API_URL}/api/prices/history?symbol=${encodeURIComponent(symbol)}&resolution=${encodeURIComponent(resolution)}&from=${from}&to=${to}`
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const data = await response.json()
+    if (data?.s !== 'ok' || !Array.isArray(data.t) || data.t.length === 0) return null
+    const bars = []
+    for (let i = 0; i < data.t.length; i++) {
+      bars.push({
+        time: data.t[i] * 1000, // server returns seconds; TV expects ms
+        open: data.o[i],
+        high: data.h[i],
+        low: data.l[i],
+        close: data.c[i],
+        volume: 0,
+      })
+    }
+    return bars
+  } catch (e) {
+    return null
+  }
+}
+
 // ===== Synthetic historical candle generator =====
 
 function seededRand(seed) {
@@ -346,6 +372,14 @@ class SuimfxDatafeed {
     const cat = getSymbolCategory(symbol)
 
     try {
+      // PRIMARY: real OHLC built on our backend from live LP ticks
+      const backendBars = await fetchBackendHistory(symbol, resolution, from, to)
+      if (backendBars && backendBars.length > 0) {
+        onResult(backendBars, { noData: false })
+        return
+      }
+
+      // Fallback: Binance klines for crypto — real market data from a public feed
       if (cat === 'crypto') {
         const bars = await fetchBinanceKlines(symbol, resolution, from, to)
         if (bars && bars.length > 0) {
@@ -354,6 +388,7 @@ class SuimfxDatafeed {
         }
       }
 
+      // Fallback: locally-built bars from live stream in this session
       const storedBars = this._barStore[symbol]?.[resolution]
       if (storedBars && storedBars.length > 0) {
         const filtered = storedBars.filter(b => b.time >= from * 1000 && b.time <= to * 1000)
@@ -363,6 +398,7 @@ class SuimfxDatafeed {
         }
       }
 
+      // Last resort: synthetic bars so the chart isn't empty until real history accumulates
       let price = priceStreamService.getPrice(symbol)
       if (!price?.bid || price.bid <= 0) {
         price = await waitForPrice(symbol, 5000)

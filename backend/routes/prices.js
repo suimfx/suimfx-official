@@ -249,6 +249,83 @@ function getContractSize(symbol) {
 
 
 
+// ───────────────────────────────────────────────────────────────
+// GET /api/prices/history — TradingView UDF bars from LP candle data
+// MUST be defined before /:symbol so Express doesn't treat
+// 'history' as a :symbol param.
+// ───────────────────────────────────────────────────────────────
+router.get('/history', async (req, res) => {
+  try {
+    const { symbol, resolution, from, to, countback } = req.query
+    if (!symbol || !resolution) {
+      return res.json({ s: 'error', errmsg: 'symbol and resolution required' })
+    }
+
+    const Candle = (await import('../models/Candle.js')).default
+    const { getCurrentBar } = await import('../services/candleAggregator.js')
+
+    const RESOLUTION_MAP = {
+      '1': 60, '3': 180, '5': 300, '15': 900, '30': 1800,
+      '60': 3600, '120': 7200, '240': 14400, '360': 21600, '720': 43200,
+      'D': 86400, '1D': 86400, 'W': 604800, '1W': 604800, 'M': 2592000, '1M': 2592000,
+    }
+
+    const sym = String(symbol).toUpperCase()
+    const targetSec = RESOLUTION_MAP[String(resolution)] || 60
+    const fromSec = parseInt(from, 10) || Math.floor(Date.now() / 1000) - targetSec * 300
+    const toSec = parseInt(to, 10) || Math.floor(Date.now() / 1000)
+    const limit = Math.min(5000, parseInt(countback, 10) || 500)
+
+    const minutesInRange = Math.ceil((toSec - fromSec) / 60) + 2
+    const docs = await Candle.find({
+      symbol: sym, timeframe: '1m',
+      time: { $gte: fromSec, $lte: toSec },
+    }).sort({ time: 1 }).limit(Math.max(minutesInRange, limit * (targetSec / 60))).lean()
+
+    let bars1m = docs.map(d => ({ time: d.time, open: d.open, high: d.high, low: d.low, close: d.close }))
+
+    const current = getCurrentBar(sym)
+    if (current && current.time >= fromSec && current.time <= toSec) {
+      if (bars1m.length && bars1m[bars1m.length - 1].time === current.time) {
+        bars1m[bars1m.length - 1] = { ...current }
+      } else {
+        bars1m.push({ ...current })
+      }
+    }
+
+    if (bars1m.length > 0) {
+      let aggregated
+      if (targetSec <= 60) {
+        aggregated = bars1m
+      } else {
+        aggregated = []
+        let bucket = null
+        for (const b of bars1m) {
+          const bucketTime = Math.floor(b.time / targetSec) * targetSec
+          if (!bucket || bucket.time !== bucketTime) {
+            if (bucket) aggregated.push(bucket)
+            bucket = { time: bucketTime, open: b.open, high: b.high, low: b.low, close: b.close }
+          } else {
+            if (b.high > bucket.high) bucket.high = b.high
+            if (b.low < bucket.low) bucket.low = b.low
+            bucket.close = b.close
+          }
+        }
+        if (bucket) aggregated.push(bucket)
+      }
+      const trimmed = aggregated.length > limit ? aggregated.slice(-limit) : aggregated
+      const t = [], o = [], h = [], l = [], c = []
+      for (const b of trimmed) { t.push(b.time); o.push(b.open); h.push(b.high); l.push(b.low); c.push(b.close) }
+      return res.json({ s: 'ok', t, o, h, l, c })
+    }
+
+    return res.json({ s: 'no_data', nextTime: fromSec - targetSec })
+  } catch (err) {
+    console.error('[prices/history] error:', err)
+    return res.json({ s: 'error', errmsg: err.message || 'unknown error' })
+  }
+})
+
 // GET /api/prices/:symbol - Get single symbol price
 
 router.get('/:symbol', async (req, res) => {

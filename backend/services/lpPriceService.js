@@ -3,6 +3,8 @@
  * Prices are populated externally via updatePrices() called by lpIntegration route.
  */
 
+import { processBidAsk } from './candleAggregator.js'
+
 const priceCache = new Map()
 let onPriceUpdateCallback = null
 let onConnectionChangeCallback = null
@@ -51,6 +53,9 @@ function updatePrices(ticks) {
       source: 'CORECEN_LP',
     }
     priceCache.set(tick.symbol, price)
+
+    // Feed the OHLC aggregator so 1m candles persist for chart history
+    processBidAsk(tick.symbol, tick.bid, tick.ask, price.timestamp)
 
     if (onPriceUpdateCallback) {
       onPriceUpdateCallback(tick.symbol, price)
