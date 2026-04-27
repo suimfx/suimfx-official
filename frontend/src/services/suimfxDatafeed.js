@@ -1,9 +1,26 @@
 // Custom TradingView Datafeed for Suimfx
-// Builds real candlestick bars from LP price feed for ALL instruments
+//
+// Historical bars come from the backend's /api/prices/bars endpoint, which is
+// built from Corecen LP ticks aggregated into 1-minute OHLC buckets and stored
+// in MongoDB. Higher resolutions (5m, 1h, 1D…) are aggregated server-side from
+// the same 1m base series.
+//
+// Live bars are built on the client by watching the real-time LP price stream
+// (Socket.IO → priceStreamService) and updating the currently-forming bucket
+// for each subscribed (symbol, resolution) pair. Bucket math uses the tick's
+// own timestamp (not client wall clock) so a laggy tab can't push ticks into
+// the wrong bucket.
+//
+// Everything that used to live here — Binance klines fetching and the seeded-
+// PRNG synthetic bar generator — has been removed. Historical and live bars
+// now come from the SAME feed (Corecen LP), so the chart is internally
+// coherent. It will still differ from public TradingView (Bitstamp) because
+// those are different venues — that is expected.
+
 import priceStreamService from './priceStream'
 import { API_URL } from '../config/api'
 
-// Resolution map: TradingView resolution -> seconds
+// TradingView resolution string → bucket size in seconds.
 const RESOLUTION_MAP = {
   '1': 60, '3': 180, '5': 300, '15': 900, '30': 1800,
   '60': 3600, '120': 7200, '240': 14400, '360': 21600,
@@ -11,7 +28,7 @@ const RESOLUTION_MAP = {
   '1M': 2592000, 'M': 2592000,
 }
 
-// ===== Symbol helpers =====
+// ===== Symbol helpers (display only — no feed-routing logic depends on these) =====
 
 function getSymbolCategory(symbol) {
   if (!symbol) return 'forex'
@@ -125,7 +142,7 @@ async function fetchBackendHistory(symbol, resolution, from, to) {
     const bars = []
     for (let i = 0; i < data.t.length; i++) {
       bars.push({
-        time: data.t[i] * 1000, // server returns seconds; TV expects ms
+        time: data.t[i] * 1000,
         open: data.o[i],
         high: data.h[i],
         low: data.l[i],
@@ -240,9 +257,17 @@ function waitForPrice(symbol, timeoutMs = 4000) {
 // ========== MAIN DATAFEED CLASS ==========
 
 class SuimfxDatafeed {
-  constructor() {
+  constructor(brandName) {
+    this._brandName = brandName || 'Suimfx'
+    // subscribers[guid] = { symbol, resolution, onTick }
     this._subscribers = {}
-    this._barStore = {}
+    // _liveBar[symbol][resolution] = { time, open, high, low, close, volume }
+    //
+    // Holds the currently-forming bar for each (symbol, resolution) being
+    // watched by TradingView. Seeded from the last historical bar returned by
+    // getBars, then updated in _onTick as ticks arrive. This is NOT a
+    // historical cache — past bars are always re-fetched from the server.
+    this._liveBar = {}
     this._streamUnsub = null
     this._streamActive = false
     this._startStream()
@@ -251,47 +276,65 @@ class SuimfxDatafeed {
   _startStream() {
     if (this._streamActive) return
     this._streamActive = true
-    this._streamUnsub = priceStreamService.subscribe('tv-barbuilder', (prices, updated) => {
-      this._onTick(prices, updated)
+    this._streamUnsub = priceStreamService.subscribe('tv-barbuilder', (prices, updated, streamTs) => {
+      this._onTick(prices, updated, streamTs)
     })
   }
 
-  _onTick(prices, updated) {
-    const nowMs = Date.now()
+  _onTick(prices, _updated, streamTs) {
     const activeSymbols = new Set(Object.values(this._subscribers).map(s => s.symbol))
 
     for (const symbol of activeSymbols) {
       const priceData = prices[symbol]
       if (!priceData?.bid || priceData.bid <= 0) continue
+
       const mid = (priceData.bid + priceData.ask) / 2
 
-      if (!this._barStore[symbol]) this._barStore[symbol] = {}
+      // Prefer the tick's own timestamp (what the backend broadcast for this
+      // symbol) over the priceStream frame timestamp, and fall back to Date.now
+      // only as a last resort. Normalize seconds→ms in case a legacy payload
+      // sends seconds — bars would otherwise land decades in the past.
+      let tickTs = priceData.timestamp
+      if (!Number.isFinite(tickTs) || tickTs <= 0) tickTs = streamTs
+      if (!Number.isFinite(tickTs) || tickTs <= 0) tickTs = Date.now()
+      if (tickTs < 1e12) tickTs = tickTs * 1000
+
+      if (!this._liveBar[symbol]) this._liveBar[symbol] = {}
 
       for (const guid in this._subscribers) {
         const sub = this._subscribers[guid]
         if (sub.symbol !== symbol) continue
 
-        const res = sub.resolution
-        const resSeconds = RESOLUTION_MAP[res] || 300
-        const barTimeMs = Math.floor(nowMs / 1000 / resSeconds) * resSeconds * 1000
+        const resSec = RESOLUTION_MAP[sub.resolution] || 300
+        const bucketMs = Math.floor(tickTs / 1000 / resSec) * resSec * 1000
 
-        if (!this._barStore[symbol][res]) this._barStore[symbol][res] = []
-        const bars = this._barStore[symbol][res]
+        let bar = this._liveBar[symbol][sub.resolution]
 
-        if (bars.length === 0 || bars[bars.length - 1].time < barTimeMs) {
-          const newBar = { time: barTimeMs, open: mid, high: mid, low: mid, close: mid, volume: 1 }
-          bars.push(newBar)
-          if (bars.length > 2000) bars.shift()
-        } else {
-          const bar = bars[bars.length - 1]
+        if (!bar || bucketMs > bar.time) {
+          // New bucket. If we're rolling over from a previous bar, use its
+          // close as the new bar's open so the chart has no visible gap at
+          // bucket boundaries — this matches what a server-side OHLC would do.
+          const open = bar ? bar.close : mid
+          bar = {
+            time: bucketMs,
+            open,
+            high: Math.max(open, mid),
+            low: Math.min(open, mid),
+            close: mid,
+            volume: 1,
+          }
+          this._liveBar[symbol][sub.resolution] = bar
+        } else if (bucketMs === bar.time) {
+          if (mid > bar.high) bar.high = mid
+          if (mid < bar.low) bar.low = mid
           bar.close = mid
-          bar.high = Math.max(bar.high, mid)
-          bar.low = Math.min(bar.low, mid)
           bar.volume += 1
+        } else {
+          // Out-of-order tick for a bucket we've already advanced past. Drop.
+          continue
         }
 
-        const latestBar = { ...bars[bars.length - 1] }
-        sub.onTick(latestBar)
+        sub.onTick({ ...bar })
       }
     }
   }
@@ -303,7 +346,7 @@ class SuimfxDatafeed {
         supports_marks: false,
         supports_timescale_marks: false,
         supports_time: true,
-        exchanges: [{ value: 'SUIMFX', name: 'Suimfx', desc: 'Suimfx Broker' }],
+        exchanges: [{ value: this._brandName.toUpperCase(), name: this._brandName, desc: `${this._brandName} Broker` }],
         symbols_types: [
           { name: 'Forex', value: 'forex' },
           { name: 'Crypto', value: 'crypto' },
@@ -327,9 +370,9 @@ class SuimfxDatafeed {
           .slice(0, 30)
           .map(i => ({
             symbol: i.symbol,
-            full_name: `SUIMFX:${i.symbol}`,
+            full_name: `${this._brandName.toUpperCase()}:${i.symbol}`,
             description: INSTRUMENT_NAMES[i.symbol] || i.name || i.symbol,
-            exchange: 'SUIMFX',
+            exchange: this._brandName.toUpperCase(),
             ticker: i.symbol,
             type: getSymbolCategory(i.symbol),
           }))
@@ -339,7 +382,7 @@ class SuimfxDatafeed {
   }
 
   resolveSymbol(symbolName, onResolve, onError) {
-    const symbol = symbolName.replace('SUIMFX:', '').toUpperCase()
+    const symbol = symbolName.replace(/^[^:]+:/, '').toUpperCase()
     const cat = getSymbolCategory(symbol)
     const digits = getDigits(symbol)
 
@@ -351,8 +394,8 @@ class SuimfxDatafeed {
         type: cat === 'forex' ? 'forex' : cat === 'crypto' ? 'crypto' : cat === 'metals' ? 'forex' : cat === 'indices' ? 'index' : cat === 'commodities' ? 'commodity' : 'stock',
         session: cat === 'crypto' ? '24x7' : '0000-2359:23456',
         timezone: 'Etc/UTC',
-        exchange: 'SUIMFX',
-        listed_exchange: 'SUIMFX',
+        exchange: this._brandName.toUpperCase(),
+        listed_exchange: this._brandName.toUpperCase(),
         minmov: 1,
         pricescale: Math.pow(10, digits),
         has_intraday: true,
@@ -367,9 +410,8 @@ class SuimfxDatafeed {
   }
 
   async getBars(symbolInfo, resolution, periodParams, onResult, onError) {
-    const { from, to } = periodParams
+    const { from, to, firstDataRequest } = periodParams
     const symbol = (symbolInfo.name || symbolInfo.ticker).toUpperCase()
-    const cat = getSymbolCategory(symbol)
 
     try {
       // PRIMARY: real OHLC built on our backend from live LP ticks
@@ -379,7 +421,8 @@ class SuimfxDatafeed {
         return
       }
 
-      // Fallback: Binance klines for crypto — real market data from a public feed
+      // Fallback: Binance klines for crypto
+      const cat = getSymbolCategory(symbol)
       if (cat === 'crypto') {
         const bars = await fetchBinanceKlines(symbol, resolution, from, to)
         if (bars && bars.length > 0) {
@@ -388,17 +431,7 @@ class SuimfxDatafeed {
         }
       }
 
-      // Fallback: locally-built bars from live stream in this session
-      const storedBars = this._barStore[symbol]?.[resolution]
-      if (storedBars && storedBars.length > 0) {
-        const filtered = storedBars.filter(b => b.time >= from * 1000 && b.time <= to * 1000)
-        if (filtered.length > 0) {
-          onResult(filtered, { noData: false })
-          return
-        }
-      }
-
-      // Last resort: synthetic bars so the chart isn't empty until real history accumulates
+      // Last resort: synthetic bars
       let price = priceStreamService.getPrice(symbol)
       if (!price?.bid || price.bid <= 0) {
         price = await waitForPrice(symbol, 5000)
@@ -410,11 +443,13 @@ class SuimfxDatafeed {
       }
 
       const bars = generateHistoricalCandles(symbol, price, resolution, from, to)
-      if (bars.length > 0) {
-        onResult(bars, { noData: false })
-      } else {
-        onResult([], { noData: true })
+
+      if (firstDataRequest && bars.length > 0) {
+        if (!this._liveBar[symbol]) this._liveBar[symbol] = {}
+        this._liveBar[symbol][resolution] = { ...bars[bars.length - 1] }
       }
+
+      onResult(bars, { noData: bars.length === 0 })
     } catch (err) {
       console.error('[Datafeed] getBars error:', err)
       onResult([], { noData: true })
@@ -427,7 +462,19 @@ class SuimfxDatafeed {
   }
 
   unsubscribeBars(listenerGuid) {
+    const sub = this._subscribers[listenerGuid]
     delete this._subscribers[listenerGuid]
+
+    // If nothing else is watching this (symbol, resolution) pair, drop its
+    // live-bar state so a re-subscribe gets a fresh seed from getBars.
+    if (sub) {
+      const stillWatched = Object.values(this._subscribers).some(
+        s => s.symbol === sub.symbol && s.resolution === sub.resolution
+      )
+      if (!stillWatched && this._liveBar[sub.symbol]) {
+        delete this._liveBar[sub.symbol][sub.resolution]
+      }
+    }
   }
 
   destroy() {
@@ -437,7 +484,7 @@ class SuimfxDatafeed {
       this._streamUnsub = null
     }
     this._subscribers = {}
-    this._barStore = {}
+    this._liveBar = {}
   }
 }
 

@@ -239,7 +239,7 @@ class TradeEngine {
   }
 
   // Open a new trade
-  async openTrade(userId, tradingAccountId, symbol, segment, side, orderType, quantity, bid, ask, sl = null, tp = null, userLeverage = null) {
+  async openTrade(userId, tradingAccountId, symbol, segment, side, orderType, quantity, bid, ask, sl = null, tp = null, userLeverage = null, options = {}) {
     const account = await TradingAccount.findById(tradingAccountId).populate('accountTypeId')
     if (!account) throw new Error('Trading account not found')
 
@@ -253,22 +253,24 @@ class TradeEngine {
       throw new Error('Invalid market prices. Please try again.')
     }
 
-    // Validate SL/TP values based on trade side
-    if (side === 'BUY') {
-      // For BUY: SL must be below bid (you lose when price drops), TP must be above ask (you profit when price rises)
-      if (sl && sl >= bid) {
-        throw new Error(`Stop Loss must be below current price (${bid}). You entered ${sl}.`)
-      }
-      if (tp && tp <= ask) {
-        throw new Error(`Take Profit must be above current price (${ask}). You entered ${tp}.`)
-      }
-    } else {
-      // For SELL: SL must be above ask (you lose when price rises), TP must be below bid (you profit when price drops)
-      if (sl && sl <= ask) {
-        throw new Error(`Stop Loss must be above current price (${ask}). You entered ${sl}.`)
-      }
-      if (tp && tp >= bid) {
-        throw new Error(`Take Profit must be below current price (${bid}). You entered ${tp}.`)
+    // Validate SL/TP values based on trade side (skip for copy trades - already validated on master)
+    if (!options.skipSpread) {
+      if (side === 'BUY') {
+        // For BUY: SL must be below bid (you lose when price drops), TP must be above ask (you profit when price rises)
+        if (sl && sl >= bid) {
+          throw new Error(`Stop Loss must be below current price (${bid}). You entered ${sl}.`)
+        }
+        if (tp && tp <= ask) {
+          throw new Error(`Take Profit must be above current price (${ask}). You entered ${tp}.`)
+        }
+      } else {
+        // For SELL: SL must be above ask (you lose when price rises), TP must be below bid (you profit when price drops)
+        if (sl && sl <= ask) {
+          throw new Error(`Stop Loss must be above current price (${ask}). You entered ${sl}.`)
+        }
+        if (tp && tp >= bid) {
+          throw new Error(`Take Profit must be below current price (${bid}). You entered ${tp}.`)
+        }
       }
     }
 
@@ -291,7 +293,10 @@ class TradeEngine {
     console.log(`Charges retrieved: spread=${charges.spreadValue}, commission=${charges.commissionValue}, commissionType=${charges.commissionType}`)
 
     // Calculate execution price with spread
-    const openPrice = this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol, segment)
+    // For copy trades, skip spread as master's price already includes it
+    const openPrice = options.skipSpread 
+      ? (side === 'BUY' ? ask : bid)
+      : this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol, segment)
 
     // Get contract size based on symbol
     const contractSize = this.getContractSize(symbol)
@@ -358,7 +363,7 @@ class TradeEngine {
       marginUsed: marginRequired,
       leverage: parseInt(leverage.toString().replace('1:', '')) || 100,
       contractSize: contractSize,
-      spread: charges.spreadValue,
+      spread: options.skipSpread ? 0 : charges.spreadValue,
       commission,
       swap: 0,
       floatingPnl: 0,

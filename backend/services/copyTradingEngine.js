@@ -111,9 +111,7 @@ class CopyTradingEngine {
           status: 'OPEN' 
         })
         for (const trade of masterOpenTrades) {
-          // Use master trade's open price as approximation for current price
-          // In real scenario, you'd get live prices
-          masterFloatingPnl += trade.currentPnl || 0
+          masterFloatingPnl += trade.floatingPnl || 0
         }
         const masterEquity = masterAccount ? (masterAccount.balance + (masterAccount.credit || 0) + masterFloatingPnl) : 0
         
@@ -125,7 +123,7 @@ class CopyTradingEngine {
           status: 'OPEN' 
         })
         for (const trade of followerOpenTrades) {
-          followerFloatingPnl += trade.currentPnl || 0
+          followerFloatingPnl += trade.floatingPnl || 0
         }
         const followerEquity = followerAccount.balance + (followerAccount.credit || 0) + followerFloatingPnl
 
@@ -268,7 +266,9 @@ class CopyTradingEngine {
           masterTrade.openPrice, // Use master's price as bid
           masterTrade.openPrice, // Use master's price as ask
           masterTrade.stopLoss,
-          masterTrade.takeProfit
+          masterTrade.takeProfit,
+          null, // userLeverage - use account default
+          { skipSpread: true } // Don't apply spread again - master's price already includes it
         )
 
         // Record successful copy trade
@@ -404,6 +404,13 @@ class CopyTradingEngine {
             follower.dailyLoss += Math.abs(result.realizedPnl)
           }
           await follower.save()
+        }
+
+        // Update master stats
+        const master = await MasterTrader.findById(copyTrade.masterId)
+        if (master) {
+          master.stats.totalProfitGenerated += result.realizedPnl
+          await master.save()
         }
 
         console.log(`[CopyTrade] Closed follower trade ${copyTrade.followerTradeId}, PnL: ${result.realizedPnl}`)

@@ -4,6 +4,7 @@
  */
 
 import { processBidAsk } from './candleAggregator.js'
+import { ingestTick } from './barAggregator.js'
 
 const priceCache = new Map()
 let onPriceUpdateCallback = null
@@ -44,18 +45,26 @@ function categorizeSymbol(symbol) {
 function updatePrices(ticks) {
   const now = Date.now()
   for (const tick of ticks) {
+    // Normalize tick timestamp to milliseconds. Corecen may send seconds;
+    // anything < 1e12 can't possibly be a recent ms timestamp, so treat it as
+    // seconds and scale up. Missing/invalid → fall back to server clock.
+    let ts = Number(tick.timestamp)
+    if (!Number.isFinite(ts) || ts <= 0) ts = now
+    else if (ts < 1e12) ts = ts * 1000
+
     const price = {
       bid: tick.bid,
       ask: tick.ask,
       spread: tick.spread != null ? tick.spread : parseFloat((tick.ask - tick.bid).toFixed(5)),
       mid: (tick.bid + tick.ask) / 2,
-      timestamp: tick.timestamp || now,
+      timestamp: ts,
       source: 'CORECEN_LP',
     }
     priceCache.set(tick.symbol, price)
 
     // Feed the OHLC aggregator so 1m candles persist for chart history
     processBidAsk(tick.symbol, tick.bid, tick.ask, price.timestamp)
+    ingestTick(tick.symbol, tick.bid, tick.ask, ts)
 
     if (onPriceUpdateCallback) {
       onPriceUpdateCallback(tick.symbol, price)

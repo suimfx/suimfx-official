@@ -4,8 +4,28 @@ dotenv.config()
 
 import express from 'express'
 import lpPriceService from '../services/lpPriceService.js'
+import PriceBar from '../models/PriceBar.js'
+import {
+  getLiveBar,
+  backfillFromBinance,
+  isCryptoBackfillable
+} from '../services/barAggregator.js'
 
 const router = express.Router()
+
+// TradingView resolution strings → seconds. Anything not in this map falls back
+// to 1 minute, so an unknown resolution always degenerates to the base series.
+const RESOLUTION_SECONDS = {
+  '1': 60, '3': 180, '5': 300, '15': 900, '30': 1800,
+  '60': 3600, '120': 7200, '240': 14400, '360': 21600, '720': 43200,
+  '1D': 86400, 'D': 86400, '1W': 604800, 'W': 604800,
+  '1M': 2592000, 'M': 2592000
+}
+
+// Hard cap on bars returned from a single /bars call. TradingView Advanced Charts
+// requests at most ~1000 bars per page, so this ceiling prevents a pathological
+// client from pulling millions of 1m rows and OOMing the Node process.
+const MAX_BARS_PER_RESPONSE = 5000
 
 
 
@@ -326,6 +346,103 @@ router.get('/history', async (req, res) => {
   }
 })
 
+// GET /api/prices/bars
+//
+// Historical OHLC bars for TradingView Advanced Charts. Reads the 1-minute
+// base series from the PriceBar collection and, if the caller asked for a
+// higher resolution, aggregates on the fly (group by floor(t / resSec*1000)).
+router.get('/bars', async (req, res) => {
+  try {
+    const symbol = String(req.query.symbol || '').toUpperCase().trim()
+    const resolution = String(req.query.resolution || '1').trim()
+    const fromSec = parseInt(req.query.from, 10)
+    const toSec = parseInt(req.query.to, 10)
+
+    if (!symbol) {
+      return res.status(400).json({ success: false, message: 'symbol required' })
+    }
+    if (!Number.isFinite(fromSec) || !Number.isFinite(toSec) || fromSec >= toSec) {
+      return res.status(400).json({ success: false, message: 'from/to (seconds) required, from < to' })
+    }
+
+    const resSec = RESOLUTION_SECONDS[resolution] || 60
+    const fromMs = fromSec * 1000
+    const toMs = toSec * 1000
+
+    if (isCryptoBackfillable(symbol)) {
+      backfillFromBinance(symbol).catch(() => {})
+    }
+
+    const lookbackMs = Math.max(resSec * 1000, 60 * 1000)
+    const raw1m = await PriceBar.find({
+      symbol,
+      resolution: '1',
+      t: { $gte: fromMs - lookbackMs, $lte: toMs }
+    })
+      .sort({ t: 1 })
+      .select('-_id t o h l c v')
+      .lean()
+
+    const live = getLiveBar(symbol)
+    if (live && live.t >= fromMs - lookbackMs && live.t <= toMs) {
+      const lastPersisted = raw1m[raw1m.length - 1]
+      if (!lastPersisted || lastPersisted.t < live.t) {
+        raw1m.push({ t: live.t, o: live.o, h: live.h, l: live.l, c: live.c, v: live.v })
+      } else if (lastPersisted.t === live.t) {
+        lastPersisted.o = live.o
+        lastPersisted.h = live.h
+        lastPersisted.l = live.l
+        lastPersisted.c = live.c
+        lastPersisted.v = live.v
+      }
+    }
+
+    let outBars
+    if (resSec === 60) {
+      outBars = raw1m
+        .filter(b => b.t >= fromMs && b.t <= toMs)
+        .map(b => ({ time: b.t, open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v || 0 }))
+    } else {
+      const bucketMs = resSec * 1000
+      const byBucket = new Map()
+      for (const b of raw1m) {
+        const key = Math.floor(b.t / bucketMs) * bucketMs
+        const agg = byBucket.get(key)
+        if (!agg) {
+          byBucket.set(key, {
+            time: key, open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v || 0,
+            _firstT: b.t, _lastT: b.t
+          })
+        } else {
+          if (b.t < agg._firstT) { agg.open = b.o; agg._firstT = b.t }
+          if (b.t > agg._lastT) { agg.close = b.c; agg._lastT = b.t }
+          if (b.h > agg.high) agg.high = b.h
+          if (b.l < agg.low) agg.low = b.l
+          agg.volume += b.v || 0
+        }
+      }
+      outBars = [...byBucket.values()]
+        .filter(b => b.time >= fromMs && b.time <= toMs)
+        .sort((a, b) => a.time - b.time)
+        .map(({ _firstT, _lastT, ...rest }) => rest)
+    }
+
+    if (outBars.length > MAX_BARS_PER_RESPONSE) {
+      outBars = outBars.slice(-MAX_BARS_PER_RESPONSE)
+    }
+
+    res.json({
+      success: true,
+      symbol,
+      resolution,
+      bars: outBars,
+      noData: outBars.length === 0
+    })
+  } catch (err) {
+    console.error('[Prices] /bars error:', err)
+    res.status(500).json({ success: false, message: err.message })
+  }
+})
 // GET /api/prices/:symbol - Get single symbol price
 
 router.get('/:symbol', async (req, res) => {
