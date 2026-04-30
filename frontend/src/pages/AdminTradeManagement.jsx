@@ -394,26 +394,37 @@ const AdminTradeManagement = () => {
       if (data.trades) {
         setTrades(data.trades)
         setTotalTrades(data.total || data.trades.length)
-        
-        // Separate real and demo trades for stats
-        const realTrades = data.trades.filter(t => !(t.tradingAccountId?.isDemo || t.accountType === 'ChallengeAccount' || t.isChallengeAccount))
-        const demoTrades = data.trades.filter(t => t.tradingAccountId?.isDemo || t.accountType === 'ChallengeAccount' || t.isChallengeAccount)
-        
-        // Calculate stats based on current filter
-        const tradesForStats = accountTypeFilter === 'real' ? realTrades : demoTrades
-        const openTrades = tradesForStats.filter(t => t.status === 'OPEN')
-        const closedTrades = tradesForStats.filter(t => t.status === 'CLOSED')
-        const totalVolume = tradesForStats.reduce((sum, t) => sum + (t.quantity * t.contractSize * t.openPrice), 0)
-        const totalPnl = closedTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0)
-        
-        setStats({
-          total: tradesForStats.length,
-          open: openTrades.length,
-          volume: totalVolume,
-          pnl: totalPnl,
-          realTotal: realTrades.length,
-          demoTotal: demoTrades.length
-        })
+
+        // Use backend aggregates (across ALL matching trades, not just current page).
+        // Fall back to current-page reduce only if the API hasn't been updated yet.
+        const agg = data.aggregates
+        if (agg && agg.real && agg.demo) {
+          const bucket = accountTypeFilter === 'real' ? agg.real : agg.demo
+          setStats({
+            total: bucket.totalCount || 0,
+            open: bucket.openCount || 0,
+            volume: bucket.totalVolume || 0,
+            pnl: bucket.totalRealizedPnl || 0,
+            realTotal: agg.real.totalCount || 0,
+            demoTotal: agg.demo.totalCount || 0
+          })
+        } else {
+          const realTrades = data.trades.filter(t => !(t.tradingAccountId?.isDemo || t.accountType === 'ChallengeAccount' || t.isChallengeAccount))
+          const demoTrades = data.trades.filter(t => t.tradingAccountId?.isDemo || t.accountType === 'ChallengeAccount' || t.isChallengeAccount)
+          const tradesForStats = accountTypeFilter === 'real' ? realTrades : demoTrades
+          const openTrades = tradesForStats.filter(t => t.status === 'OPEN')
+          const closedTrades = tradesForStats.filter(t => t.status === 'CLOSED')
+          const totalVolume = tradesForStats.reduce((sum, t) => sum + (t.quantity * t.contractSize * t.openPrice), 0)
+          const totalPnl = closedTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0)
+          setStats({
+            total: tradesForStats.length,
+            open: openTrades.length,
+            volume: totalVolume,
+            pnl: totalPnl,
+            realTotal: realTrades.length,
+            demoTotal: demoTrades.length
+          })
+        }
       }
     } catch (error) {
       console.error('Error fetching trades:', error)

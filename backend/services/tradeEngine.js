@@ -36,39 +36,35 @@ class TradeEngine {
       'XAGEUR','XAGAUD','XAGGBP'].includes(symbol)
   }
 
+  // Convert raw spread config (PIPS / cents / USD) into a price-unit delta
+  // (i.e. how much the broker shifts the execution price away from market).
+  spreadInPriceUnits(spreadValue, spreadType, symbol = '', segment = '', bid = 0, ask = 0) {
+    if (!spreadValue) return 0
+    if (spreadType === 'PERCENTAGE') {
+      return (ask - bid) * (spreadValue / 100)
+    }
+    const isJPYPair = symbol.includes('JPY')
+    const isMetal = segment === 'Metals' || this._isMetal(symbol)
+    const isCrypto = segment === 'Crypto' || this._isCrypto(symbol)
+    if (isCrypto) return spreadValue
+    if (isMetal) return spreadValue * 0.01
+    if (isJPYPair) return spreadValue * 0.01
+    return spreadValue * 0.0001
+  }
+
+  // Broker spread earning (in account currency / USD) for a single trade.
+  // = spread-in-price-units × quantity × contract size
+  calculateSpreadEarning(spreadValue, spreadType, symbol, segment, quantity, contractSize, bid = 0, ask = 0) {
+    const spreadPrice = this.spreadInPriceUnits(spreadValue, spreadType, symbol, segment, bid, ask)
+    const earning = spreadPrice * (quantity || 0) * (contractSize || 0)
+    return Math.round(earning * 100) / 100
+  }
+
   // Calculate execution price with spread
   // For FIXED spread: value is in PIPS (needs conversion based on symbol)
   // For PERCENTAGE spread: value is percentage of price difference
   calculateExecutionPrice(side, bid, ask, spreadValue, spreadType, symbol = '', segment = '') {
-    let spread = 0
-    
-    if (spreadType === 'PERCENTAGE') {
-      spread = (ask - bid) * (spreadValue / 100)
-    } else {
-      // FIXED spread - value is in PIPS, need to convert to price
-      // For JPY pairs: 1 pip = 0.01
-      // For other forex pairs: 1 pip = 0.0001
-      // For metals (XAUUSD): value is in cents (50 = $0.50)
-      // For crypto: spread is in USD directly
-      const isJPYPair = symbol.includes('JPY')
-      const isMetal = segment === 'Metals' || this._isMetal(symbol)
-      const isCrypto = segment === 'Crypto' || this._isCrypto(symbol)
-      
-      if (isCrypto) {
-        // Crypto: spread is in USD
-        spread = spreadValue
-      } else if (isMetal) {
-        // Metals: value in cents (50 = $0.50)
-        spread = spreadValue * 0.01
-      } else if (isJPYPair) {
-        // JPY pairs: 1 pip = 0.01
-        spread = spreadValue * 0.01
-      } else {
-        // Standard forex pairs: 1 pip = 0.0001
-        spread = spreadValue * 0.0001
-      }
-    }
-    
+    const spread = this.spreadInPriceUnits(spreadValue, spreadType, symbol, segment, bid, ask)
     if (side === 'BUY') {
       return ask + spread
     } else {
@@ -294,12 +290,18 @@ class TradeEngine {
 
     // Calculate execution price with spread
     // For copy trades, skip spread as master's price already includes it
-    const openPrice = options.skipSpread 
+    const openPrice = options.skipSpread
       ? (side === 'BUY' ? ask : bid)
       : this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol, segment)
 
     // Get contract size based on symbol
     const contractSize = this.getContractSize(symbol)
+
+    // Broker's spread earning in DOLLARS for this trade
+    // (raw config is in pips/cents/USD; we must store dollars so reports add up correctly)
+    const spreadEarning = options.skipSpread
+      ? 0
+      : this.calculateSpreadEarning(charges.spreadValue, charges.spreadType, symbol, segment, quantity, contractSize, bid, ask)
 
     // Use user-selected leverage if provided, otherwise use account's leverage
     // User can select any leverage up to account's max leverage
@@ -363,7 +365,7 @@ class TradeEngine {
       marginUsed: marginRequired,
       leverage: parseInt(leverage.toString().replace('1:', '')) || 100,
       contractSize: contractSize,
-      spread: options.skipSpread ? 0 : charges.spreadValue,
+      spread: spreadEarning,
       commission,
       swap: 0,
       floatingPnl: 0,
@@ -430,6 +432,11 @@ class TradeEngine {
     // Update trade
     trade.closePrice = closePrice
     trade.realizedPnl = realizedPnl
+    // Roll close-side commission into trade.commission so admin earnings reports
+    // (which sum trade.commission across closed trades) capture it.
+    if (closeCommission > 0) {
+      trade.commission = (trade.commission || 0) + closeCommission
+    }
     trade.status = 'CLOSED'
     trade.closedBy = closedBy
     trade.closedAt = new Date()

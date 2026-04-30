@@ -59,12 +59,79 @@ router.get('/all', requireSidebarPermission(PERMISSIONS.SIDEBAR.TRADE_MANAGEMENT
       .skip(parseInt(offset))
       .limit(parseInt(limit))
 
+    // Aggregate totals across ALL trades matching the filter, split by real vs demo
+    // so the dashboard cards reflect every trade, not just the current page.
+    const aggregateAll = await Trade.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: 'tradingaccounts',
+          localField: 'tradingAccountId',
+          foreignField: '_id',
+          as: '_ta'
+        }
+      },
+      {
+        $addFields: {
+          _isDemo: {
+            $or: [
+              { $eq: ['$accountType', 'ChallengeAccount'] },
+              { $eq: ['$isChallengeAccount', true] },
+              { $eq: [{ $arrayElemAt: ['$_ta.isDemo', 0] }, true] }
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$_isDemo',
+          totalCount: { $sum: 1 },
+          openCount: { $sum: { $cond: [{ $eq: ['$status', 'OPEN'] }, 1, 0] } },
+          totalVolume: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ['$quantity', 0] },
+                { $ifNull: ['$contractSize', 0] },
+                { $ifNull: ['$openPrice', 0] }
+              ]
+            }
+          },
+          totalRealizedPnl: {
+            $sum: {
+              $cond: [
+                { $eq: ['$status', 'CLOSED'] },
+                { $ifNull: ['$realizedPnl', 0] },
+                0
+              ]
+            }
+          }
+        }
+      }
+    ])
+
+    const realAgg = aggregateAll.find(a => a._id === false) || { totalCount: 0, openCount: 0, totalVolume: 0, totalRealizedPnl: 0 }
+    const demoAgg = aggregateAll.find(a => a._id === true) || { totalCount: 0, openCount: 0, totalVolume: 0, totalRealizedPnl: 0 }
+
     res.json({
       success: true,
       trades,
       total,
       limit: parseInt(limit),
-      offset: parseInt(offset)
+      offset: parseInt(offset),
+      aggregates: {
+        real: {
+          totalCount: realAgg.totalCount,
+          openCount: realAgg.openCount,
+          totalVolume: realAgg.totalVolume,
+          totalRealizedPnl: realAgg.totalRealizedPnl
+        },
+        demo: {
+          totalCount: demoAgg.totalCount,
+          openCount: demoAgg.openCount,
+          totalVolume: demoAgg.totalVolume,
+          totalRealizedPnl: demoAgg.totalRealizedPnl
+        }
+      }
     })
   } catch (error) {
     console.error('Error fetching trades:', error)

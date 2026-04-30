@@ -334,13 +334,17 @@ router.post('/close', async (req, res) => {
       
       // Calculate final PnL (subtract swap and close commission)
       const pnl = rawPnl - (tradeToClose.swap || 0) - closeCommission
-      
+
       // Update trade
       tradeToClose.status = 'CLOSED'
       tradeToClose.closePrice = closePrice
       tradeToClose.closedAt = new Date()
       tradeToClose.realizedPnl = pnl
       tradeToClose.closeReason = 'USER'
+      // Roll close commission into trade.commission so admin earnings reports include it.
+      if (closeCommission > 0) {
+        tradeToClose.commission = (tradeToClose.commission || 0) + closeCommission
+      }
       await tradeToClose.save()
       
       // Update challenge account

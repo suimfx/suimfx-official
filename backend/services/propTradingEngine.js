@@ -231,28 +231,28 @@ class PropTradingEngine {
       'XAGEUR','XAGAUD','XAGGBP'].includes(symbol)
   }
 
-  calculateExecutionPrice(side, bid, ask, spreadValue, spreadType, symbol = '', segment = '') {
-    let spread = 0
-    
+  spreadInPriceUnits(spreadValue, spreadType, symbol = '', segment = '', bid = 0, ask = 0) {
+    if (!spreadValue) return 0
     if (spreadType === 'PERCENTAGE') {
-      spread = (ask - bid) * (spreadValue / 100)
-    } else {
-      // FIXED spread - value is in PIPS, need to convert to price
-      const isJPYPair = symbol.includes('JPY')
-      const isMetal = segment === 'Metals' || this._isMetal(symbol)
-      const isCrypto = segment === 'Crypto' || this._isCrypto(symbol)
-      
-      if (isCrypto) {
-        spread = spreadValue || 0
-      } else if (isMetal) {
-        spread = (spreadValue || 0) * 0.01
-      } else if (isJPYPair) {
-        spread = (spreadValue || 0) * 0.01
-      } else {
-        spread = (spreadValue || 0) * 0.0001
-      }
+      return (ask - bid) * (spreadValue / 100)
     }
-    
+    const isJPYPair = symbol.includes('JPY')
+    const isMetal = segment === 'Metals' || this._isMetal(symbol)
+    const isCrypto = segment === 'Crypto' || this._isCrypto(symbol)
+    if (isCrypto) return spreadValue
+    if (isMetal) return spreadValue * 0.01
+    if (isJPYPair) return spreadValue * 0.01
+    return spreadValue * 0.0001
+  }
+
+  calculateSpreadEarning(spreadValue, spreadType, symbol, segment, quantity, contractSize, bid = 0, ask = 0) {
+    const spreadPrice = this.spreadInPriceUnits(spreadValue, spreadType, symbol, segment, bid, ask)
+    const earning = spreadPrice * (quantity || 0) * (contractSize || 0)
+    return Math.round(earning * 100) / 100
+  }
+
+  calculateExecutionPrice(side, bid, ask, spreadValue, spreadType, symbol = '', segment = '') {
+    const spread = this.spreadInPriceUnits(spreadValue, spreadType, symbol, segment, bid, ask)
     if (side === 'BUY') {
       return ask + spread
     } else {
@@ -319,6 +319,12 @@ class PropTradingEngine {
 
     // Get contract size based on symbol
     const contractSize = this.getContractSize(symbol)
+
+    // Broker spread earning in DOLLARS for this trade
+    const spreadEarning = this.calculateSpreadEarning(
+      charges.spreadValue, charges.spreadType, symbol, segment || 'Forex',
+      quantity, contractSize, bid, ask
+    )
     
     // Calculate margin
     const leverage = rules.maxLeverage || 100
@@ -352,7 +358,7 @@ class PropTradingEngine {
       marginUsed: marginRequired,
       contractSize,
       leverage: leverage,
-      spread: charges.spreadValue || 0,
+      spread: spreadEarning,
       status: 'OPEN',
       openedAt: new Date(),
       sl: sl || null,
