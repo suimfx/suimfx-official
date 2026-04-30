@@ -2,6 +2,7 @@ import express from 'express'
 import Trade from '../models/Trade.js'
 import { verifyAdminToken } from '../middleware/rbac.js'
 import { getAdminUserIds } from '../utils/adminFilter.js'
+import { SPREAD_DOLLARS_STAGE } from '../utils/earningsAgg.js'
 
 const router = express.Router()
 
@@ -30,6 +31,7 @@ const REAL_ACCOUNT_STAGES = [
     }
   }
 ]
+
 
 function earningsTotal (commission, spread, swap) {
   return (commission || 0) + (spread || 0) + (swap || 0)
@@ -65,11 +67,12 @@ router.get('/summary', verifyAdminToken, async (req, res) => {
           }
         },
         ...REAL_ACCOUNT_STAGES,
+        SPREAD_DOLLARS_STAGE,
         {
           $group: {
             _id: null,
             totalCommission: { $sum: '$commission' },
-            totalSpread: { $sum: '$spread' },
+            totalSpread: { $sum: '$_spreadDollars' },
             totalSwap: { $sum: '$swap' },
             tradeCount: { $sum: 1 },
             totalVolume: { $sum: '$quantity' }
@@ -158,7 +161,7 @@ router.get('/daily', verifyAdminToken, async (req, res) => {
             day: { $dayOfMonth: '$_tradeDate' }
           },
           commission: { $sum: '$commission' },
-          spread: { $sum: '$spread' },
+          spread: { $sum: '$_spreadDollars' },
           swap: { $sum: '$swap' },
           trades: { $sum: 1 },
           volume: { $sum: '$quantity' }
@@ -223,7 +226,7 @@ router.get('/by-user', verifyAdminToken, async (req, res) => {
         $group: {
           _id: '$userId',
           commission: { $sum: '$commission' },
-          spread: { $sum: '$spread' },
+          spread: { $sum: '$_spreadDollars' },
           swap: { $sum: '$swap' },
           trades: { $sum: 1 },
           volume: { $sum: '$quantity' }
@@ -302,7 +305,7 @@ router.get('/by-symbol', verifyAdminToken, async (req, res) => {
         $group: {
           _id: '$symbol',
           commission: { $sum: '$commission' },
-          spread: { $sum: '$spread' },
+          spread: { $sum: '$_spreadDollars' },
           swap: { $sum: '$swap' },
           trades: { $sum: 1 },
           volume: { $sum: '$quantity' }

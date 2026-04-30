@@ -93,6 +93,13 @@ const tradeSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Broker spread earning in account-currency DOLLARS for this trade.
+  // Computed at open: spreadInPriceUnits × quantity × contractSize.
+  // Use this for earnings reports — the legacy `spread` field is the raw config (pips/cents).
+  spreadEarning: {
+    type: Number,
+    default: 0
+  },
   commission: {
     type: Number,
     default: 0

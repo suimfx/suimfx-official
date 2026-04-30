@@ -297,8 +297,9 @@ class TradeEngine {
     // Get contract size based on symbol
     const contractSize = this.getContractSize(symbol)
 
-    // Broker's spread earning in DOLLARS for this trade
-    // (raw config is in pips/cents/USD; we must store dollars so reports add up correctly)
+    // Broker's spread earning in DOLLARS for this trade.
+    // Stored on the trade as `spreadEarning` so earnings aggregations have a single
+    // source of truth and don't have to re-derive dollars from the raw pip/cents config.
     const spreadEarning = options.skipSpread
       ? 0
       : this.calculateSpreadEarning(charges.spreadValue, charges.spreadType, symbol, segment, quantity, contractSize, bid, ask)
@@ -365,7 +366,8 @@ class TradeEngine {
       marginUsed: marginRequired,
       leverage: parseInt(leverage.toString().replace('1:', '')) || 100,
       contractSize: contractSize,
-      spread: spreadEarning,
+      spread: charges.spreadValue || 0,
+      spreadEarning,
       commission,
       swap: 0,
       floatingPnl: 0,

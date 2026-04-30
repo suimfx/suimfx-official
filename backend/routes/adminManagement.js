@@ -13,6 +13,7 @@ import User from '../models/User.js'
 import Transaction from '../models/Transaction.js'
 import Trade from '../models/Trade.js'
 import { generateReferralCode } from '../utils/adminFilter.js'
+import { SPREAD_DOLLARS_STAGE } from '../utils/earningsAgg.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -741,10 +742,11 @@ router.get('/super-admin-stats', async (req, res) => {
 
       const tradeAgg = await Trade.aggregate([
         { $match: { userId: { $in: userIds }, status: { $in: ['OPEN', 'CLOSED'] } } },
+        SPREAD_DOLLARS_STAGE,
         { $group: {
           _id: null,
           totalCommission: { $sum: '$commission' },
-          totalSpread: { $sum: '$spread' },
+          totalSpread: { $sum: '$_spreadDollars' },
           totalSwap: { $sum: '$swap' }
         }}
       ])
@@ -791,10 +793,11 @@ router.get('/admin-summary/:adminId', async (req, res) => {
     // Trade earnings: commission + spread + swap
     const tradeAgg = await Trade.aggregate([
       { $match: { userId: { $in: userIds }, status: { $in: ['OPEN', 'CLOSED'] } } },
+      SPREAD_DOLLARS_STAGE,
       { $group: {
         _id: null,
         totalCommission: { $sum: '$commission' },
-        totalSpread: { $sum: '$spread' },
+        totalSpread: { $sum: '$_spreadDollars' },
         totalSwap: { $sum: '$swap' },
         totalTrades: { $sum: 1 },
         totalVolume: { $sum: '$quantity' },
