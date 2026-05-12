@@ -132,6 +132,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
     { name: 'Bank Settings', icon: Building2, path: '/admin/bank-settings', sidebarKey: 'bankSettings' },
     { name: 'Manual crypto', icon: Bitcoin, path: '/admin/manual-crypto', sidebarKey: 'bankSettings' },
     { name: 'IB Management', icon: UserCog, path: '/admin/ib-management', sidebarKey: 'ibManagement' },
+    { name: 'Forex Charges', icon: DollarSign, path: '/admin/forex-charges', sidebarKey: 'forexCharges' },
     { name: 'Earnings Report', icon: TrendingUp, path: '/admin/earnings', sidebarKey: 'earningsReport' },
     { name: 'Copy Trade Management', icon: Copy, path: '/admin/copy-trade', sidebarKey: 'copyTrade' },
     { name: 'Prop Firm Challenges', icon: Trophy, path: '/admin/prop-firm', sidebarKey: 'propFirmChallenges' },

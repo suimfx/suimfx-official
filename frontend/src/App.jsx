@@ -25,6 +25,7 @@ import AdminTradeManagement from './pages/AdminTradeManagement'
 import AdminFundManagement from './pages/AdminFundManagement'
 import AdminBankSettings from './pages/AdminBankSettings'
 import AdminIBManagement from './pages/AdminIBManagement'
+import AdminForexCharges from './pages/AdminForexCharges'
 import AdminIndianCharges from './pages/AdminIndianCharges'
 import AdminCopyTrade from './pages/AdminCopyTrade'
 import AdminPropFirm from './pages/AdminPropFirm'
@@ -87,6 +88,7 @@ function App() {
           <Route path="/admin/bank-settings" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminBankSettings /></ProtectedAdminRoute>} />
           <Route path="/admin/manual-crypto" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminManualCrypto /></ProtectedAdminRoute>} />
           <Route path="/admin/ib-management" element={<ProtectedAdminRoute requiredPermission="ibManagement"><AdminIBManagement /></ProtectedAdminRoute>} />
+          <Route path="/admin/forex-charges" element={<ProtectedAdminRoute requiredPermission="forexCharges"><AdminForexCharges /></ProtectedAdminRoute>} />
           <Route path="/admin/indian-charges" element={<ProtectedAdminRoute requiredPermission="forexCharges"><AdminIndianCharges /></ProtectedAdminRoute>} />
           <Route path="/admin/copy-trade" element={<ProtectedAdminRoute requiredPermission="copyTrade"><AdminCopyTrade /></ProtectedAdminRoute>} />
           <Route path="/admin/prop-firm" element={<ProtectedAdminRoute requiredPermission="propFirmChallenges"><AdminPropFirm /></ProtectedAdminRoute>} />
