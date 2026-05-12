@@ -32,8 +32,6 @@ const AdminAccountTypes = () => {
     minDeposit: '',
     leverage: '1:100',
     exposureLimit: '',
-    minSpread: '0',
-    commission: '0',
     isActive: true,
     isDemo: false,
     demoBalance: '10000'
@@ -75,8 +73,6 @@ const AdminAccountTypes = () => {
           ...formData,
           minDeposit: parseFloat(formData.minDeposit),
           exposureLimit: formData.exposureLimit ? parseFloat(formData.exposureLimit) : 0,
-          minSpread: parseFloat(formData.minSpread) || 0,
-          commission: parseFloat(formData.commission) || 0,
           isDemo: formData.isDemo,
           demoBalance: formData.isDemo ? parseFloat(formData.demoBalance) : 0
         })
@@ -147,8 +143,6 @@ const AdminAccountTypes = () => {
       minDeposit: '',
       leverage: '1:100',
       exposureLimit: '',
-      minSpread: '0',
-      commission: '0',
       isActive: true,
       isDemo: false,
       demoBalance: '10000'
@@ -159,18 +153,16 @@ const AdminAccountTypes = () => {
 
   const openEditModal = (type) => {
     setEditingType(type)
-    // `?? '10000'` (not `||`) so a stored demoBalance of 0 shows as "0" and is preserved,
-    // instead of silently being replaced by the 10000 default.
     setFormData({
       name: type.name,
       description: type.description || '',
       minDeposit: type.minDeposit != null ? type.minDeposit.toString() : '',
       leverage: type.leverage,
       exposureLimit: type.exposureLimit != null ? type.exposureLimit.toString() : '',
-      minSpread: type.minSpread != null ? type.minSpread.toString() : '0',
-      commission: type.commission != null ? type.commission.toString() : '0',
       isActive: type.isActive,
       isDemo: type.isDemo || false,
+      // != null (not ||) so a stored demoBalance of 0 shows as "0" and is preserved,
+      // instead of silently being replaced by the 10000 default.
       demoBalance: type.demoBalance != null ? type.demoBalance.toString() : '10000'
     })
     setShowModal(true)
@@ -230,14 +222,6 @@ const AdminAccountTypes = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-500">Exposure</span>
                       <span className="text-white">${type.exposureLimit || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Min Spread</span>
-                      <span className="text-white">{type.minSpread || 0} pips</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Commission</span>
-                      <span className="text-white">{type.commission > 0 ? `$${type.commission}` : 'NO COMM'}</span>
                     </div>
                     {type.isDemo && (
                       <div className="flex justify-between">
@@ -351,32 +335,6 @@ const AdminAccountTypes = () => {
                   placeholder="0 for unlimited"
                   className="w-full bg-dark-700 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
                 />
-              </div>
-
-              {/* Min Spread and Commission */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-400 text-sm mb-2">Min Spread (pips)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formData.minSpread}
-                    onChange={(e) => setFormData({ ...formData, minSpread: e.target.value })}
-                    placeholder="0"
-                    className="w-full bg-dark-700 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-400 text-sm mb-2">Commission ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.commission}
-                    onChange={(e) => setFormData({ ...formData, commission: e.target.value })}
-                    placeholder="0"
-                    className="w-full bg-dark-700 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
-                  />
-                </div>
               </div>
 
               {/* Demo Account Toggle */}
