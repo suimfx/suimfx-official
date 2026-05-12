@@ -353,10 +353,11 @@ const AdminPropFirm = () => {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowSettingsModal(true)}
-              className="p-2 hover:bg-dark-700 rounded-lg transition-colors text-gray-400 hover:text-white"
-              title="Settings"
+              className="flex items-center gap-2 px-4 py-2 bg-dark-700 hover:bg-dark-600 rounded-lg transition-colors text-white border border-gray-700"
+              title="Edit name, description & terms & conditions"
             >
-              <Settings size={20} />
+              <Settings size={18} />
+              <span className="text-sm font-medium">Settings &amp; T&amp;C</span>
             </button>
             <button
               onClick={toggleChallengeMode}

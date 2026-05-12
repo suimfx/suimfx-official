@@ -705,7 +705,7 @@ const MobileTradingApp = () => {
 
 
 
-  const executeOrder = async () => {
+  const executeOrder = async (sideOverride = null) => {
 
     if (!selectedAccount || !selectedInstrument || isExecuting) return
 
@@ -747,7 +747,12 @@ const MobileTradingApp = () => {
 
     try {
 
-      const side = orderType === 'pending' ? (pendingOrderType.includes('BUY') ? 'BUY' : 'SELL') : orderSide
+      // Use sideOverride passed directly from the button click — relying on `orderSide`
+       // state alone is unsafe because `setOrderSide(...)` is async and `executeOrder()`
+       // runs in the same tick, reading the *previous* orderSide value.
+      const side = orderType === 'pending'
+        ? (pendingOrderType.includes('BUY') ? 'BUY' : 'SELL')
+        : (sideOverride || orderSide)
 
       const actualOrderType = orderType === 'market' ? 'MARKET' : pendingOrderType
 
@@ -3001,7 +3006,7 @@ const MobileTradingApp = () => {
 
                 <button
 
-                  onClick={() => { setOrderSide('SELL'); executeOrder() }}
+                  onClick={() => { setOrderSide('SELL'); executeOrder('SELL') }}
 
                   disabled={isExecuting}
 
@@ -3021,7 +3026,7 @@ const MobileTradingApp = () => {
 
                 <button
 
-                  onClick={() => { setOrderSide('BUY'); executeOrder() }}
+                  onClick={() => { setOrderSide('BUY'); executeOrder('BUY') }}
 
                   disabled={isExecuting}
 
@@ -3279,7 +3284,7 @@ const MobileTradingApp = () => {
 
                   <button
 
-                    onClick={() => { setOrderSide('SELL'); executeOrder() }}
+                    onClick={() => { setOrderSide('SELL'); executeOrder('SELL') }}
 
                     disabled={isExecuting}
 
@@ -3293,7 +3298,7 @@ const MobileTradingApp = () => {
 
                   <button
 
-                    onClick={() => { setOrderSide('BUY'); executeOrder() }}
+                    onClick={() => { setOrderSide('BUY'); executeOrder('BUY') }}
 
                     disabled={isExecuting}
 

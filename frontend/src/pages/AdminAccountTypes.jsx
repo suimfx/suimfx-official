@@ -122,14 +122,18 @@ const AdminAccountTypes = () => {
 
   const handleToggleActive = async (type) => {
     try {
+      // Only send the isActive change — backend builds the update object selectively now.
       const res = await fetch(`${API_URL}/account-types/${type._id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ ...type, isActive: !type.isActive })
+        body: JSON.stringify({ isActive: !type.isActive })
       })
-      
+
       if (res.ok) {
         fetchAccountTypes()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.message || 'Error updating account type')
       }
     } catch (error) {
       setError('Error updating account type')
@@ -155,17 +159,19 @@ const AdminAccountTypes = () => {
 
   const openEditModal = (type) => {
     setEditingType(type)
+    // `?? '10000'` (not `||`) so a stored demoBalance of 0 shows as "0" and is preserved,
+    // instead of silently being replaced by the 10000 default.
     setFormData({
       name: type.name,
       description: type.description || '',
-      minDeposit: type.minDeposit.toString(),
+      minDeposit: type.minDeposit != null ? type.minDeposit.toString() : '',
       leverage: type.leverage,
-      exposureLimit: type.exposureLimit?.toString() || '',
-      minSpread: type.minSpread?.toString() || '0',
-      commission: type.commission?.toString() || '0',
+      exposureLimit: type.exposureLimit != null ? type.exposureLimit.toString() : '',
+      minSpread: type.minSpread != null ? type.minSpread.toString() : '0',
+      commission: type.commission != null ? type.commission.toString() : '0',
       isActive: type.isActive,
       isDemo: type.isDemo || false,
-      demoBalance: type.demoBalance?.toString() || '10000'
+      demoBalance: type.demoBalance != null ? type.demoBalance.toString() : '10000'
     })
     setShowModal(true)
     setError('')

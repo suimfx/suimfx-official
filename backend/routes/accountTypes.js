@@ -82,11 +82,25 @@ router.get('/', async (req, res) => {
   }
 })
 
+// Access policy for account types:
+//   SUPER_ADMIN  → can read/write every account type, including legacy rows with adminId=null
+//   ADMIN        → can read/write own (adminId === self) + legacy globals (adminId == null)
+function adminCanAccess (existing, admin) {
+  if (admin.role === 'SUPER_ADMIN') return true
+  const owner = existing.adminId?.toString() || null
+  if (!owner) return true // legacy global row created before multi-tenant
+  return owner === admin._id.toString()
+}
+
 // GET /api/account-types/all - Get all account types (for admin)
 router.get('/all', verifyAdminToken, async (req, res) => {
   try {
-    // Each admin sees only their own account types
-    const accountTypes = await AccountType.find({ adminId: req.admin._id }).sort({ createdAt: -1 })
+    let q = {}
+    if (req.admin.role !== 'SUPER_ADMIN') {
+      // Admin sees their own + legacy global (adminId=null) account types
+      q = { $or: [{ adminId: req.admin._id }, { adminId: null }, { adminId: { $exists: false } }] }
+    }
+    const accountTypes = await AccountType.find(q).sort({ createdAt: -1 })
     res.json({ accountTypes })
   } catch (error) {
     res.status(500).json({ message: 'Error fetching account types', error: error.message })
@@ -121,15 +135,27 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
   try {
     const existing = await AccountType.findById(req.params.id)
     if (!existing) return res.status(404).json({ message: 'Account type not found' })
-    if (existing.adminId?.toString() !== req.admin._id.toString()) {
+    if (!adminCanAccess(existing, req.admin)) {
       return res.status(403).json({ message: 'Access denied' })
     }
     const { name, description, minDeposit, leverage, exposureLimit, minSpread, commission, isActive, isDemo, demoBalance } = req.body
-    const accountType = await AccountType.findByIdAndUpdate(
-      req.params.id,
-      { name, description, minDeposit, leverage, exposureLimit, minSpread, commission, isActive, isDemo, demoBalance },
-      { new: true }
-    )
+    // Build update object explicitly so we only overwrite fields the client actually sent.
+    // (Sending `{ isDemo: undefined }` via findByIdAndUpdate would otherwise leave the field
+    // unchanged, but `demoBalance: 0` is a legitimate write we DO want to persist.)
+    const update = {}
+    if (name !== undefined) update.name = name
+    if (description !== undefined) update.description = description
+    if (minDeposit !== undefined) update.minDeposit = minDeposit
+    if (leverage !== undefined) update.leverage = leverage
+    if (exposureLimit !== undefined) update.exposureLimit = exposureLimit
+    if (minSpread !== undefined) update.minSpread = minSpread
+    if (commission !== undefined) update.commission = commission
+    if (isActive !== undefined) update.isActive = isActive
+    if (isDemo !== undefined) update.isDemo = isDemo
+    if (demoBalance !== undefined) update.demoBalance = demoBalance
+    // Adopt legacy null-adminId rows on first edit so subsequent ADMIN edits work.
+    if (!existing.adminId) update.adminId = req.admin._id
+    const accountType = await AccountType.findByIdAndUpdate(req.params.id, update, { new: true })
     res.json({ message: 'Account type updated', accountType })
   } catch (error) {
     res.status(500).json({ message: 'Error updating account type', error: error.message })
@@ -141,7 +167,7 @@ router.delete('/:id', verifyAdminToken, async (req, res) => {
   try {
     const existing = await AccountType.findById(req.params.id)
     if (!existing) return res.status(404).json({ message: 'Account type not found' })
-    if (existing.adminId?.toString() !== req.admin._id.toString()) {
+    if (!adminCanAccess(existing, req.admin)) {
       return res.status(403).json({ message: 'Access denied' })
     }
 
