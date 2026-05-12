@@ -33,50 +33,19 @@ router.get('/', async (req, res) => {
     }
     
     const accountTypes = await AccountType.find(atQuery).sort({ createdAt: -1 })
-    
-    // Fetch actual spread and commission from Charges for each account type
-    const accountTypesWithCharges = await Promise.all(accountTypes.map(async (at) => {
-      const atObj = at.toObject()
-      
-      // Find charges for this account type (both ACCOUNT_TYPE level and SEGMENT level with accountTypeId)
-      const charges = await Charges.find({ 
-        isActive: true, 
-        accountTypeId: at._id
-      })
-      
-      console.log(`[AccountTypes] Found ${charges.length} charges for ${at.name}:`, charges.map(c => ({
-        segment: c.segment,
-        spreadValue: c.spreadValue,
-        commissionValue: c.commissionValue
-      })))
-      
-      // Get the highest spread value from any charge (regardless of segment)
-      let maxSpread = 0
-      let maxCommission = 0
-      
-      for (const charge of charges) {
-        if (charge.spreadValue > maxSpread) {
-          maxSpread = charge.spreadValue
-        }
-        if (charge.commissionValue > maxCommission) {
-          maxCommission = charge.commissionValue
-        }
-      }
-      
-      // Override minSpread and commission with values from Charges if found
-      if (maxSpread > 0) {
-        atObj.minSpread = maxSpread
-        console.log(`[AccountTypes] Setting minSpread for ${at.name} to ${maxSpread}`)
-      }
-      if (maxCommission > 0) {
-        atObj.commission = maxCommission
-        console.log(`[AccountTypes] Setting commission for ${at.name} to ${maxCommission}`)
-      }
-      
-      return atObj
-    }))
-    
-    res.json({ success: true, accountTypes: accountTypesWithCharges })
+
+    // Strip legacy minSpread / commission from the user-facing payload.
+    // Forex Charges is the single source for live trade spread/commission now;
+    // we no longer show these per-AccountType numbers in the UI, so don't leak
+    // stale stored values from older account types either.
+    const sanitized = accountTypes.map(at => {
+      const obj = at.toObject()
+      delete obj.minSpread
+      delete obj.commission
+      return obj
+    })
+
+    res.json({ success: true, accountTypes: sanitized })
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching account types', error: error.message })
   }

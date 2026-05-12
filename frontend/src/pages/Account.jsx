@@ -1195,16 +1195,8 @@ const Account = () => {
                             <p className="text-white font-semibold">${type.isDemo ? '10,000' : type.minDeposit?.toLocaleString() || '100'} {!type.isDemo && 'USD'}</p>
                           </div>
                           <div>
-                            <p className="text-gray-500 text-xs">Min spread</p>
-                            <p className="text-white font-semibold">{type.minSpread || '0'} pips</p>
-                          </div>
-                          <div>
                             <p className="text-gray-500 text-xs">Max leverage</p>
                             <p className="text-white font-semibold">{type.leverage || '1:100'}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500 text-xs">Commission</p>
-                            <p className="text-white font-semibold">{type.commission ? `$${type.commission}/lot` : 'NO COMM'}</p>
                           </div>
                         </div>
                       </button>

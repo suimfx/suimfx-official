@@ -270,22 +270,14 @@ class TradeEngine {
       }
     }
 
-    // Get charges for this trade (filtered by user's assigned admin)
+    // Get charges for this trade (filtered by user's assigned admin).
+    // Forex Charges is now the single source of truth — AccountType.minSpread /
+    // .commission are no longer used as a fallback. Legacy AccountTypes that
+    // still have those stored values will NOT apply them to live trades.
     const tradeUser = await User.findById(userId).select('assignedAdmin')
     const userAdminId = tradeUser?.assignedAdmin || null
     const charges = await Charges.getChargesForTrade(userId, symbol, segment, account.accountTypeId?._id, userAdminId)
-    
-    // Fallback to AccountType's spread/commission if no charges found
-    if (charges.spreadValue === 0 && account.accountTypeId?.minSpread > 0) {
-      charges.spreadValue = account.accountTypeId.minSpread
-      console.log(`Using AccountType minSpread fallback: ${charges.spreadValue}`)
-    }
-    if (charges.commissionValue === 0 && account.accountTypeId?.commission > 0) {
-      charges.commissionValue = account.accountTypeId.commission
-      charges.commissionType = 'PER_LOT'
-      console.log(`Using AccountType commission fallback: ${charges.commissionValue}`)
-    }
-    
+
     console.log(`Charges retrieved: spread=${charges.spreadValue}, commission=${charges.commissionValue}, commissionType=${charges.commissionType}`)
 
     // Calculate execution price with spread
