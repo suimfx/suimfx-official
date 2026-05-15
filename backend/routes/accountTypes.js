@@ -10,28 +10,41 @@ import { verifyAdminToken } from '../middleware/rbac.js'
 const router = express.Router()
 
 // GET /api/account-types - Get all active account types (for users)
+//
+// Scope rules:
+//   - User assigned to a sub-admin → show that admin's types
+//       + Super Admin's types (universally available)
+//       + legacy null-adminId types
+//   - User with no assignedAdmin    → show Super Admin's types
+//       + legacy null-adminId types
+//   - Unauthenticated request (no userId) → show every active type
+//
+// Previously we only returned the user's assignedAdmin types, which meant a
+// branded-tenant user saw only that admin's types and missed every platform-
+// level type that Super Admin had created. That's the "user sees only 1 type"
+// regression — fixed by OR-ing Super Admin in.
 router.get('/', async (req, res) => {
   try {
     const { userId } = req.query
     let atQuery = { isActive: true }
-    
-    // Scope account types to the user's assigned admin
+
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
       const user = await User.findById(userId).select('assignedAdmin')
-      if (user) {
-        if (user.assignedAdmin) {
-          // User belongs to a specific admin — show only that admin's account types
-          atQuery.adminId = user.assignedAdmin
-        } else {
-          // User belongs to Super Admin — show only Super Admin's account types
-          const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id')
-          if (superAdmin) {
-            atQuery.adminId = superAdmin._id
-          }
-        }
+      const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id')
+
+      const ownerScopes = []
+      if (user?.assignedAdmin) ownerScopes.push(user.assignedAdmin)
+      if (superAdmin?._id && (!user?.assignedAdmin || user.assignedAdmin.toString() !== superAdmin._id.toString())) {
+        ownerScopes.push(superAdmin._id)
       }
+
+      atQuery.$or = [
+        ...ownerScopes.map(id => ({ adminId: id })),
+        { adminId: null },
+        { adminId: { $exists: false } }
+      ]
     }
-    
+
     const accountTypes = await AccountType.find(atQuery).sort({ createdAt: -1 })
 
     // Strip legacy minSpread / commission from the user-facing payload.
