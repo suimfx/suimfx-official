@@ -11,17 +11,15 @@ const router = express.Router()
 
 // GET /api/account-types - Get all active account types (for users)
 //
-// Strict tenant isolation: each user only sees their own admin's account types.
-//   - sub-admin user (assignedAdmin set) → ONLY that admin's types
-//   - super-admin user (no assignedAdmin) → Super Admin's types + legacy globals
-//
-// "Legacy globals" = rows with adminId == null / missing, created before
-// multi-tenant migration. They conceptually belong to the platform owner
-// (Super Admin) so we surface them to Super Admin's users — but NOT to
-// sub-admin tenants. That was the missing piece: if super admin had 10
-// account types but some were legacy (adminId=null) and some were tagged
-// (adminId=superAdminId), the strict equality filter was only matching one
-// of those two groups, so only a subset of the 10 showed up.
+// Scope rules:
+//   - Sub-admin tenant user (assignedAdmin = some sub-admin)
+//       → STRICT isolation: only that admin's types.
+//   - Super-admin user (assignedAdmin = super-admin _id, null, or missing)
+//       → EVERY active type. Super Admin owns the platform catalog, and
+//         historical types have a mix of stored adminId values (super admin's
+//         id / null / sub-admins' ids from impersonation flows). Filtering by
+//         super admin's id alone was hiding the rest, so super-admin users
+//         saw a subset of the types they themselves had configured.
 router.get('/', async (req, res) => {
   try {
     const { userId } = req.query
@@ -29,20 +27,19 @@ router.get('/', async (req, res) => {
 
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
       const user = await User.findById(userId).select('assignedAdmin')
-      if (user) {
-        if (user.assignedAdmin) {
-          // Sub-admin tenant: strict isolation, only that admin's types.
-          atQuery.adminId = user.assignedAdmin
-        } else {
-          // Super Admin user: their explicit types + legacy globals.
-          const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id')
-          atQuery.$or = [
-            ...(superAdmin ? [{ adminId: superAdmin._id }] : []),
-            { adminId: null },
-            { adminId: { $exists: false } }
-          ]
-        }
+      const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id')
+      const superAdminId = superAdmin?._id?.toString() || null
+      const userAdminId = user?.assignedAdmin?.toString() || null
+
+      const isSuperAdminUser =
+        !userAdminId ||
+        (superAdminId && userAdminId === superAdminId)
+
+      if (!isSuperAdminUser) {
+        // Sub-admin tenant: strict isolation
+        atQuery.adminId = user.assignedAdmin
       }
+      // else: super-admin user → no extra filter, see every active type
     }
 
     const accountTypes = await AccountType.find(atQuery).sort({ createdAt: -1 })
