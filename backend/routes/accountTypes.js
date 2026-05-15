@@ -11,18 +11,17 @@ const router = express.Router()
 
 // GET /api/account-types - Get all active account types (for users)
 //
-// Scope rules:
-//   - User assigned to a sub-admin → show that admin's types
-//       + Super Admin's types (universally available)
-//       + legacy null-adminId types
-//   - User with no assignedAdmin    → show Super Admin's types
-//       + legacy null-adminId types
-//   - Unauthenticated request (no userId) → show every active type
+// Strict tenant isolation: each user only sees their own admin's account types.
+//   - sub-admin user (assignedAdmin set) → ONLY that admin's types
+//   - super-admin user (no assignedAdmin) → Super Admin's types + legacy globals
 //
-// Previously we only returned the user's assignedAdmin types, which meant a
-// branded-tenant user saw only that admin's types and missed every platform-
-// level type that Super Admin had created. That's the "user sees only 1 type"
-// regression — fixed by OR-ing Super Admin in.
+// "Legacy globals" = rows with adminId == null / missing, created before
+// multi-tenant migration. They conceptually belong to the platform owner
+// (Super Admin) so we surface them to Super Admin's users — but NOT to
+// sub-admin tenants. That was the missing piece: if super admin had 10
+// account types but some were legacy (adminId=null) and some were tagged
+// (adminId=superAdminId), the strict equality filter was only matching one
+// of those two groups, so only a subset of the 10 showed up.
 router.get('/', async (req, res) => {
   try {
     const { userId } = req.query
@@ -30,19 +29,20 @@ router.get('/', async (req, res) => {
 
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
       const user = await User.findById(userId).select('assignedAdmin')
-      const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id')
-
-      const ownerScopes = []
-      if (user?.assignedAdmin) ownerScopes.push(user.assignedAdmin)
-      if (superAdmin?._id && (!user?.assignedAdmin || user.assignedAdmin.toString() !== superAdmin._id.toString())) {
-        ownerScopes.push(superAdmin._id)
+      if (user) {
+        if (user.assignedAdmin) {
+          // Sub-admin tenant: strict isolation, only that admin's types.
+          atQuery.adminId = user.assignedAdmin
+        } else {
+          // Super Admin user: their explicit types + legacy globals.
+          const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id')
+          atQuery.$or = [
+            ...(superAdmin ? [{ adminId: superAdmin._id }] : []),
+            { adminId: null },
+            { adminId: { $exists: false } }
+          ]
+        }
       }
-
-      atQuery.$or = [
-        ...ownerScopes.map(id => ({ adminId: id })),
-        { adminId: null },
-        { adminId: { $exists: false } }
-      ]
     }
 
     const accountTypes = await AccountType.find(atQuery).sort({ createdAt: -1 })
