@@ -96,23 +96,41 @@ const AdminAccountTypes = () => {
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this account type?')) return
 
+    const doDelete = async (force = false) => {
+      const url = `${API_URL}/account-types/${id}${force ? '?force=true' : ''}`
+      const res = await fetch(url, { method: 'DELETE', headers: getAuthHeaders() })
+      const data = await res.json().catch(() => ({}))
+      return { res, data }
+    }
+
     try {
-      const res = await fetch(`${API_URL}/account-types/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      })
-      const data = await res.json()
+      let { res, data } = await doDelete(false)
+
+      // Linked trading accounts blocked it — offer a force-delete confirmation.
+      if (!res.ok && data?.canForce && data?.linkedAccounts > 0) {
+        const ok = confirm(
+          `${data.linkedAccounts} trading account(s) currently use this type.\n\n` +
+          `Force delete? The linked accounts will be detached (NOT deleted) and will lose their account-type label.`
+        )
+        if (!ok) {
+          setError(data.message || 'Cannot delete account type')
+          setTimeout(() => setError(''), 6000)
+          return
+        }
+        ;({ res, data } = await doDelete(true))
+      }
 
       if (res.ok) {
-        setSuccess('Account type deleted!')
+        setSuccess(data.message || 'Account type deleted!')
         fetchAccountTypes()
         setTimeout(() => setSuccess(''), 3000)
       } else {
-        setError(data.message || 'Cannot delete account type')
-        setTimeout(() => setError(''), 5000)
+        setError(data?.message || 'Cannot delete account type')
+        setTimeout(() => setError(''), 6000)
       }
     } catch (error) {
       setError('Error deleting account type')
+      setTimeout(() => setError(''), 6000)
     }
   }
 
@@ -187,6 +205,16 @@ const AdminAccountTypes = () => {
           {success && (
             <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-500 flex items-center gap-2">
               <Check size={18} /> {success}
+            </div>
+          )}
+          {/* Show errors from delete / toggle on the main page too — previously only
+              rendered inside the modal, so users couldn't see why a delete failed. */}
+          {error && !showModal && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 flex items-start justify-between gap-2">
+              <span className="text-sm">{error}</span>
+              <button onClick={() => setError('')} className="text-red-400 hover:text-red-300 shrink-0">
+                <X size={16} />
+              </button>
             </div>
           )}
 

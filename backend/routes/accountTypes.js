@@ -145,6 +145,9 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
 })
 
 // DELETE /api/account-types/:id - Delete account type (admin)
+// Add ?force=true to also delete an account type that has linked trading
+// accounts. Linked accounts are NOT deleted — their accountTypeId is just
+// unset, so the accounts remain usable.
 router.delete('/:id', verifyAdminToken, async (req, res) => {
   try {
     const existing = await AccountType.findById(req.params.id)
@@ -153,16 +156,30 @@ router.delete('/:id', verifyAdminToken, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' })
     }
 
-    // Block deletion if any trading accounts use this account type
     const linkedAccounts = await TradingAccount.countDocuments({ accountTypeId: req.params.id })
-    if (linkedAccounts > 0) {
+    const force = req.query.force === 'true' || req.body?.force === true
+
+    if (linkedAccounts > 0 && !force) {
       return res.status(400).json({
-        message: `Cannot delete "${existing.name}" — ${linkedAccounts} trading account(s) are using it. Disable it instead.`
+        message: `Cannot delete "${existing.name}" — ${linkedAccounts} trading account(s) are using it. Pass ?force=true to delete anyway (linked accounts will be detached), or disable the type instead.`,
+        linkedAccounts,
+        canForce: true
       })
     }
 
+    if (linkedAccounts > 0 && force) {
+      await TradingAccount.updateMany(
+        { accountTypeId: req.params.id },
+        { $unset: { accountTypeId: 1 } }
+      )
+    }
+
     await AccountType.findByIdAndDelete(req.params.id)
-    res.json({ message: 'Account type deleted' })
+    res.json({
+      message: linkedAccounts > 0
+        ? `Account type deleted. ${linkedAccounts} linked trading account(s) detached.`
+        : 'Account type deleted'
+    })
   } catch (error) {
     res.status(500).json({ message: 'Error deleting account type', error: error.message })
   }
