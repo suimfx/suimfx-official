@@ -743,6 +743,26 @@ const MobileTradingApp = () => {
 
     }
 
+    // Client-side pending-price direction check (backend validates again).
+    // BUY_LIMIT  → entry < market ask    BUY_STOP   → entry > market ask
+    // SELL_LIMIT → entry > market bid    SELL_STOP  → entry < market bid
+    if (orderType === 'pending' && entryPrice) {
+      const entry = parseFloat(entryPrice)
+      const mBid = prices.bid
+      const mAsk = prices.ask
+      const fmt = (n) => Number(n).toFixed(selectedInstrument.category === 'Forex' ? 5 : 2)
+      let err = null
+      if (pendingOrderType === 'BUY_LIMIT' && entry >= mAsk) err = `BUY LIMIT entry must be BELOW current ask (${fmt(mAsk)}).`
+      else if (pendingOrderType === 'BUY_STOP' && entry <= mAsk) err = `BUY STOP entry must be ABOVE current ask (${fmt(mAsk)}).`
+      else if (pendingOrderType === 'SELL_LIMIT' && entry <= mBid) err = `SELL LIMIT entry must be ABOVE current bid (${fmt(mBid)}).`
+      else if (pendingOrderType === 'SELL_STOP' && entry >= mBid) err = `SELL STOP entry must be BELOW current bid (${fmt(mBid)}).`
+      if (err) {
+        showNotification(err, 'error')
+        setIsExecuting(false)
+        return
+      }
+    }
+
 
 
     try {

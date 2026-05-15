@@ -1728,6 +1728,21 @@ const TradingPage = () => {
 
       const currentAsk = livePrice?.ask || selectedInstrument.ask
 
+      // Client-side pending-price direction check (backend validates again).
+      if (pendingPrice && currentBid && currentAsk) {
+        const fmt = (n) => Number(n).toFixed(segment === 'Forex' ? 5 : 2)
+        let err = null
+        if (orderType === 'BUY_LIMIT' && pendingPrice >= currentAsk) err = `BUY LIMIT entry must be BELOW current ask (${fmt(currentAsk)}).`
+        else if (orderType === 'BUY_STOP' && pendingPrice <= currentAsk) err = `BUY STOP entry must be ABOVE current ask (${fmt(currentAsk)}).`
+        else if (orderType === 'SELL_LIMIT' && pendingPrice <= currentBid) err = `SELL LIMIT entry must be ABOVE current bid (${fmt(currentBid)}).`
+        else if (orderType === 'SELL_STOP' && pendingPrice >= currentBid) err = `SELL STOP entry must be BELOW current bid (${fmt(currentBid)}).`
+        if (err) {
+          setTradeError(err)
+          setIsExecutingTrade(false)
+          return
+        }
+      }
+
       
 
       const res = await fetch(`${API_URL}/trade/open`, {

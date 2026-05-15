@@ -124,10 +124,52 @@ router.post('/open', async (req, res) => {
     // Validate order type
     const validOrderTypes = ['MARKET', 'BUY_LIMIT', 'BUY_STOP', 'SELL_LIMIT', 'SELL_STOP']
     if (!validOrderTypes.includes(orderType)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid order type' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order type'
       })
+    }
+
+    // For pending orders, validate the entry price direction against live market.
+    // Frontend currently sends entry price in `bid` and `ask` for pending orders,
+    // so we have to look up the actual market via lpPriceService to validate.
+    //
+    //   BUY_LIMIT  — buy lower than market  → entry < market ask
+    //   BUY_STOP   — buy higher (breakout)  → entry > market ask
+    //   SELL_LIMIT — sell higher than mkt   → entry > market bid
+    //   SELL_STOP  — sell lower (breakdown) → entry < market bid
+    if (orderType !== 'MARKET') {
+      const market = await getFreshPrice(symbol)
+      if (!market || !market.bid || !market.ask) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot place pending order — no live market data for this symbol right now. Try again in a moment.',
+          code: 'NO_DATA_FEED'
+        })
+      }
+      const entry = parseFloat(bid)
+      const mAsk = market.ask
+      const mBid = market.bid
+      const fmt = (n) => Number.isFinite(n) ? Number(n).toFixed(5) : '-'
+
+      let priceError = null
+      if (orderType === 'BUY_LIMIT' && entry >= mAsk) {
+        priceError = `BUY LIMIT entry must be BELOW current ask (${fmt(mAsk)}). You entered ${fmt(entry)}.`
+      } else if (orderType === 'BUY_STOP' && entry <= mAsk) {
+        priceError = `BUY STOP entry must be ABOVE current ask (${fmt(mAsk)}). You entered ${fmt(entry)}.`
+      } else if (orderType === 'SELL_LIMIT' && entry <= mBid) {
+        priceError = `SELL LIMIT entry must be ABOVE current bid (${fmt(mBid)}). You entered ${fmt(entry)}.`
+      } else if (orderType === 'SELL_STOP' && entry >= mBid) {
+        priceError = `SELL STOP entry must be BELOW current bid (${fmt(mBid)}). You entered ${fmt(entry)}.`
+      }
+
+      if (priceError) {
+        return res.status(400).json({
+          success: false,
+          message: priceError,
+          code: 'INVALID_PENDING_PRICE'
+        })
+      }
     }
 
     const gate = await assertUserMayOpenTrades(userId, tradingAccountId)
