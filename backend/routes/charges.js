@@ -1,6 +1,7 @@
 import express from 'express'
 import Charges from '../models/Charges.js'
 import AccountType from '../models/AccountType.js'
+import Admin from '../models/Admin.js'
 import { verifyAdminToken } from '../middleware/rbac.js'
 
 const router = express.Router()
@@ -9,11 +10,26 @@ const router = express.Router()
 router.get('/spreads', async (req, res) => {
   try {
     const { userId, accountTypeId, adminId } = req.query
-    
-    // Filter by adminId: use admin-specific charges + fallback to global (adminId: null)
-    let spreadQuery = { isActive: true, spreadValue: { $gt: 0 } }
-    if (adminId) {
-      spreadQuery.$or = [{ adminId: adminId }, { adminId: null }, { adminId: { $exists: false } }]
+
+    // Frontend omits adminId for Super-Admin users (those without assignedAdmin).
+    // Without explicit resolution, every sub-admin's spreads would be returned and
+    // displayed to Super-Admin users — fall back to the Super Admin's id so the
+    // UI only shows spreads that actually apply at trade execution.
+    let effectiveAdminId = adminId || null
+    if (!effectiveAdminId) {
+      const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id').lean()
+      effectiveAdminId = superAdmin?._id?.toString() || null
+    }
+
+    // Filter by adminId: use tenant-specific charges + fallback to legacy global (adminId null/missing)
+    let spreadQuery = {
+      isActive: true,
+      spreadValue: { $gt: 0 },
+      $or: [
+        ...(effectiveAdminId ? [{ adminId: effectiveAdminId }] : []),
+        { adminId: null },
+        { adminId: { $exists: false } }
+      ]
     }
     
     const charges = await Charges.find(spreadQuery)

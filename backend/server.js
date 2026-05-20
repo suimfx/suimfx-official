@@ -143,16 +143,50 @@ setInterval(async () => {
   } catch (error) {}
 }, 5000)
 
-// Background SL/TP check every 1 second
+// Background pending-order check every 1 second.
+// Without this, BUY_LIMIT / SELL_LIMIT / BUY_STOP / SELL_STOP only fire when a
+// frontend (TradingPage / MobileTradingApp) is actively open and posting to
+// /trade/check-pending — so orders go untriggered if the user closes the tab,
+// switches symbol, or simply isn't watching that pair.
 setInterval(async () => {
   try {
     if (priceCache.size === 0) return
-    
+
     const currentPrices = {}
     priceCache.forEach((data, symbol) => {
       currentPrices[symbol] = { bid: data.bid, ask: data.ask }
     })
-    
+
+    const executed = await tradeEngine.checkPendingOrders(currentPrices)
+    if (executed && executed.length > 0) {
+      console.log(`[PENDING AUTO] ${executed.length} pending order(s) executed`)
+      executed.forEach(et => {
+        io.emit('pendingOrderExecuted', {
+          tradeId: et.trade?._id,
+          orderTradeId: et.trade?.tradeId,
+          symbol: et.trade?.symbol,
+          side: et.trade?.side,
+          orderType: et.trade?.orderType,
+          executionPrice: et.executionPrice,
+          tradingAccountId: et.trade?.tradingAccountId
+        })
+      })
+    }
+  } catch (error) {
+    console.error('[PENDING AUTO] error:', error.message)
+  }
+}, 1000)
+
+// Background SL/TP check every 1 second
+setInterval(async () => {
+  try {
+    if (priceCache.size === 0) return
+
+    const currentPrices = {}
+    priceCache.forEach((data, symbol) => {
+      currentPrices[symbol] = { bid: data.bid, ask: data.ask }
+    })
+
     const closedRegularTrades = await tradeEngine.checkSlTpForAllTrades(currentPrices)
     const closedChallengeTrades = await propTradingEngine.checkSlTpForAllTrades(currentPrices)
     

@@ -107,12 +107,26 @@ const chargesSchema = new mongoose.Schema({
 // Merges charges from multiple levels - most specific wins for each field
 chargesSchema.statics.getChargesForTrade = async function(userId, symbol, segment, accountTypeId, adminId = null) {
   console.log(`Getting charges for: userId=${userId}, symbol=${symbol}, segment=${segment}, accountTypeId=${accountTypeId}, adminId=${adminId}`)
-  
-  // Build query to find all potentially applicable charges
-  // Filter by adminId: use admin-specific charges, fall back to global (adminId: null)
-  let adminFilter = {}
-  if (adminId) {
-    adminFilter.$or = [{ adminId: adminId }, { adminId: null }, { adminId: { $exists: false } }]
+
+  // Resolve effective tenant. A Super-Admin user is represented by
+  // user.assignedAdmin == null, so adminId arrives here as null — without
+  // resolving it, the filter below collapses to {} and silently pulls in
+  // EVERY sub-admin's charges, leaking their spread/commission/swap into
+  // Super-Admin users' trades.
+  let effectiveAdminId = adminId
+  if (!effectiveAdminId) {
+    const Admin = mongoose.model('Admin')
+    const superAdmin = await Admin.findOne({ role: 'SUPER_ADMIN' }).select('_id').lean()
+    effectiveAdminId = superAdmin?._id || null
+  }
+
+  // Filter by adminId: tenant-specific charges + legacy global (adminId null/missing).
+  const adminFilter = {
+    $or: [
+      ...(effectiveAdminId ? [{ adminId: effectiveAdminId }] : []),
+      { adminId: null },
+      { adminId: { $exists: false } }
+    ]
   }
   const allCharges = await this.find({ isActive: true, ...adminFilter }).sort({ createdAt: -1 })
   

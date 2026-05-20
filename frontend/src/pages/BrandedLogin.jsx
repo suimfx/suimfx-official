@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { X, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { API_URL, API_BASE_URL } from '../config/api'
 import { useBranding } from '../context/BrandingContext'
+import InstallAppButton from '../components/InstallAppButton'
 
 const BrandedLogin = () => {
   const { slug } = useParams()
@@ -26,6 +27,26 @@ const BrandedLogin = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Auto-redirect to dashboard if a valid (non-expired) JWT is already stored.
+  // This is what makes the installed PWA "open straight to dashboard" for 13 days.
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      if (payload?.exp && payload.exp * 1000 > Date.now()) {
+        const target = window.innerWidth < 768 ? '/mobile' : '/dashboard'
+        navigate(target, { replace: true })
+      } else {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
+    } catch {
+      localStorage.removeItem('token')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -242,6 +263,14 @@ const BrandedLogin = () => {
           Don't have an account?{' '}
           <Link to={`/${slug}/signup`} className="text-white hover:underline">Sign up</Link>
         </p>
+
+        {/* PWA install — only renders when browser supports it and app is not yet installed */}
+        <div className="mt-4">
+          <InstallAppButton
+            brandName={brandInfo?.brandName}
+            logoUrl={brandInfo?.logo ? `${API_BASE_URL}${brandInfo.logo}` : null}
+          />
+        </div>
       </div>
     </div>
   )

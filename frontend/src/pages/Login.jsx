@@ -5,6 +5,7 @@ import { login } from '../api/auth'
 import { API_BASE_URL } from '../config/api'
 import suimfxLogo from '../assets/suimfxLogo.png'
 import { useBranding } from '../context/BrandingContext'
+import InstallAppButton from '../components/InstallAppButton'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -23,6 +24,27 @@ const Login = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Auto-redirect to dashboard if a valid (non-expired) JWT is already stored.
+  // This is what makes the installed PWA "open straight to dashboard" for 13 days.
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      if (payload?.exp && payload.exp * 1000 > Date.now()) {
+        const target = window.innerWidth < 768 ? '/mobile' : '/dashboard'
+        navigate(target, { replace: true })
+      } else {
+        // expired — clear stale state
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
+    } catch {
+      localStorage.removeItem('token')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Dynamic favicon & title from admin branding (custom domain)
@@ -195,6 +217,14 @@ const Login = () => {
           >
             Create an Account
           </Link>
+
+          {/* PWA install — only renders when the browser supports it and app is not installed */}
+          <div className="mt-4">
+            <InstallAppButton
+              brandName={branding?.brandName}
+              logoUrl={branding?.logo}
+            />
+          </div>
         </div>
       </div>
     </div>

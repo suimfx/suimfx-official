@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* PWA / no-zoom base rules */
+html, body {
+  touch-action: manipulation;            /* No double-tap zoom on mobile */
+  -webkit-text-size-adjust: 100%;        /* Prevent iOS auto-resize */
+  -ms-text-size-adjust: 100%;
+  overscroll-behavior: none;             /* No pull-to-refresh / bounce */
+}
+
 :root {
   /* Theme CSS Variables - Default Blue Theme */
   --theme-primary: #3B82F6;

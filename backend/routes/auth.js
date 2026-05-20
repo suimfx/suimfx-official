@@ -10,7 +10,7 @@ const router = express.Router()
 
 // Generate JWT token with issued at timestamp
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId, iat: Math.floor(Date.now() / 1000) }, process.env.JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign({ id: userId, iat: Math.floor(Date.now() / 1000) }, process.env.JWT_SECRET, { expiresIn: '13d' })
 }
 
 // POST /api/auth/send-otp - Send OTP for email verification
