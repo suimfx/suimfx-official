@@ -819,6 +819,27 @@ class TradeEngine {
             }
           }
 
+          // If this pending order belongs to a master trader, propagate the
+          // now-OPEN trade to followers. Without this, master's pending orders
+          // would never reach followers (the placement-time copy is suppressed
+          // for PENDING status, and there is no other trigger between PENDING
+          // and OPEN).
+          try {
+            const MasterTrader = (await import('../models/MasterTrader.js')).default
+            const master = await MasterTrader.findOne({
+              tradingAccountId: trade.tradingAccountId,
+              status: 'ACTIVE'
+            })
+            if (master) {
+              const copyTradingEngine = (await import('./copyTradingEngine.js')).default
+              const copyResults = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
+              const successCount = copyResults.filter(r => r.status === 'SUCCESS').length
+              console.log(`[CopyTrade] Pending order ${trade.tradeId} fired — copied to ${successCount}/${copyResults.length} followers`)
+            }
+          } catch (copyError) {
+            console.error(`[CopyTrade] Error copying triggered pending ${trade.tradeId}:`, copyError)
+          }
+
           executedTrades.push({
             trade,
             executedAt: new Date(),

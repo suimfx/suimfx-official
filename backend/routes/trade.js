@@ -247,20 +247,29 @@ router.post('/open', async (req, res) => {
       leverage // Pass user-selected leverage
     )
 
-    // Check if this is a master trader and copy to followers
-    const master = await MasterTrader.findOne({ 
-      tradingAccountId, 
-      status: 'ACTIVE' 
-    })
-    
+    // Check if this is a master trader and copy to followers.
+    // PENDING orders (BUY_LIMIT / SELL_LIMIT / BUY_STOP / SELL_STOP) must NOT
+    // be copied at placement time — the copy engine would otherwise hand the
+    // follower a MARKET trade at master's trigger price (which is not the
+    // current market price). Pending orders are propagated when they actually
+    // fire inside tradeEngine.checkPendingOrders.
     let copyResults = []
-    if (master) {
-      try {
-        copyResults = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
-        console.log(`Copied trade to ${copyResults.filter(r => r.status === 'SUCCESS').length} followers`)
-      } catch (copyError) {
-        console.error('Error copying trade to followers:', copyError)
+    if (trade.status === 'OPEN') {
+      const master = await MasterTrader.findOne({
+        tradingAccountId,
+        status: 'ACTIVE'
+      })
+
+      if (master) {
+        try {
+          copyResults = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
+          console.log(`Copied trade to ${copyResults.filter(r => r.status === 'SUCCESS').length} followers`)
+        } catch (copyError) {
+          console.error('Error copying trade to followers:', copyError)
+        }
       }
+    } else if (trade.status === 'PENDING') {
+      console.log(`[CopyTrade] Master ${userId} placed pending order ${trade.tradeId} — copy deferred until trigger`)
     }
 
     res.json({
