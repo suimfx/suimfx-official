@@ -517,10 +517,11 @@ class TradeEngine {
       const copyTradingEngine = (await import('./copyTradingEngine.js')).default
       const results = await copyTradingEngine.closeFollowerTrades(masterTradeId, closePrice)
       if (results.length > 0) {
-        console.log(`Closed ${results.length} follower trades for master trade ${masterTradeId}`)
+        const ok = results.filter(r => r.status === 'SUCCESS').length
+        console.log(`[CopyTrade] CLOSE master ${masterTradeId}: closed ${ok}/${results.length} follower trades`)
       }
     } catch (error) {
-      console.error('Error closing follower trades:', error)
+      console.error('[CopyTrade] Error closing follower trades:', error)
     }
   }
 
@@ -835,6 +836,13 @@ class TradeEngine {
               const copyResults = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
               const successCount = copyResults.filter(r => r.status === 'SUCCESS').length
               console.log(`[CopyTrade] Pending order ${trade.tradeId} fired — copied to ${successCount}/${copyResults.length} followers`)
+            } else {
+              const anyMaster = await MasterTrader.findOne({ tradingAccountId: trade.tradingAccountId })
+              if (anyMaster) {
+                console.log(`[CopyTrade] Pending ${trade.tradeId} fired but master ${anyMaster._id} status=${anyMaster.status} (need ACTIVE) — skipping copy`)
+              } else {
+                console.log(`[CopyTrade] Pending ${trade.tradeId} fired but no MasterTrader linked to tradingAccountId=${trade.tradingAccountId}`)
+              }
             }
           } catch (copyError) {
             console.error(`[CopyTrade] Error copying triggered pending ${trade.tradeId}:`, copyError)

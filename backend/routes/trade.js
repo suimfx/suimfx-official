@@ -263,9 +263,17 @@ router.post('/open', async (req, res) => {
       if (master) {
         try {
           copyResults = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
-          console.log(`Copied trade to ${copyResults.filter(r => r.status === 'SUCCESS').length} followers`)
+          console.log(`[CopyTrade] OPEN ${trade.tradeId}: copied to ${copyResults.filter(r => r.status === 'SUCCESS').length}/${copyResults.length} followers`)
         } catch (copyError) {
-          console.error('Error copying trade to followers:', copyError)
+          console.error('[CopyTrade] Error copying trade to followers:', copyError)
+        }
+      } else {
+        // Diagnose silent misses — was a master record there at all?
+        const anyMaster = await MasterTrader.findOne({ tradingAccountId })
+        if (anyMaster) {
+          console.log(`[CopyTrade] OPEN ${trade.tradeId}: master ${anyMaster._id} exists but status=${anyMaster.status} (need ACTIVE) — skipping copy`)
+        } else {
+          console.log(`[CopyTrade] OPEN ${trade.tradeId}: no MasterTrader linked to tradingAccountId=${tradingAccountId} — not a master, skipping copy`)
         }
       }
     } else if (trade.status === 'PENDING') {
@@ -501,9 +509,16 @@ router.put('/modify', async (req, res) => {
           parsedSl,
           parsedTp
         )
-        console.log(`Mirrored SL/TP modification to follower trades for ${tradeId}`)
+        console.log(`[CopyTrade] MODIFY ${tradeId}: mirrored SL/TP to followers`)
       } catch (copyError) {
-        console.error('Error mirroring SL/TP:', copyError)
+        console.error('[CopyTrade] Error mirroring SL/TP:', copyError)
+      }
+    } else {
+      const anyMaster = await MasterTrader.findOne({ tradingAccountId: trade.tradingAccountId })
+      if (anyMaster) {
+        console.log(`[CopyTrade] MODIFY ${tradeId}: master ${anyMaster._id} exists but status=${anyMaster.status} (need ACTIVE) — skipping mirror`)
+      } else {
+        console.log(`[CopyTrade] MODIFY ${tradeId}: no MasterTrader linked to tradingAccountId=${trade.tradingAccountId} — not a master, skipping mirror`)
       }
     }
 
@@ -809,6 +824,81 @@ router.post('/cancel', async (req, res) => {
       success: false, 
       message: error.message 
     })
+  }
+})
+
+// GET /api/trade/copy-debug/:tradingAccountId - Diagnose why copy trading isn't propagating
+router.get('/copy-debug/:tradingAccountId', async (req, res) => {
+  try {
+    const { tradingAccountId } = req.params
+    const CopyFollower = (await import('../models/CopyFollower.js')).default
+    const CopyTrade = (await import('../models/CopyTrade.js')).default
+
+    const master = await MasterTrader.findOne({ tradingAccountId })
+    if (!master) {
+      return res.json({
+        success: true,
+        diagnosis: 'NOT_A_MASTER',
+        message: 'No MasterTrader record is linked to this trading account. Become a master first (and get admin approval).',
+        tradingAccountId
+      })
+    }
+
+    const followers = await CopyFollower.find({ masterId: master._id })
+    const followersByStatus = followers.reduce((acc, f) => {
+      acc[f.status] = (acc[f.status] || 0) + 1
+      return acc
+    }, {})
+    const activeFollowers = followers.filter(f => f.status === 'ACTIVE')
+
+    const recentCopyTrades = await CopyTrade.find({ masterId: master._id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean()
+
+    let diagnosis = 'OK'
+    const issues = []
+    if (master.status !== 'ACTIVE') {
+      diagnosis = 'MASTER_NOT_ACTIVE'
+      issues.push(`MasterTrader.status = ${master.status} (must be ACTIVE — admin must approve the master application).`)
+    }
+    if (activeFollowers.length === 0) {
+      if (diagnosis === 'OK') diagnosis = 'NO_ACTIVE_FOLLOWERS'
+      issues.push(`No active followers. Total followers=${followers.length}, by status=${JSON.stringify(followersByStatus)}.`)
+    }
+
+    res.json({
+      success: true,
+      diagnosis,
+      issues,
+      master: {
+        _id: master._id,
+        userId: master.userId,
+        tradingAccountId: master.tradingAccountId,
+        status: master.status,
+        displayName: master.displayName,
+        approvedAt: master.approvedAt
+      },
+      followers: {
+        total: followers.length,
+        active: activeFollowers.length,
+        byStatus: followersByStatus
+      },
+      recentCopyTrades: recentCopyTrades.map(ct => ({
+        _id: ct._id,
+        masterTradeId: ct.masterTradeId,
+        followerTradeId: ct.followerTradeId,
+        followerId: ct.followerId,
+        symbol: ct.symbol,
+        side: ct.side,
+        status: ct.status,
+        failureReason: ct.failureReason,
+        createdAt: ct.createdAt
+      }))
+    })
+  } catch (error) {
+    console.error('[CopyDebug] Error:', error)
+    res.status(500).json({ success: false, message: error.message })
   }
 })
 
