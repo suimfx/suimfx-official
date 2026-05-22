@@ -251,6 +251,8 @@ const MobileTradingApp = () => {
 
         fetchOpenTrades()
 
+        fetchPendingOrders()
+
         fetchAccountSummary()
 
       }, 5000)
@@ -617,7 +619,7 @@ const MobileTradingApp = () => {
 
       const data = await res.json()
 
-      if (data.success) setPendingOrders(data.orders || [])
+      if (data.success) setPendingOrders(data.trades || data.orders || [])
 
     } catch (e) { }
 

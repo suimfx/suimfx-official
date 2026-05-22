@@ -36,8 +36,15 @@ router.get('/', async (req, res) => {
         (superAdminId && userAdminId === superAdminId)
 
       if (!isSuperAdminUser) {
-        // Sub-admin tenant: strict isolation
-        atQuery.adminId = user.assignedAdmin
+        // Sub-admin tenant: own types + legacy globals (adminId null / missing).
+        // This MUST match the admin-side `/all` query, otherwise types the
+        // sub-admin can see in their admin panel won't appear for their users
+        // (e.g. legacy rows or types created when adminId wasn't persisted).
+        atQuery.$or = [
+          { adminId: user.assignedAdmin },
+          { adminId: null },
+          { adminId: { $exists: false } }
+        ]
       }
       // else: super-admin user → no extra filter, see every active type
     }
