@@ -2,7 +2,7 @@
   "name": "Suimfx",
   "short_name": "Suimfx",
   "description": "Suimfx — Trading platform",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
