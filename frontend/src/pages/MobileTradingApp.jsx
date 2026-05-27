@@ -91,7 +91,7 @@ const MobileTradingApp = () => {
 
   const [isExecuting, setIsExecuting] = useState(false)
 
-  const [accountSummary, setAccountSummary] = useState({ balance: 0, equity: 0, credit: 0, freeMargin: 0, usedMargin: 0, floatingPnl: 0 })
+  const [accountSummary, setAccountSummary] = useState({ balance: 0, equity: 0, credit: 0, freeMargin: 0, usedMargin: 0, floatingPnl: 0, _initialized: false })
 
   const [expandedTrade, setExpandedTrade] = useState(null)
 
@@ -238,6 +238,14 @@ const MobileTradingApp = () => {
   useEffect(() => {
 
     if (selectedAccount) {
+
+      // Seed accountSummary with the account's stored balance immediately so
+      // the UI never shows $0.00 while waiting for the summary API response.
+      setAccountSummary(prev => ({
+        ...prev,
+        balance: selectedAccount.balance ?? 0,
+        credit: selectedAccount.credit ?? 0
+      }))
 
       fetchOpenTrades()
 
@@ -651,7 +659,18 @@ const MobileTradingApp = () => {
 
     try {
 
-      const pricesParam = encodeURIComponent(JSON.stringify(livePrices))
+      // Only send prices for symbols that have open trades — avoids sending
+      // the entire livePrices map (80-100+ symbols) as a query param which
+      // can exceed URL length limits on Nginx/proxies and silently fail,
+      // leaving accountSummary stuck at { balance: 0 }.
+      const relevantPrices = {}
+      openTrades.forEach(t => {
+        if (livePrices[t.symbol]) {
+          relevantPrices[t.symbol] = livePrices[t.symbol]
+        }
+      })
+
+      const pricesParam = encodeURIComponent(JSON.stringify(relevantPrices))
 
       const res = await fetch(`${API_URL}/trade/summary/${selectedAccount._id}?prices=${pricesParam}`)
 
@@ -659,7 +678,15 @@ const MobileTradingApp = () => {
 
       if (data.success) setAccountSummary(data.summary)
 
-    } catch (e) { }
+    } catch (e) {
+      // Summary fetch failed — use selectedAccount.balance as fallback so
+      // the user at least sees their stored balance instead of $0.00.
+      setAccountSummary(prev => ({
+        ...prev,
+        balance: selectedAccount.balance ?? prev.balance,
+        credit: selectedAccount.credit ?? prev.credit
+      }))
+    }
 
   }
 
