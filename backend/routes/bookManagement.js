@@ -4,6 +4,7 @@ import User from '../models/User.js'
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
 import lpService from '../services/lpService.js'
+import LpSettings from '../models/LpSettings.js'
 import dotenv from 'dotenv'
 import { verifyAdminToken, requireSidebarPermission, PERMISSIONS } from '../middleware/rbac.js'
 import { getAdminUserIds } from '../utils/adminFilter.js'
@@ -16,40 +17,90 @@ const router = express.Router()
 router.use(verifyAdminToken)
 router.use(requireSidebarPermission(PERMISSIONS.SIDEBAR.BOOK_MANAGEMENT))
 
-// Get LP settings from environment variables
+// DB-backed cache of the saved LP settings. Loaded once at startup from the
+// LpSettings collection and refreshed on every save. Priority everywhere:
+//   saved DB value  →  env var  →  empty (NO hard-coded corecen default).
+let lpSettingsCache = null
+
+// Load persisted LP settings from MongoDB into the cache + lpService. Mongoose
+// buffers this until the connection is ready, so it is safe to call at import.
+const loadLpSettingsFromDb = async () => {
+  try {
+    const doc = await LpSettings.findOne({ key: 'lp_config' }).lean()
+    if (doc) {
+      lpSettingsCache = {
+        lpApiUrl: doc.lpApiUrl || '',
+        corecenWsUrl: doc.corecenWsUrl || '',
+        lpApiKey: doc.lpApiKey || '',
+        lpApiSecret: doc.lpApiSecret || '',
+      }
+      lpService.updateConfig({
+        apiUrl: lpSettingsCache.lpApiUrl,
+        apiKey: lpSettingsCache.lpApiKey,
+        apiSecret: lpSettingsCache.lpApiSecret,
+      })
+      console.log('[Book Management] LP settings loaded from DB →', lpSettingsCache.lpApiUrl || '(no url)')
+    }
+  } catch (e) {
+    console.warn('[Book Management] loadLpSettingsFromDb failed:', e.message)
+  }
+}
+
+// Get LP settings — DB-saved value wins, then env, then empty.
 const getLpSettings = () => {
+  const c = lpSettingsCache || {}
   return {
-    lpApiKey: process.env.LP_API_KEY || '',
-    lpApiSecret: process.env.LP_API_SECRET || '',
-    lpApiUrl: process.env.LP_API_URL || 'https://api.corecen.com',
-    corecenWsUrl: process.env.CORECEN_WS_URL || process.env.LP_API_URL || 'https://api.corecen.com',
-    enabled: process.env.LP_ENABLED === 'true'
+    lpApiKey: c.lpApiKey || process.env.LP_API_KEY || '',
+    lpApiSecret: c.lpApiSecret || process.env.LP_API_SECRET || '',
+    lpApiUrl: c.lpApiUrl || process.env.LP_API_URL || '',
+    corecenWsUrl: c.corecenWsUrl || process.env.CORECEN_WS_URL || '',
+    enabled: !!(c.lpApiKey || process.env.LP_API_KEY)
   }
 }
 
-// Runtime LP config (can be updated via API)
-let runtimeLpConfig = null
-
-// Update LP config at runtime (also updates lpService)
-const updateLpConfig = (config) => {
-  runtimeLpConfig = {
-    apiUrl: config.apiUrl || process.env.LP_API_URL || 'https://api.corecen.com',
-    apiKey: config.apiKey || process.env.LP_API_KEY || '',
-    apiSecret: config.apiSecret || process.env.LP_API_SECRET || ''
+// Persist LP config to DB + cache + lpService.
+const updateLpConfig = async (config) => {
+  const merged = {
+    lpApiUrl: config.apiUrl != null ? config.apiUrl : (lpSettingsCache?.lpApiUrl || ''),
+    corecenWsUrl: config.wsUrl != null ? config.wsUrl : (lpSettingsCache?.corecenWsUrl || ''),
+    lpApiKey: config.apiKey != null ? config.apiKey : (lpSettingsCache?.lpApiKey || ''),
+    lpApiSecret: config.apiSecret != null ? config.apiSecret : (lpSettingsCache?.lpApiSecret || ''),
   }
-  // Sync with lpService so trade engine uses updated config
-  lpService.updateConfig(runtimeLpConfig)
-  console.log('[Book Management] LP config updated (runtime)')
+  lpSettingsCache = merged
+  // Persist so it survives refresh + restart.
+  try {
+    await LpSettings.findOneAndUpdate(
+      { key: 'lp_config' },
+      { $set: { ...merged, key: 'lp_config' } },
+      { upsert: true, new: true }
+    )
+  } catch (e) {
+    console.error('[Book Management] Failed to persist LP settings:', e.message)
+  }
+  // Sync with lpService so the trade engine uses the updated config.
+  lpService.updateConfig({ apiUrl: merged.lpApiUrl, apiKey: merged.lpApiKey, apiSecret: merged.lpApiSecret })
+  console.log('[Book Management] LP config saved (DB) →', merged.lpApiUrl || '(no url)')
 }
 
-// Get current LP config
+// Get current LP config (for outbound LP calls / status checks).
 const getCurrentLpConfig = () => {
-  return runtimeLpConfig || {
-    apiUrl: process.env.LP_API_URL || 'https://api.corecen.com',
-    apiKey: process.env.LP_API_KEY || '',
-    apiSecret: process.env.LP_API_SECRET || ''
+  const c = lpSettingsCache || {}
+  return {
+    apiUrl: c.lpApiUrl || process.env.LP_API_URL || '',
+    apiKey: c.lpApiKey || process.env.LP_API_KEY || '',
+    apiSecret: c.lpApiSecret || process.env.LP_API_SECRET || ''
   }
 }
+
+// Detects masked / placeholder values the UI sends back when the admin did not
+// re-type the secret (e.g. "lpk_xxxx...", "••••", "*****...1234", "abc...xyz").
+const isMaskedValue = (v) => {
+  if (!v) return true
+  return /[•*]/.test(v) || v.includes('...') || /x{4,}/i.test(v)
+}
+
+// Load persisted settings at startup.
+loadLpSettingsFromDb()
 
 // Get all users with book type info
 router.get('/users', async (req, res) => {
@@ -556,22 +607,27 @@ router.get('/lp-settings', async (req, res) => {
   }
 })
 
-// PUT /api/book-management/lp-settings - Update LP connection settings (runtime only)
+// PUT /api/book-management/lp-settings - Update LP connection settings (persisted to DB)
 router.put('/lp-settings', async (req, res) => {
   try {
     const { lpApiKey, lpApiSecret, lpApiUrl, corecenWsUrl } = req.body
+    const current = getLpSettings()
 
-    updateLpConfig({
-      apiUrl: lpApiUrl || process.env.LP_API_URL || 'http://localhost:3001',
-      apiKey: lpApiKey || process.env.LP_API_KEY || '',
-      apiSecret: lpApiSecret || process.env.LP_API_SECRET || ''
+    // Keep the existing key/secret if the UI sent back a masked / blank
+    // placeholder (admin didn't re-type the secret).
+    const apiKey = isMaskedValue(lpApiKey) ? current.lpApiKey : lpApiKey.trim()
+    const apiSecret = isMaskedValue(lpApiSecret) ? current.lpApiSecret : lpApiSecret.trim()
+
+    await updateLpConfig({
+      apiUrl: (lpApiUrl || '').trim(),
+      wsUrl: (corecenWsUrl || '').trim(),
+      apiKey,
+      apiSecret,
     })
-
-    console.log('[Book Management] LP settings updated (runtime)')
 
     res.json({
       success: true,
-      message: 'LP settings updated (runtime only). For permanent changes, update .env file and restart server.'
+      message: 'LP settings saved and persisted to database.'
     })
   } catch (error) {
     console.error('Error updating LP settings:', error)
@@ -605,7 +661,7 @@ router.post('/test-lp-connection', async (req, res) => {
         try {
           const timestamp = Date.now().toString()
           const method = 'GET'
-          const path = '/api/v1/broker-api/trades/stats'
+          const path = '/api/v1/broker-api/ping'
           const body = ''
 
           const signatureData = timestamp + method + path + body

@@ -91,23 +91,28 @@ class LPService {
     const method = 'POST'
     const path = '/api/v1/broker-api/trades/push'
 
+    // Payload matches the XMLiquidity broker-api PushTradeRequest contract:
+    //   direction must be lowercase buy|sell, and lot_size/open_price/leverage
+    //   are the exact field names the LP validates. stop_loss/take_profit are
+    //   only sent when > 0 (the LP rejects values <= 0).
     const tradeData = {
       external_trade_id: trade.tradeId || trade._id.toString(),
+      symbol: trade.symbol,
+      direction: String(trade.side).toLowerCase(),
+      lot_size: trade.quantity || trade.volume,
+      open_price: trade.openPrice,
+      leverage: trade.leverage || 100,
+      opened_at_ms: trade.openedAt ? new Date(trade.openedAt).getTime() : Date.now(),
+      // End-user identity so the LP/admin dashboards show the real trader:
       user_id: user._id.toString(),
       user_email: user.email,
       user_name: user.firstName || user.name || 'Unknown',
-      symbol: trade.symbol,
-      side: trade.side.toUpperCase(),
-      volume: trade.quantity || trade.volume,
-      open_price: trade.openPrice,
-      sl: trade.stopLoss || 0,
-      tp: trade.takeProfit || 0,
-      margin: trade.marginUsed || trade.margin || 0,
-      leverage: trade.leverage || 100,
-      contract_size: trade.contractSize || this.getContractSize(trade.symbol), // Send contract size for P/L calculation
+      // Extra context — ignored by the LP, kept for our own audit/debug:
+      contract_size: trade.contractSize || this.getContractSize(trade.symbol),
       trading_account_id: trade.tradingAccountId?.toString() || '',
-      opened_at: trade.openedAt?.toISOString() || new Date().toISOString()
     }
+    if (trade.stopLoss && trade.stopLoss > 0) tradeData.stop_loss = trade.stopLoss
+    if (trade.takeProfit && trade.takeProfit > 0) tradeData.take_profit = trade.takeProfit
 
     const body = JSON.stringify(tradeData)
     const signature = this.generateCorecenSignature(timestamp, method, path, body)
@@ -237,22 +242,23 @@ class LPService {
     }
 
     const timestamp = Date.now().toString()
-    const method = 'PUT'
+    const method = 'POST'
     const path = '/api/v1/broker-api/trades/update'
 
+    // The LP exposes SL/TP updates as POST /trades/update and only accepts
+    // stop_loss / take_profit (> 0). Omit a field to leave it untouched.
     const updateData = {
       external_trade_id: trade.tradeId || trade._id.toString(),
-      sl: trade.stopLoss || 0,
-      tp: trade.takeProfit || 0,
-      contract_size: trade.contractSize || this.getContractSize(trade.symbol), // CRITICAL: Send actual contract size for P/L consistency
     }
+    if (trade.stopLoss && trade.stopLoss > 0) updateData.stop_loss = trade.stopLoss
+    if (trade.takeProfit && trade.takeProfit > 0) updateData.take_profit = trade.takeProfit
 
     const body = JSON.stringify(updateData)
     const signature = this.generateCorecenSignature(timestamp, method, path, body)
 
     try {
       const response = await fetch(`${config.apiUrl}${path}`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-API-Key': config.apiKey,
@@ -279,52 +285,16 @@ class LPService {
   // Remove A-Book user and close all their trades in LP
   // Called when admin deletes a user or transfers from A-Book to B-Book
   async removeABookUser(user) {
-    const config = this.getCorecenConfig()
-
-    if (!config.apiKey || !config.apiSecret) {
+    // The LP has no "remove user" concept — a broker's exposure is just its
+    // open trades. So "removing" an A-Book user means closing every open
+    // A-Book trade they hold on the LP. closeAllUserTrades already skips demo
+    // accounts, so this is the correct, LP-supported way to flatten a user.
+    if (!this.isConfigured()) {
       console.log('[LP Service] Corecen API credentials not configured, skipping user removal')
       return { success: false, message: 'LP credentials not configured' }
     }
-
-    const timestamp = Date.now().toString()
-    const method = 'POST'
-    const path = '/api/v1/broker-api/users/remove'
-
-    const payload = {
-      external_user_id: user._id.toString(),
-      user_email: user.email || '',
-      source_platform: 'SUIMFX',
-      timestamp: new Date().toISOString(),
-    }
-
-    const body = JSON.stringify(payload)
-    const signature = this.generateCorecenSignature(timestamp, method, path, body)
-
-    try {
-      const response = await fetch(`${config.apiUrl}${path}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': config.apiKey,
-          'X-Timestamp': timestamp,
-          'X-Signature': signature
-        },
-        body
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        console.log(`[LP Service] User ${user.email} removed from Corecen`)
-        return { success: true, data }
-      } else {
-        console.error(`[LP Service] Failed to remove user from Corecen:`, data)
-        return { success: false, error: data.error?.message || 'User removal failed' }
-      }
-    } catch (error) {
-      console.error('[LP Service] Error removing user from Corecen:', error)
-      return { success: false, error: error.message }
-    }
+    console.log(`[LP Service] Flattening LP exposure for user ${user.email || user._id} by closing their open A-Book trades`)
+    return this.closeAllUserTrades(user._id)
   }
 
   // Close all open A-Book trades for a user in LP
@@ -385,7 +355,7 @@ class LPService {
 
     const timestamp = Date.now().toString()
     const method = 'GET'
-    const path = '/api/v1/broker-api/health'
+    const path = '/api/v1/broker-api/ping'
 
     const signature = this.generateCorecenSignature(timestamp, method, path, '')
 

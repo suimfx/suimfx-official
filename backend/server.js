@@ -45,6 +45,7 @@ import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
 import lpPriceService from './services/lpPriceService.js'
+import { startInfowayFeed } from './services/infowayFeed.js'
 import AdminDomainConnection from './models/AdminDomainConnection.js'
 import { refreshDnsCheck } from './services/domainDnsService.js'
 import { renderBrandedHtml, resolveBrandingAdmin } from './services/htmlBrandingService.js'
@@ -328,6 +329,15 @@ mongoose.connect(process.env.MONGODB_URI)
       startPeriodicFlush()
     } catch (e) {
       console.warn('[candleAggregator] startPeriodicFlush failed:', e.message)
+    }
+    // Start the direct Infoway market-data feed (this platform sources its own
+    // prices; the LP only handles A-Book trade execution). Disabled cleanly if
+    // INFOWAY_API_KEY is not set. Ticks flow into the same cache/candles/socket
+    // pipeline that Corecen pushes used to feed.
+    try {
+      await startInfowayFeed({ onTicks: (ticks) => lpPriceService.updatePrices(ticks) })
+    } catch (e) {
+      console.warn('[Infoway] start failed:', e.message)
     }
     try {
       const Transaction = (await import('./models/Transaction.js')).default
