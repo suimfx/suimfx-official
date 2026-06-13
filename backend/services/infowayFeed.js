@@ -254,7 +254,15 @@ async function loadSymbols() {
   return DEFAULT_SYMBOLS
 }
 
+// Coalesce window: Infoway streams many ticks/sec per symbol. Broadcasting on
+// every single tick (full price-cache serialize + socket emit) overwhelms the
+// server and makes quotes lag. Instead we keep only the LATEST tick per symbol
+// and flush them as ONE batch this often (≈4 updates/sec — smooth for quotes,
+// light on the wire). Mirrors how the old Corecen push batched at ~100ms.
+const FLUSH_MS = 250
+
 let _feeds = []
+let _flushTimer = null
 
 /**
  * Start the Infoway feed. `onTicks(ticks)` receives an array of
@@ -278,16 +286,30 @@ export async function startInfowayFeed({ onTicks }) {
   const cryptoSyms = symbols.filter(isCrypto)
   const commonSyms = symbols.filter((s) => !isCrypto(s))
 
+  // Buffer keyed by symbol → keeps only the latest price per symbol per window,
+  // so a symbol that ticks 50× in 250ms is broadcast once with its newest price.
+  const buffer = new Map()
+  const bufferTicks = (ticks) => { for (const t of ticks) buffer.set(t.symbol, t) }
+  const flush = () => {
+    if (!buffer.size) return
+    const batch = [...buffer.values()]
+    buffer.clear()
+    try { onTicks(batch) } catch (e) { console.warn('[Infoway] flush sink error:', e.message) }
+  }
+  if (_flushTimer) clearInterval(_flushTimer)
+  _flushTimer = setInterval(flush, FLUSH_MS)
+
   _feeds = []
-  if (commonSyms.length) _feeds.push(new BusinessFeed('common', commonSyms, apiKey, onTicks))
-  if (cryptoSyms.length) _feeds.push(new BusinessFeed('crypto', cryptoSyms, apiKey, onTicks))
+  if (commonSyms.length) _feeds.push(new BusinessFeed('common', commonSyms, apiKey, bufferTicks))
+  if (cryptoSyms.length) _feeds.push(new BusinessFeed('crypto', cryptoSyms, apiKey, bufferTicks))
   _feeds.forEach((f) => f.start())
 
-  console.log(`[Infoway] feed started → ${commonSyms.length} common + ${cryptoSyms.length} crypto symbols (${WS_BASE})`)
-  return { stop: () => _feeds.forEach((f) => f.stop()) }
+  console.log(`[Infoway] feed started → ${commonSyms.length} common + ${cryptoSyms.length} crypto symbols (batched ${FLUSH_MS}ms, ${WS_BASE})`)
+  return { stop: stopInfowayFeed }
 }
 
 export function stopInfowayFeed() {
+  if (_flushTimer) { clearInterval(_flushTimer); _flushTimer = null }
   _feeds.forEach((f) => f.stop())
   _feeds = []
 }
