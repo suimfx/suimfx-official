@@ -280,9 +280,12 @@ class TradeEngine {
 
     console.log(`Charges retrieved: spread=${charges.spreadValue}, commission=${charges.commissionValue}, commissionType=${charges.commissionType}`)
 
-    // Calculate execution price with spread
-    // For copy trades, skip spread as master's price already includes it
-    const openPrice = options.skipSpread
+    // Spread is applied on the live feed (spreadService) — the incoming bid/ask
+    // already include the admin's markup, so fill at that price directly to
+    // avoid charging the spread twice. Copy trades also use the master's price
+    // directly. Set SPREAD_AT_FEED=false to revert to execution-time spread.
+    const spreadAtFeed = process.env.SPREAD_AT_FEED !== 'false'
+    const openPrice = (options.skipSpread || spreadAtFeed)
       ? (side === 'BUY' ? ask : bid)
       : this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol, segment)
 
@@ -294,7 +297,9 @@ class TradeEngine {
     // source of truth and don't have to re-derive dollars from the raw pip/cents config.
     const spreadEarning = options.skipSpread
       ? 0
-      : this.calculateSpreadEarning(charges.spreadValue, charges.spreadType, symbol, segment, quantity, contractSize, bid, ask)
+      : spreadAtFeed
+        ? Math.round(Math.max(0, ask - bid) * (quantity || 0) * (contractSize || 0) * 100) / 100
+        : this.calculateSpreadEarning(charges.spreadValue, charges.spreadType, symbol, segment, quantity, contractSize, bid, ask)
 
     // Use user-selected leverage if provided, otherwise use account's leverage
     // User can select any leverage up to account's max leverage

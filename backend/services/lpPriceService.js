@@ -5,6 +5,7 @@
 
 import { processBidAsk } from './candleAggregator.js'
 import { ingestTick } from './barAggregator.js'
+import { applySpread } from './spreadService.js'
 
 const priceCache = new Map()
 let onPriceUpdateCallback = null
@@ -52,19 +53,24 @@ function updatePrices(ticks) {
     if (!Number.isFinite(ts) || ts <= 0) ts = now
     else if (ts < 1e12) ts = ts * 1000
 
+    // Apply the broker admin's configured spread on top of the raw LP feed, so
+    // the displayed quotes (and the price the frontend trades at) reflect the
+    // admin's markup instead of the LP's tight spread.
+    const { bid, ask } = applySpread(tick.symbol, tick.bid, tick.ask)
+
     const price = {
-      bid: tick.bid,
-      ask: tick.ask,
-      spread: tick.spread != null ? tick.spread : parseFloat((tick.ask - tick.bid).toFixed(5)),
-      mid: (tick.bid + tick.ask) / 2,
+      bid,
+      ask,
+      spread: parseFloat((ask - bid).toFixed(5)),
+      mid: (bid + ask) / 2,
       timestamp: ts,
       source: 'CORECEN_LP',
     }
     priceCache.set(tick.symbol, price)
 
     // Feed the OHLC aggregator so 1m candles persist for chart history
-    processBidAsk(tick.symbol, tick.bid, tick.ask, price.timestamp)
-    ingestTick(tick.symbol, tick.bid, tick.ask, ts)
+    processBidAsk(tick.symbol, bid, ask, price.timestamp)
+    ingestTick(tick.symbol, bid, ask, ts)
 
     if (onPriceUpdateCallback) {
       onPriceUpdateCallback(tick.symbol, price)
