@@ -3239,29 +3239,15 @@ const TradingPage = () => {
 
                         {/* Show admin-set spread if available, otherwise show '-' */}
 
-                        {adminSpreads[inst.symbol]?.spread > 0 ? (
+                        {/* Show the admin-configured spread value exactly as set
+                            (pips for forex, cents for metals, USD for crypto) —
+                            no unit conversion, so a configured 10 shows "10". */}
 
-                          // Metals: spreadValue is stored in cents (50 = $0.50) per Charges model
+                        {adminSpreads[inst.symbol]?.spread > 0
 
-                          (inst.category === 'Metals' || ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XAUEUR', 'XAUAUD', 'XAUGBP', 'XAUCHF', 'XAUJPY', 'XAGEUR', 'XAGAUD', 'XAGGBP'].includes(inst.symbol))
+                          ? Number(adminSpreads[inst.symbol].spread).toLocaleString(undefined, { maximumFractionDigits: 2 })
 
-                            ? (adminSpreads[inst.symbol].spread / 100).toFixed(2)
-
-                            : inst.category === 'Crypto'
-
-                              ? adminSpreads[inst.symbol].spread.toFixed(2)
-
-                              : inst.symbol.includes('JPY')
-
-                                ? (adminSpreads[inst.symbol].spread * 100).toFixed(1)
-
-                                : inst.bid > 100
-
-                                  ? adminSpreads[inst.symbol].spread.toFixed(2)
-
-                                  : (adminSpreads[inst.symbol].spread * 10000).toFixed(1)
-
-                        ) : '-'}
+                          : '-'}
 
                       </div>
 
