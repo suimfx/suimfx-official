@@ -75,7 +75,9 @@ const MobileTradingApp = () => {
     else if (/^(XAU|XAG|XPT|XPD)/.test(symbol)) d = val * 0.01
     else if (mid >= 100) d = val
     else d = val * 0.0001
-    return { bid: mid - d, ask: mid + d }
+    // Configured value is the TOTAL spread → split half each side around the mid.
+    const half = d / 2
+    return { bid: mid - half, ask: mid + half }
   }
 
   const fetchAdminSpreads = async () => {

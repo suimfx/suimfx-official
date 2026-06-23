@@ -41,7 +41,9 @@ class TradeEngine {
   spreadInPriceUnits(spreadValue, spreadType, symbol = '', segment = '', bid = 0, ask = 0) {
     if (!spreadValue) return 0
     if (spreadType === 'PERCENTAGE') {
-      return (ask - bid) * (spreadValue / 100)
+      // Feed is MID (ask == bid), so base the % on the mid price, not the (zero) gap.
+      const base = (ask - bid) > 0 ? (ask - bid) : ((Number(ask) + Number(bid)) / 2)
+      return base * (spreadValue / 100)
     }
     const isJPYPair = symbol.includes('JPY')
     const isMetal = segment === 'Metals' || this._isMetal(symbol)
@@ -280,13 +282,16 @@ class TradeEngine {
 
     console.log(`Charges retrieved: spread=${charges.spreadValue}, commission=${charges.commissionValue}, commissionType=${charges.commissionType}`)
 
-    // The live feed is MID only (no LP spread). Apply THIS user's admin-configured
-    // spread (Forex Charges — per-admin/per-user hierarchy) on top of the mid, so
-    // every admin can price their own users. Copy trades skip — the master's price
-    // already includes the spread.
+    // The live feed is MID only (no LP spread). The admin-configured spread value
+    // is the TOTAL bid-ask spread, so split it HALF each side: BUY fills at
+    // mid + half, SELL at mid - half. This way a configured "30" shows a 30-wide
+    // bid/ask (not 60) and matches the client display. Per-admin/per-user via
+    // Forex Charges. Copy trades skip — the master's price already includes it.
+    const midPx = (Number(bid) + Number(ask)) / 2
+    const halfSpread = this.spreadInPriceUnits(charges.spreadValue, charges.spreadType, symbol, segment, bid, ask) / 2
     const openPrice = options.skipSpread
       ? (side === 'BUY' ? ask : bid)
-      : this.calculateExecutionPrice(side, bid, ask, charges.spreadValue, charges.spreadType, symbol, segment)
+      : (side === 'BUY' ? midPx + halfSpread : midPx - halfSpread)
 
     // Get contract size based on symbol
     const contractSize = this.getContractSize(symbol)
@@ -296,7 +301,7 @@ class TradeEngine {
     // source of truth and don't have to re-derive dollars from the raw pip/cents config.
     const spreadEarning = options.skipSpread
       ? 0
-      : this.calculateSpreadEarning(charges.spreadValue, charges.spreadType, symbol, segment, quantity, contractSize, bid, ask)
+      : Math.round(halfSpread * (quantity || 0) * (contractSize || 0) * 100) / 100
 
     // Use user-selected leverage if provided, otherwise use account's leverage
     // User can select any leverage up to account's max leverage
