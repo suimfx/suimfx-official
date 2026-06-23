@@ -5,7 +5,6 @@
 
 import { processBidAsk } from './candleAggregator.js'
 import { ingestTick } from './barAggregator.js'
-import { applySpread } from './spreadService.js'
 
 const priceCache = new Map()
 let onPriceUpdateCallback = null
@@ -53,24 +52,26 @@ function updatePrices(ticks) {
     if (!Number.isFinite(ts) || ts <= 0) ts = now
     else if (ts < 1e12) ts = ts * 1000
 
-    // Apply the broker admin's configured spread on top of the raw LP feed, so
-    // the displayed quotes (and the price the frontend trades at) reflect the
-    // admin's markup instead of the LP's tight spread.
-    const { bid, ask } = applySpread(tick.symbol, tick.bid, tick.ask)
+    // Treat the LP feed as MID only — zero out the LP's (Infoway's) own spread.
+    // This platform is multi-tenant: each admin sets their OWN spread for their
+    // OWN users, so the shared price feed must carry NO spread. The per-user
+    // spread is applied at execution (tradeEngine via Forex Charges) and on the
+    // client display (each user fetches their admin's spreads).
+    const mid = (Number(tick.bid) + Number(tick.ask)) / 2
 
     const price = {
-      bid,
-      ask,
-      spread: parseFloat((ask - bid).toFixed(5)),
-      mid: (bid + ask) / 2,
+      bid: mid,
+      ask: mid,
+      spread: 0,
+      mid,
       timestamp: ts,
-      source: 'CORECEN_LP',
+      source: 'INFOWAY',
     }
     priceCache.set(tick.symbol, price)
 
     // Feed the OHLC aggregator so 1m candles persist for chart history
-    processBidAsk(tick.symbol, bid, ask, price.timestamp)
-    ingestTick(tick.symbol, bid, ask, ts)
+    processBidAsk(tick.symbol, mid, mid, price.timestamp)
+    ingestTick(tick.symbol, mid, mid, ts)
 
     if (onPriceUpdateCallback) {
       onPriceUpdateCallback(tick.symbol, price)

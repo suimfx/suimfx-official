@@ -60,6 +60,33 @@ const MobileTradingApp = () => {
   const [instruments, setInstruments] = useState([])
 
   const [livePrices, setLivePrices] = useState({})
+  const adminSpreadsRef = useRef({})
+
+  // The live feed is MID only. Split THIS user's admin spread (from /charges/spreads)
+  // around the mid so the displayed bid/ask reflect the user's admin's spread.
+  const applyUserSpread = (symbol, mid) => {
+    if (!(mid > 0)) return { bid: mid, ask: mid }
+    const cfg = adminSpreadsRef.current?.[symbol]
+    const val = cfg?.spread
+    if (!(val > 0)) return { bid: mid, ask: mid }
+    let d
+    if (cfg.spreadType === 'PERCENTAGE') d = mid * (val / 100)
+    else if (symbol.includes('JPY')) d = val * 0.01
+    else if (/^(XAU|XAG|XPT|XPD)/.test(symbol)) d = val * 0.01
+    else if (mid >= 100) d = val
+    else d = val * 0.0001
+    return { bid: mid - d, ask: mid + d }
+  }
+
+  const fetchAdminSpreads = async () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}')
+      const adminParam = u.assignedAdmin ? `?adminId=${u.assignedAdmin}` : ''
+      const res = await fetch(`${API_URL}/charges/spreads${adminParam}`)
+      const data = await res.json()
+      if (data.success) adminSpreadsRef.current = data.spreads || {}
+    } catch (e) { /* ignore */ }
+  }
 
   const [loading, setLoading] = useState(true)
 
@@ -351,13 +378,11 @@ const MobileTradingApp = () => {
 
         if (priceData && priceData.bid && priceData.bid > 0) {
 
-          const bid = priceData.bid
+          const mid = priceData.bid // feed is MID only
 
-          const ask = priceData.ask || priceData.bid
+          const { bid, ask } = applyUserSpread(inst.symbol, mid)
 
-          const spread = Math.abs(ask - bid) || (bid * 0.0001)
-
-          return { ...inst, bid, ask, spread }
+          return { ...inst, bid, ask, spread: Math.abs(ask - bid), mid }
 
         }
 
@@ -380,6 +405,8 @@ const MobileTradingApp = () => {
 
 
     // Fallback: also fetch via HTTP for initial load
+
+    fetchAdminSpreads()
 
     fetchLivePrices()
 
@@ -417,13 +444,11 @@ const MobileTradingApp = () => {
 
           if (priceData && priceData.bid) {
 
-            const bid = priceData.bid
+            const mid = priceData.bid // feed is MID only
 
-            const ask = priceData.ask || priceData.bid
+            const { bid, ask } = applyUserSpread(inst.symbol, mid)
 
-            const spread = Math.abs(ask - bid) || (bid * 0.0001)
-
-            return { ...inst, bid, ask, spread }
+            return { ...inst, bid, ask, spread: Math.abs(ask - bid), mid }
 
           }
 

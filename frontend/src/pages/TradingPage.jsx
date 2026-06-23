@@ -179,6 +179,25 @@ const TradingPage = () => {
   const [livePrices, setLivePrices] = useState({}) // Store live prices separately
 
   const [adminSpreads, setAdminSpreads] = useState({}) // Store admin-set spreads
+  const adminSpreadsRef = useRef({}) // mirror for socket callbacks (avoids stale closure)
+
+  // The live feed is MID only. Split THIS user's admin spread (from /charges/spreads)
+  // around the mid so the displayed bid/ask reflect the user's admin's spread.
+  // Returns { bid: mid - d, ask: mid + d }; mid for both when no spread configured.
+  // Matches the backend tradeEngine execution math so display == fill.
+  const applyUserSpread = (symbol, mid) => {
+    if (!(mid > 0)) return { bid: mid, ask: mid }
+    const cfg = adminSpreadsRef.current?.[symbol]
+    const val = cfg?.spread
+    if (!(val > 0)) return { bid: mid, ask: mid }
+    let d
+    if (cfg.spreadType === 'PERCENTAGE') d = mid * (val / 100)
+    else if (symbol.includes('JPY')) d = val * 0.01
+    else if (/^(XAU|XAG|XPT|XPD)/.test(symbol)) d = val * 0.01
+    else if (mid >= 100) d = val
+    else d = val * 0.0001
+    return { bid: mid - d, ask: mid + d }
+  }
 
   
 
@@ -578,13 +597,11 @@ const TradingPage = () => {
 
         if (priceData && priceData.bid && priceData.bid > 0) {
 
-          const bid = priceData.bid
+          const mid = priceData.bid // feed is MID only
 
-          const ask = priceData.ask || priceData.bid
+          const { bid, ask } = applyUserSpread(inst.symbol, mid)
 
-          const spread = Math.abs(ask - bid) || (bid * 0.0001)
-
-          return { ...inst, bid, ask, spread }
+          return { ...inst, bid, ask, spread: Math.abs(ask - bid), mid }
 
         }
 
@@ -600,15 +617,21 @@ const TradingPage = () => {
 
       if (selectedPrice && selectedPrice.bid && selectedPrice.bid > 0) {
 
+        const mid = selectedPrice.bid // feed is MID only
+
+        const { bid, ask } = applyUserSpread(selectedInstrument.symbol, mid)
+
         setSelectedInstrument(prev => ({
 
           ...prev,
 
-          bid: selectedPrice.bid,
+          bid,
 
-          ask: selectedPrice.ask || selectedPrice.bid,
+          ask,
 
-          spread: Math.abs((selectedPrice.ask || selectedPrice.bid) - selectedPrice.bid)
+          spread: Math.abs(ask - bid),
+
+          mid
 
         }))
 
@@ -944,23 +967,21 @@ const TradingPage = () => {
 
           if (priceData && priceData.bid) {
 
-            // Use bid for both if ask not provided, add small spread
+            const mid = priceData.bid // feed is MID only
 
-            const bid = priceData.bid
-
-            const ask = priceData.ask || priceData.bid
-
-            const spread = Math.abs(ask - bid) || (bid * 0.0001) // Default spread if same
+            const { bid, ask } = applyUserSpread(inst.symbol, mid)
 
             return {
 
               ...inst,
 
-              bid: bid,
+              bid,
 
-              ask: ask,
+              ask,
 
-              spread: spread
+              spread: Math.abs(ask - bid),
+
+              mid
 
             }
 
@@ -980,19 +1001,21 @@ const TradingPage = () => {
 
           if (priceData && priceData.bid) {
 
-            const bid = priceData.bid
+            const mid = priceData.bid // feed is MID only
 
-            const ask = priceData.ask || priceData.bid
+            const { bid, ask } = applyUserSpread(prev.symbol, mid)
 
             return {
 
               ...prev,
 
-              bid: bid,
+              bid,
 
-              ask: ask,
+              ask,
 
-              spread: Math.abs(ask - bid) || (bid * 0.0001)
+              spread: Math.abs(ask - bid),
+
+              mid
 
             }
 
@@ -1012,19 +1035,21 @@ const TradingPage = () => {
 
           if (priceData && priceData.bid) {
 
-            const bid = priceData.bid
+            const mid = priceData.bid // feed is MID only
 
-            const ask = priceData.ask || priceData.bid
+            const { bid, ask } = applyUserSpread(tab.symbol, mid)
 
             return {
 
               ...tab,
 
-              bid: bid,
+              bid,
 
-              ask: ask,
+              ask,
 
-              spread: Math.abs(ask - bid) || (bid * 0.0001)
+              spread: Math.abs(ask - bid),
+
+              mid
 
             }
 
@@ -1167,6 +1192,8 @@ const TradingPage = () => {
       if (data.success) {
 
         setAdminSpreads(data.spreads || {})
+
+        adminSpreadsRef.current = data.spreads || {}
 
       }
 
@@ -1534,9 +1561,12 @@ const TradingPage = () => {
 
       const livePrice = livePrices[selectedInstrument.symbol]
 
-      const bid = livePrice?.bid || selectedInstrument.bid
+      // Send the MID (raw feed) — the backend applies this user's admin spread.
+      // selectedInstrument.bid/ask are the marked-up DISPLAY prices, so fall back
+      // to selectedInstrument.mid to avoid double-applying the spread.
+      const bid = livePrice?.bid || selectedInstrument.mid || selectedInstrument.bid
 
-      const ask = livePrice?.ask || selectedInstrument.ask
+      const ask = livePrice?.ask || selectedInstrument.mid || selectedInstrument.ask
 
       
 
@@ -1724,9 +1754,9 @@ const TradingPage = () => {
 
       const livePrice = livePrices[selectedInstrument.symbol]
 
-      const currentBid = livePrice?.bid || selectedInstrument.bid
+      const currentBid = livePrice?.bid || selectedInstrument.mid || selectedInstrument.bid
 
-      const currentAsk = livePrice?.ask || selectedInstrument.ask
+      const currentAsk = livePrice?.ask || selectedInstrument.mid || selectedInstrument.ask
 
       // Client-side pending-price direction check (backend validates again).
       if (pendingPrice && currentBid && currentAsk) {
