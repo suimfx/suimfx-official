@@ -48,7 +48,7 @@ import lpPriceService from './services/lpPriceService.js'
 import { startInfowayFeed } from './services/infowayFeed.js'
 import AdminDomainConnection from './models/AdminDomainConnection.js'
 import { refreshDnsCheck } from './services/domainDnsService.js'
-import { renderBrandedHtml, resolveBrandingAdmin } from './services/htmlBrandingService.js'
+import { renderBrandedHtml, resolveBrandingAdmin, renderBrandedManifest } from './services/htmlBrandingService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -478,6 +478,21 @@ app.get('/api-health/branding', async (req, res) => {
     })
   } catch (err) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+// Per-tenant PWA manifest. Nginx must route /manifest.json here (not to the
+// static dist file) so the native "Install app" / "Add to Home Screen" prompt
+// shows the admin's brand name + logo instead of the hardcoded "Suimfx".
+app.get(['/manifest.json', '/manifest.webmanifest'], async (req, res) => {
+  try {
+    const manifest = await renderBrandedManifest(req)
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    return res.json(manifest)
+  } catch (err) {
+    console.error('[manifest] render error:', err.message)
+    return res.status(500).json({ error: err.message })
   }
 })
 

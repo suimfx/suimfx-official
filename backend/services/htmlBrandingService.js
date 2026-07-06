@@ -144,6 +144,59 @@ export async function resolveBrandingAdmin(req) {
   return brandingAdmin
 }
 
+/**
+ * Returns a per-tenant PWA Web App Manifest (as a JS object) so the browser's
+ * native "Add to Home Screen" / "Install app" prompt shows the admin's brand
+ * name + logo instead of the default "Suimfx". Chrome reads /manifest.json
+ * directly (it does NOT honor the runtime blob-manifest swap reliably), so the
+ * branding MUST be baked into the server response — same idea as renderBrandedHtml.
+ */
+export async function renderBrandedManifest(req) {
+  const fwdHost = (req.headers['x-forwarded-host'] || '').split(',')[0].split(':')[0].toLowerCase().trim()
+  const rawHost = (req.headers.host || '').split(':')[0].toLowerCase().trim()
+  const hostHeader = fwdHost || rawHost
+
+  let name = 'Suimfx'
+  let logoPath = '/suimfxLogo.png'
+
+  const brandingAdmin = await resolveBrandingAdmin(req)
+  if (brandingAdmin) {
+    const brand = (brandingAdmin.brandName || '').trim()
+    name = brand || brandingAdmin.customDomain || hostHeader || 'Suimfx'
+    if (brandingAdmin.logo) {
+      const raw = String(brandingAdmin.logo).trim()
+      if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) logoPath = raw
+      else logoPath = raw.startsWith('/') ? raw : '/' + raw
+    }
+  } else if (hostHeader && !hostHeader.endsWith('suimfx.com') && hostHeader !== 'localhost') {
+    name = hostHeader
+  }
+
+  const shortName = name.length > 12 ? name.slice(0, 12) : name
+  const icon = /^https?:\/\/|^data:/i.test(logoPath)
+    ? logoPath
+    : (hostHeader ? `https://${hostHeader}${logoPath}` : logoPath)
+
+  console.log(`[manifest] host=${hostHeader} ref=${req.query?.ref || '-'} resolvedBrand="${name}"`)
+
+  return {
+    name,
+    short_name: shortName,
+    description: `${name} — Trading platform`,
+    start_url: '/',
+    scope: '/',
+    display: 'standalone',
+    orientation: 'any',
+    background_color: '#020617',
+    theme_color: '#020617',
+    icons: [
+      { src: icon, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: icon, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: icon, sizes: '192x192', type: 'image/png', purpose: 'maskable' }
+    ]
+  }
+}
+
 export async function renderBrandedHtml(req) {
   const template = loadTemplate()
   if (!template) return null

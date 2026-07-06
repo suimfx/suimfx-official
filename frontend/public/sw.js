@@ -2,8 +2,8 @@
 // Minimal implementation — required for install prompt eligibility.
 // Strategy: network-first for API, cache-first for static assets.
 
-const CACHE_NAME = 'suimfx-pwa-v1'
-const STATIC_ASSETS = ['/', '/index.html', '/manifest.json', '/suimfxLogo.png']
+const CACHE_NAME = 'suimfx-pwa-v2'
+const STATIC_ASSETS = ['/suimfxLogo.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -30,6 +30,24 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) return
   if (url.pathname.startsWith('/socket.io/')) return
   if (url.protocol === 'ws:' || url.protocol === 'wss:') return
+
+  // Network-first for HTML navigations and the PWA manifest so per-admin
+  // branding (title/OG tags + install name/icon) always stays fresh and never
+  // gets pinned to a stale "Suimfx" cache.
+  if (request.mode === 'navigate' || url.pathname === '/manifest.json' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200 && url.origin === self.location.origin) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {})
+          }
+          return response
+        })
+        .catch(() => caches.match(request).then((c) => c || caches.match('/index.html')))
+    )
+    return
+  }
 
   // Cache-first for static assets
   event.respondWith(
