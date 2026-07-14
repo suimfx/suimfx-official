@@ -1,4 +1,16 @@
-import dns from 'dns/promises'
+import { Resolver } from 'dns/promises'
+
+// Domain verification must NOT rely on the host box's /etc/resolv.conf, because
+// a VPS resolver can hold a stale A record (e.g. an old GoDaddy parking IP)
+// long after authoritative + public DNS have updated — which makes "Verify &
+// Connect" fail even though the domain is pointed correctly. Query fast public
+// resolvers directly so the check reflects real-world DNS, not the box's cache.
+const PUBLIC_DNS = (process.env.DOMAIN_CHECK_RESOLVERS
+  ? process.env.DOMAIN_CHECK_RESOLVERS.split(',').map((s) => s.trim()).filter(Boolean)
+  : ['1.1.1.1', '8.8.8.8', '8.8.4.4'])
+
+const dns = new Resolver({ timeout: 5000, tries: 2 })
+try { dns.setServers(PUBLIC_DNS) } catch (_) { /* fall back to system resolver */ }
 
 /**
  * Strip URL noise; return hostname or null.
