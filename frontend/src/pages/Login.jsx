@@ -206,7 +206,7 @@ const Login = () => {
               <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/80 text-slate-500">New to Suimfx?</span>
+              <span className="px-4 bg-slate-900/80 text-slate-500">New to {branding?.brandName || 'Suimfx'}?</span>
             </div>
           </div>
 
