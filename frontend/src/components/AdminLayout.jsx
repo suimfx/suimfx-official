@@ -260,7 +260,10 @@ const AdminLayout = ({ children, title, subtitle }) => {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900 flex">
+    // Lock the shell to the viewport height and clip its overflow so the sidebar
+    // stays put and ONLY <main> (which is overflow-auto) scrolls. With min-h-screen
+    // the whole page grew and the body scrolled, taking the sidebar off-screen.
+    <div className="h-screen overflow-hidden bg-dark-900 flex">
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
