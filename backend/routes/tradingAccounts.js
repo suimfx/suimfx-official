@@ -146,40 +146,62 @@ router.post('/:id/transfer', async (req, res) => {
       return res.status(400).json({ message: 'Account is not active' })
     }
 
-    // Get main wallet
+    // Ensure a main wallet exists (created once; mutated atomically below).
     let wallet = await Wallet.findOne({ userId })
     if (!wallet) {
       wallet = new Wallet({ userId, balance: 0 })
       await wallet.save()
     }
 
-    if (direction === 'deposit') {
-      // Transfer from Main Wallet to Account Wallet
-      if (wallet.balance < amount) {
-        return res.status(400).json({ message: 'Insufficient wallet balance' })
-      }
+    // Round to cents. Two reasons:
+    //  - money is cents-precise, and
+    //  - a stored balance carries floating-point dust from prior P&L math
+    //    (e.g. 99.99999999 instead of 100), which used to make "transfer all"
+    //    fail the `balance < amount` check.
+    const amt = Math.round(parseFloat(amount) * 100) / 100
+    if (!(amt > 0)) {
+      return res.status(400).json({ message: 'Invalid amount' })
+    }
 
-      // Check minimum deposit for first deposit to trading account
-      if (account.balance === 0 && account.accountTypeId?.minDeposit) {
+    // All balance moves use atomic { $inc } via updateOne instead of loading the
+    // doc and .save(). This:
+    //  - fixes concurrent-close clobbering (save() would overwrite a balance a
+    //    trade close just changed, and vice-versa), and
+    //  - bypasses full-document validation, so a legacy account missing the
+    //    required accountTypeId (which made .save() throw and every transfer on
+    //    that account fail with 500) now transfers fine.
+    if (direction === 'deposit') {
+      // Main Wallet -> Trading Account
+      // Minimum first-deposit rule (dust-tolerant "is this the first deposit").
+      if ((account.balance || 0) < 0.005 && account.accountTypeId?.minDeposit) {
         const minDeposit = account.accountTypeId.minDeposit
-        if (amount < minDeposit) {
-          return res.status(400).json({ 
-            message: `Minimum first deposit for ${account.accountTypeId.name} account is $${minDeposit}` 
+        if (amt < minDeposit) {
+          return res.status(400).json({
+            message: `Minimum first deposit for ${account.accountTypeId.name} account is $${minDeposit}`
           })
         }
       }
 
-      wallet.balance -= amount
-      account.balance += amount
-      
-      await wallet.save()
-      await account.save()
+      // Atomic guarded debit from the wallet — succeeds only if it still holds the funds.
+      const walletDr = await Wallet.updateOne(
+        { userId, balance: { $gte: amt } },
+        { $inc: { balance: -amt } }
+      )
+      if (walletDr.matchedCount === 0) {
+        return res.status(400).json({ message: 'Insufficient wallet balance' })
+      }
+      // Credit the account. If this fails, roll the wallet debit back so money can't vanish.
+      try {
+        await TradingAccount.updateOne({ _id: account._id }, { $inc: { balance: amt } })
+      } catch (creditErr) {
+        await Wallet.updateOne({ userId }, { $inc: { balance: amt } })
+        throw creditErr
+      }
 
-      // Log transaction
       await Transaction.create({
         userId,
         type: 'Transfer_To_Account',
-        amount,
+        amount: amt,
         paymentMethod: 'Internal',
         tradingAccountId: account._id,
         tradingAccountName: account.accountId,
@@ -187,28 +209,47 @@ router.post('/:id/transfer', async (req, res) => {
         transactionRef: `TRF${Date.now()}`
       })
 
-      res.json({ 
+      const [freshAcc, freshWallet] = await Promise.all([
+        TradingAccount.findById(account._id).select('balance').lean(),
+        Wallet.findOne({ userId }).select('balance').lean()
+      ])
+      res.json({
         message: 'Funds transferred to account successfully',
-        walletBalance: wallet.balance,
-        accountBalance: account.balance
+        walletBalance: freshWallet?.balance ?? 0,
+        accountBalance: freshAcc?.balance ?? 0
       })
     } else if (direction === 'withdraw') {
-      // Transfer from Account Wallet to Main Wallet
-      if (account.balance < amount) {
+      // Trading Account -> Main Wallet
+      // "Withdraw all" tolerance: if the request is up to a cent ABOVE the stored
+      // balance, take exactly the stored balance so the account zeroes out and the
+      // $gte guard below can't be defeated by sub-cent floating-point dust. Compare
+      // against the RAW stored balance (not a rounded copy) — the atomic guard uses
+      // that same raw value. Anything more than a cent over is a genuine
+      // over-withdraw and still fails the guard.
+      const rawBal = account.balance || 0
+      let finalAmt = amt
+      if (finalAmt > rawBal && finalAmt - rawBal <= 0.01) finalAmt = rawBal
+
+      // Atomic guarded debit from the account.
+      const accDr = await TradingAccount.updateOne(
+        { _id: account._id, balance: { $gte: finalAmt } },
+        { $inc: { balance: -finalAmt } }
+      )
+      if (accDr.matchedCount === 0) {
         return res.status(400).json({ message: 'Insufficient account balance' })
       }
+      // Credit the wallet. If this fails, roll the account debit back.
+      try {
+        await Wallet.updateOne({ userId }, { $inc: { balance: finalAmt } }, { upsert: true })
+      } catch (creditErr) {
+        await TradingAccount.updateOne({ _id: account._id }, { $inc: { balance: finalAmt } })
+        throw creditErr
+      }
 
-      account.balance -= amount
-      wallet.balance += amount
-      
-      await account.save()
-      await wallet.save()
-
-      // Log transaction
       await Transaction.create({
         userId,
         type: 'Transfer_From_Account',
-        amount,
+        amount: finalAmt,
         paymentMethod: 'Internal',
         tradingAccountId: account._id,
         tradingAccountName: account.accountId,
@@ -216,10 +257,14 @@ router.post('/:id/transfer', async (req, res) => {
         transactionRef: `TRF${Date.now()}`
       })
 
-      res.json({ 
+      const [freshAcc, freshWallet] = await Promise.all([
+        TradingAccount.findById(account._id).select('balance').lean(),
+        Wallet.findOne({ userId }).select('balance').lean()
+      ])
+      res.json({
         message: 'Funds withdrawn to main wallet successfully',
-        walletBalance: wallet.balance,
-        accountBalance: account.balance
+        walletBalance: freshWallet?.balance ?? 0,
+        accountBalance: freshAcc?.balance ?? 0
       })
     } else {
       return res.status(400).json({ message: 'Invalid transfer direction' })
