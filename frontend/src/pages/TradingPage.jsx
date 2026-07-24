@@ -18,7 +18,7 @@ import TradingViewChart from '../components/TradingViewChart'
 
 
 
-const HISTORY_PAGE_SIZE = 50
+const HISTORY_PAGE_SIZE = 100
 
 
 

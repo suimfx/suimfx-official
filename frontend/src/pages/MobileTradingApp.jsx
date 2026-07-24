@@ -56,6 +56,8 @@ const MobileTradingApp = () => {
   const [pendingOrders, setPendingOrders] = useState([])
 
   const [tradeHistory, setTradeHistory] = useState([])
+  const [historyPage, setHistoryPage] = useState(1)
+  const HISTORY_PER_PAGE = 100
 
   const [instruments, setInstruments] = useState([])
 
@@ -668,11 +670,23 @@ const MobileTradingApp = () => {
 
     try {
 
-      const res = await fetch(`${API_URL}/trade/history/${selectedAccount._id}?limit=50`)
-
-      const data = await res.json()
-
-      if (data.success) setTradeHistory(data.trades || [])
+      // Pull the FULL history (all pages), not just the first 50. Backend caps a
+      // single response at 200, so loop with offset until we've collected `total`.
+      const pageSize = 200
+      const safetyCap = 20000
+      let offset = 0
+      let all = []
+      while (offset < safetyCap) {
+        const res = await fetch(`${API_URL}/trade/history/${selectedAccount._id}?limit=${pageSize}&offset=${offset}`)
+        const data = await res.json()
+        if (!data.success || !Array.isArray(data.trades) || data.trades.length === 0) break
+        all = all.concat(data.trades)
+        const total = typeof data.total === 'number' ? data.total : all.length
+        offset += data.trades.length
+        if (all.length >= total || data.trades.length < pageSize) break
+      }
+      setTradeHistory(all)
+      setHistoryPage(1)
 
     } catch (e) { }
 
@@ -2305,9 +2319,11 @@ const MobileTradingApp = () => {
 
           ) : (
 
+            <>
+
             <div className="divide-y divide-gray-800">
 
-              {tradeHistory.map(trade => (
+              {tradeHistory.slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE).map(trade => (
 
                 <div key={trade._id} className="p-4">
 
@@ -2356,6 +2372,26 @@ const MobileTradingApp = () => {
               ))}
 
             </div>
+
+            {tradeHistory.length > HISTORY_PER_PAGE && (
+
+              <div className="flex items-center justify-between p-4 text-sm border-t border-gray-800">
+
+                <span className="text-gray-500">Page {historyPage} of {Math.ceil(tradeHistory.length / HISTORY_PER_PAGE)}</span>
+
+                <div className="flex gap-2">
+
+                  <button onClick={() => setHistoryPage(p => Math.max(1, p - 1))} disabled={historyPage === 1} className="px-3 py-1.5 bg-gray-800 text-white rounded-lg disabled:opacity-40">Prev</button>
+
+                  <button onClick={() => setHistoryPage(p => Math.min(Math.ceil(tradeHistory.length / HISTORY_PER_PAGE), p + 1))} disabled={historyPage >= Math.ceil(tradeHistory.length / HISTORY_PER_PAGE)} className="px-3 py-1.5 bg-gray-800 text-white rounded-lg disabled:opacity-40">Next</button>
+
+                </div>
+
+              </div>
+
+            )}
+
+            </>
 
           )
 
