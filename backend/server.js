@@ -40,6 +40,7 @@ import employeeManagementRoutes from './routes/employeeManagement.js'
 import lpIntegrationRoutes from './routes/lpIntegration.js'
 import bookManagementRoutes from './routes/bookManagement.js'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
@@ -473,16 +474,34 @@ app.use('/api/book-management', bookManagementRoutes)
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
-// Serve APK download
-app.get('/downloads/Suimfx.apk', (req, res) => {
-  const apkPath = path.join(__dirname, 'apk', 'Suimfx.apk')
-  res.download(apkPath, 'Suimfx.apk', (err) => {
-    if (err) {
-      console.error('APK download error:', err)
-      res.status(404).json({ error: 'APK not found' })
+// Serve the Android APK for download.
+// The landing page historically linked to /suimfx.apk while the only backend
+// route was /downloads/Suimfx.apk — so the download hit the SPA fallback and
+// returned an empty (0-byte) response, which Android rejects with "problem
+// parsing the package". Accept every spelling/path, and refuse up front with a
+// clear 404 when the file is missing or empty instead of streaming 0 bytes.
+const APK_PATH = path.join(__dirname, 'apk', 'Suimfx.apk')
+const serveApk = (req, res) => {
+  try {
+    const stat = fs.existsSync(APK_PATH) ? fs.statSync(APK_PATH) : null
+    if (!stat || stat.size === 0) {
+      console.error(`[APK] not downloadable — ${stat ? 'file is 0 bytes' : 'file not found'} at ${APK_PATH}`)
+      return res.status(404).json({ error: 'App file is not available right now. Please try again later or contact support.' })
     }
-  })
-})
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive')
+    res.setHeader('Content-Length', stat.size)
+    res.download(APK_PATH, 'Suimfx.apk', (err) => {
+      if (err && !res.headersSent) {
+        console.error('[APK] download error:', err.message)
+        res.status(500).json({ error: 'APK download failed' })
+      }
+    })
+  } catch (e) {
+    console.error('[APK] serve error:', e.message)
+    if (!res.headersSent) res.status(500).json({ error: 'APK download failed' })
+  }
+}
+app.get(['/downloads/Suimfx.apk', '/downloads/suimfx.apk', '/suimfx.apk', '/Suimfx.apk'], serveApk)
 
 // Health check / dynamic branded HTML fallback.
 // Nginx proxies HTML page requests here (root, /register, /login, etc.) so that
