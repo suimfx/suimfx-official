@@ -590,7 +590,7 @@ const AdminForexCharges = () => {
 
               <p className="text-gray-500 text-center py-4">Loading...</p>
 
-            ) : charges.filter(c => c.spreadValue > 0).length === 0 ? (
+            ) : charges.filter(c => c.spreadValue > 0 || c.spreadOverride).length === 0 ? (
 
               <p className="text-gray-500 text-center py-4">No spread charges configured</p>
 
@@ -598,7 +598,7 @@ const AdminForexCharges = () => {
 
               <div className="space-y-2">
 
-                {charges.filter(c => c.spreadValue > 0).map((charge) => (
+                {charges.filter(c => c.spreadValue > 0 || c.spreadOverride).map((charge) => (
 
                   <div key={charge._id} className="flex items-center justify-between p-3 bg-dark-700 rounded-lg">
 
@@ -612,7 +612,7 @@ const AdminForexCharges = () => {
 
                     <div className="flex items-center gap-4">
 
-                      <span className="text-white font-medium">{charge.spreadValue} <span className="text-gray-500 text-sm">({charge.spreadType})</span></span>
+                      <span className="text-white font-medium">{charge.spreadValue} <span className="text-gray-500 text-sm">({charge.spreadType})</span>{charge.spreadValue === 0 && charge.spreadOverride ? <span className="ml-2 px-1.5 py-0.5 bg-gray-600 text-gray-300 text-xs rounded">no spread</span> : null}</span>
 
                       <div className="flex items-center gap-1">
 

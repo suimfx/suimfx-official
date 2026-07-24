@@ -51,7 +51,15 @@ const chargesSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
+  // When true, spreadValue=0 explicitly overrides higher-level spread.
+  // Without this a 0 is indistinguishable from "not configured", so clearing an
+  // INSTRUMENT/USER spread silently falls back to the SEGMENT/GLOBAL value and
+  // the old spread keeps getting charged.
+  spreadOverride: {
+    type: Boolean,
+    default: false
+  },
+
   // ============ COMMISSION SETTINGS ============
   // Commission charged per lot on each execution (buy/sell/close)
   commissionType: {
@@ -200,9 +208,10 @@ chargesSchema.statics.getChargesForTrade = async function(userId, symbol, segmen
           existing.commissionOnClose = charge.commissionOnClose
           existing.commissionOverride = charge.commissionOverride
         }
-        if (charge.spreadValue > 0 && !existing.spreadValue) {
+        if ((charge.spreadValue > 0 || charge.spreadOverride) && !existing.spreadValue && !existing.spreadOverride) {
           existing.spreadValue = charge.spreadValue
           existing.spreadType = charge.spreadType
+          existing.spreadOverride = charge.spreadOverride
         }
         if ((charge.swapLong !== 0 || charge.swapShort !== 0) && !existing.swapLong && !existing.swapShort) {
           existing.swapLong = charge.swapLong
@@ -240,8 +249,9 @@ chargesSchema.statics.getChargesForTrade = async function(userId, symbol, segmen
   for (let i = applicableCharges.length - 1; i >= 0; i--) {
     const charge = applicableCharges[i]
     
-    // Only overwrite if the charge has a non-zero/non-default value
-    if (charge.spreadValue > 0) {
+    // Only overwrite if the charge has a non-zero/non-default value.
+    // spreadOverride lets an explicit 0 win over less-specific levels.
+    if (charge.spreadValue > 0 || charge.spreadOverride) {
       result.spreadValue = charge.spreadValue
       result.spreadType = charge.spreadType
     }

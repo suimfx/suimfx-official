@@ -127,11 +127,18 @@ lpPriceService.setOnConnectionChange((connected) => {
 lpPriceService.connect()
 console.log('[Market data] Corecen LP → POST /api/lp/prices/batch')
 
+// Re-entrancy guards. setInterval does not wait for the previous run, so a sweep
+// that takes longer than its interval used to overlap with itself — two passes then
+// closed the same trades and raced each other's account-balance writes.
+const sweepRunning = { stopOut: false, pending: false, slTp: false }
+
 // Background stop-out check every 5 seconds
 setInterval(async () => {
+  if (sweepRunning.stopOut) return
+  sweepRunning.stopOut = true
   try {
     if (priceCache.size === 0) return
-    
+
     const currentPrices = {}
     priceCache.forEach((data, symbol) => {
       currentPrices[symbol] = { bid: data.bid, ask: data.ask }
@@ -141,7 +148,9 @@ setInterval(async () => {
     if (result.stopOuts && result.stopOuts.length > 0) {
       console.log(`[STOP-OUT] ${result.stopOuts.length} accounts stopped out`)
     }
-  } catch (error) {}
+  } catch (error) {} finally {
+    sweepRunning.stopOut = false
+  }
 }, 5000)
 
 // Background pending-order check every 1 second.
@@ -150,6 +159,8 @@ setInterval(async () => {
 // /trade/check-pending — so orders go untriggered if the user closes the tab,
 // switches symbol, or simply isn't watching that pair.
 setInterval(async () => {
+  if (sweepRunning.pending) return
+  sweepRunning.pending = true
   try {
     if (priceCache.size === 0) return
 
@@ -175,11 +186,15 @@ setInterval(async () => {
     }
   } catch (error) {
     console.error('[PENDING AUTO] error:', error.message)
+  } finally {
+    sweepRunning.pending = false
   }
 }, 1000)
 
 // Background SL/TP check every 1 second
 setInterval(async () => {
+  if (sweepRunning.slTp) return
+  sweepRunning.slTp = true
   try {
     if (priceCache.size === 0) return
 
@@ -210,7 +225,9 @@ setInterval(async () => {
         })
       })
     }
-  } catch (error) {}
+  } catch (error) {} finally {
+    sweepRunning.slTp = false
+  }
 }, 1000)
 
 io.on('connection', (socket) => {
@@ -392,6 +409,31 @@ mongoose.connect(process.env.MONGODB_URI)
       }
     } catch (e) {
       console.warn('[Migration] bankSettings:', e.message)
+    }
+    // One-time migration: tag already-open follower trades as copy trades.
+    // isCopyTrade is set at creation from now on, but positions opened before this
+    // deploy have no flag — without backfilling them the SL/TP sweep would keep
+    // closing them independently of their master and their P&L would keep drifting.
+    try {
+      const CopyTrade = (await import('./models/CopyTrade.js')).default
+      const TradeModel = (await import('./models/Trade.js')).default
+      const openCopies = await CopyTrade.find({ status: 'OPEN' })
+        .select('followerTradeId masterTradeId')
+        .lean()
+      let tagged = 0
+      for (const ct of openCopies) {
+        if (!ct.followerTradeId) continue
+        const r = await TradeModel.updateOne(
+          { _id: ct.followerTradeId, isCopyTrade: { $ne: true } },
+          { $set: { isCopyTrade: true, copyMasterTradeId: ct.masterTradeId || null } }
+        )
+        tagged += r.modifiedCount || 0
+      }
+      if (tagged > 0) {
+        console.log(`[Migration] Tagged ${tagged} existing open follower trade(s) as copy trades`)
+      }
+    } catch (e) {
+      console.warn('[Migration] copy trade tagging:', e.message)
     }
   })
   .catch((err) => console.error('MongoDB connection error:', err))

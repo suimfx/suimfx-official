@@ -365,21 +365,26 @@ class TradeEngine {
       marginUsed: marginRequired,
       leverage: parseInt(leverage.toString().replace('1:', '')) || 100,
       contractSize: contractSize,
-      spread: charges.spreadValue || 0,
+      // Copy trades fill at the master's already-marked-up price, so no spread was
+      // charged here — store 0 rather than the raw config, otherwise legacy earnings
+      // math re-derives a spread this trade never paid.
+      spread: options.skipSpread ? 0 : (charges.spreadValue || 0),
       spreadEarning,
       commission,
       swap: 0,
       floatingPnl: 0,
       status: orderType === 'MARKET' ? 'OPEN' : 'PENDING',
       pendingPrice: orderType !== 'MARKET' ? openPrice : null,
-      bookType: userBookType
+      bookType: userBookType,
+      isCopyTrade: !!options.copyMasterTradeId,
+      copyMasterTradeId: options.copyMasterTradeId || null
     })
 
-    // Deduct commission from trading account balance when trade opens
+    // Deduct commission from trading account balance when trade opens.
+    // Routed through applyPnlToAccount so it is atomic against concurrent closes
+    // on the same account and any shortfall is audited rather than clamped away.
     if (orderType === 'MARKET' && commission > 0) {
-      account.balance -= commission
-      if (account.balance < 0) account.balance = 0
-      await account.save()
+      await this.applyPnlToAccount(tradingAccountId, -commission)
     }
 
     if (orderType === 'MARKET' && userBookType === 'A' && !account.isDemo && lpService.isConfigured() && userForBook) {
@@ -398,6 +403,73 @@ class TradeEngine {
     }
 
     return trade
+  }
+
+  // Apply a realized P&L amount to an account's balance.
+  //
+  // Concurrency: several closes can land on the same account at once (the 1s SL/TP
+  // sweep, the 5s stop-out sweep, a user-initiated close, and closeFollowerTrades'
+  // Promise.all all run independently). The previous read → mutate → save() sequence
+  // lost updates when that happened, which is why some accounts' balances did not
+  // match their closed-trade P&L. Profit uses a plain $inc; loss needs the current
+  // balance to split across balance/credit, so it reads and then writes under a
+  // compare-and-set guard, retrying if another close moved the values in between.
+  async applyPnlToAccount(tradingAccountId, realizedPnl, attempt = 0) {
+    const MAX_ATTEMPTS = 5
+
+    if (!realizedPnl) return
+
+    if (realizedPnl > 0) {
+      await TradingAccount.updateOne(
+        { _id: tradingAccountId },
+        { $inc: { balance: realizedPnl } }
+      )
+      return
+    }
+
+    const account = await TradingAccount.findById(tradingAccountId).select('balance credit')
+    if (!account) return
+
+    const balance = account.balance || 0
+    const credit = account.credit || 0
+    const loss = Math.abs(realizedPnl)
+
+    let newBalance
+    let newCredit
+    let shortfall = 0
+
+    if (balance >= loss) {
+      newBalance = balance - loss
+      newCredit = credit
+    } else {
+      // Balance can't cover it — take the remainder from credit. Balance floors at 0
+      // (negative-balance protection), so anything credit can't absorb either is
+      // recorded as unrecoveredLoss rather than silently disappearing.
+      const remainingLoss = loss - balance
+      newBalance = 0
+      newCredit = Math.max(0, credit - remainingLoss)
+      shortfall = Math.max(0, remainingLoss - credit)
+    }
+
+    const update = { $set: { balance: newBalance, credit: newCredit } }
+    if (shortfall > 0) update.$inc = { unrecoveredLoss: shortfall }
+
+    const res = await TradingAccount.updateOne(
+      { _id: tradingAccountId, balance, credit },
+      update
+    )
+
+    if (res.matchedCount === 0) {
+      if (attempt + 1 >= MAX_ATTEMPTS) {
+        console.error(`[TradeEngine] applyPnlToAccount: gave up after ${MAX_ATTEMPTS} contended attempts on account ${tradingAccountId} (pnl ${realizedPnl})`)
+        return
+      }
+      return this.applyPnlToAccount(tradingAccountId, realizedPnl, attempt + 1)
+    }
+
+    if (shortfall > 0) {
+      console.warn(`[TradeEngine] Account ${tradingAccountId}: loss $${loss.toFixed(2)} exceeded balance+credit — $${shortfall.toFixed(2)} recorded as unrecoveredLoss`)
+    }
   }
 
   // Close a trade
@@ -451,31 +523,7 @@ class TradeEngine {
     await trade.save()
 
     // Update account balance with proper credit handling
-    const account = await TradingAccount.findById(trade.tradingAccountId)
-    
-    if (realizedPnl >= 0) {
-      // Profit: Add to balance only (credit stays the same)
-      account.balance += realizedPnl
-    } else {
-      // Loss: First deduct from balance, then from credit if balance insufficient
-      const loss = Math.abs(realizedPnl)
-      
-      if (account.balance >= loss) {
-        // Balance can cover the loss
-        account.balance -= loss
-      } else {
-        // Balance cannot cover the loss - use credit for remaining
-        const remainingLoss = loss - account.balance
-        account.balance = 0
-        
-        // Deduct remaining loss from credit
-        if (account.credit > 0) {
-          account.credit = Math.max(0, (account.credit || 0) - remainingLoss)
-        }
-      }
-    }
-    
-    await account.save()
+    await this.applyPnlToAccount(trade.tradingAccountId, realizedPnl)
 
     // Log admin action if applicable
     if (adminId) {
@@ -672,13 +720,20 @@ class TradeEngine {
         }
       }
 
-      // Recalculate final balance after all trades closed
-      const finalAccount = await TradingAccount.findById(tradingAccountId)
-      
-      // If equity was zero or negative, set balance to 0
-      if (summary.equity <= 0) {
-        finalAccount.balance = 0
-        await finalAccount.save()
+      // Recalculate final balance after all trades closed. Read it back fresh —
+      // applyPnlToAccount has just written to it from each close.
+      let finalAccount = await TradingAccount.findById(tradingAccountId)
+
+      // If equity was zero or negative, floor the balance at 0. Whatever is being
+      // zeroed out here is a real loss the account could not cover, so it is audited
+      // rather than quietly discarded.
+      if (summary.equity <= 0 && finalAccount && finalAccount.balance > 0) {
+        const writeOff = finalAccount.balance
+        await TradingAccount.updateOne(
+          { _id: tradingAccountId },
+          { $set: { balance: 0 }, $inc: { unrecoveredLoss: writeOff } }
+        )
+        finalAccount = await TradingAccount.findById(tradingAccountId)
       }
 
       return { 
@@ -705,8 +760,16 @@ class TradeEngine {
 
   // Check SL/TP for all open trades (non-challenge only)
   async checkSlTpForAllTrades(currentPrices) {
-    // Only check non-challenge trades (challenge trades are handled by propTradingEngine)
-    const openTrades = await Trade.find({ status: 'OPEN', isChallengeAccount: { $ne: true } })
+    // Only check non-challenge trades (challenge trades are handled by propTradingEngine).
+    // Copy trades are excluded too: they carry the master's SL/TP verbatim, so letting
+    // them trigger independently would close a follower at its own price while the
+    // master stays open — the two P&Ls then diverge. Followers close via
+    // closeFollowerTrades() at the master's close price instead.
+    const openTrades = await Trade.find({
+      status: 'OPEN',
+      isChallengeAccount: { $ne: true },
+      isCopyTrade: { $ne: true }
+    })
     const triggeredTrades = []
 
     if (openTrades.length > 0) {

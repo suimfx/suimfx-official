@@ -271,16 +271,17 @@ router.put('/edit/:tradeId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANA
         trade.closedAt = new Date()
         
         // Update account balance with P&L - handle both account types
-        let account = null
         if (trade.accountType === 'ChallengeAccount' || trade.isChallengeAccount) {
-          account = await ChallengeAccount.findById(trade.tradingAccountId)
+          const account = await ChallengeAccount.findById(trade.tradingAccountId)
+          if (account) {
+            account.balance += trade.realizedPnl
+            if (account.balance < 0) account.balance = 0
+            await account.save()
+          }
         } else {
-          account = await TradingAccount.findById(trade.tradingAccountId)
-        }
-        if (account) {
-          account.balance += trade.realizedPnl
-          if (account.balance < 0) account.balance = 0
-          await account.save()
+          // Atomic + audited: same path a normal close uses, so an admin close
+          // cannot lose a concurrent update or silently truncate an uncovered loss.
+          await tradeEngine.applyPnlToAccount(trade.tradingAccountId, trade.realizedPnl)
         }
       }
     } else if (realizedPnl !== undefined && realizedPnl !== null) {
@@ -290,16 +291,16 @@ router.put('/edit/:tradeId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANA
       
       // Adjust account balance if trade is closed - handle both account types
       if (trade.status === 'CLOSED') {
-        let account = null
         if (trade.accountType === 'ChallengeAccount' || trade.isChallengeAccount) {
-          account = await ChallengeAccount.findById(trade.tradingAccountId)
+          const account = await ChallengeAccount.findById(trade.tradingAccountId)
+          if (account) {
+            account.balance = account.balance - oldPnl + realizedPnl
+            if (account.balance < 0) account.balance = 0
+            await account.save()
+          }
         } else {
-          account = await TradingAccount.findById(trade.tradingAccountId)
-        }
-        if (account) {
-          account.balance = account.balance - oldPnl + realizedPnl
-          if (account.balance < 0) account.balance = 0
-          await account.save()
+          // Apply only the delta — the old P&L is already reflected in the balance.
+          await tradeEngine.applyPnlToAccount(trade.tradingAccountId, realizedPnl - oldPnl)
         }
       }
     }
@@ -374,17 +375,15 @@ router.post('/close/:tradeId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.CL
     await trade.save()
 
     // Update account balance - handle both TradingAccount and ChallengeAccount
-    let account = null
     if (trade.accountType === 'ChallengeAccount' || trade.isChallengeAccount) {
-      account = await ChallengeAccount.findById(trade.tradingAccountId)
+      const account = await ChallengeAccount.findById(trade.tradingAccountId)
+      if (account) {
+        account.balance += realizedPnl
+        if (account.balance < 0) account.balance = 0
+        await account.save()
+      }
     } else {
-      account = await TradingAccount.findById(trade.tradingAccountId)
-    }
-    
-    if (account) {
-      account.balance += realizedPnl
-      if (account.balance < 0) account.balance = 0
-      await account.save()
+      await tradeEngine.applyPnlToAccount(trade.tradingAccountId, realizedPnl)
     }
 
     // Check if this is a master trader's trade and close follower trades

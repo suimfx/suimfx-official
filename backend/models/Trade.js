@@ -152,6 +152,21 @@ const tradeSchema = new mongoose.Schema({
     default: null
   },
 
+  // Copy trading. A follower trade mirrors its master exactly: it opens at the
+  // master's fill price and must close at the master's close price. The background
+  // SL/TP sweep therefore skips these — letting a follower hit the copied SL/TP on
+  // its own would close it at a different price than the master and make the two
+  // P&Ls diverge.
+  isCopyTrade: {
+    type: Boolean,
+    default: false
+  },
+  copyMasterTradeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Trade',
+    default: null
+  },
+
   // Book Management + Corecen LP
   bookType: {
     type: String,

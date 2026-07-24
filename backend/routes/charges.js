@@ -3,6 +3,7 @@ import Charges from '../models/Charges.js'
 import AccountType from '../models/AccountType.js'
 import Admin from '../models/Admin.js'
 import { verifyAdminToken } from '../middleware/rbac.js'
+import { refreshSpreadConfig } from '../services/spreadService.js'
 
 const router = express.Router()
 
@@ -22,13 +23,19 @@ router.get('/spreads', async (req, res) => {
     }
 
     // Filter by adminId: use tenant-specific charges + fallback to legacy global (adminId null/missing)
+    // An explicit zero (spreadOverride) must be returned too — otherwise the UI
+    // drops it and falls back to showing the SEGMENT/GLOBAL spread the admin cleared.
     let spreadQuery = {
       isActive: true,
-      spreadValue: { $gt: 0 },
-      $or: [
-        ...(effectiveAdminId ? [{ adminId: effectiveAdminId }] : []),
-        { adminId: null },
-        { adminId: { $exists: false } }
+      $and: [
+        { $or: [{ spreadValue: { $gt: 0 } }, { spreadOverride: true }] },
+        {
+          $or: [
+            ...(effectiveAdminId ? [{ adminId: effectiveAdminId }] : []),
+            { adminId: null },
+            { adminId: { $exists: false } }
+          ]
+        }
       ]
     }
     
@@ -144,6 +151,7 @@ router.post('/', verifyAdminToken, async (req, res) => {
       accountTypeId,
       spreadType,
       spreadValue,
+      spreadOverride,
       commissionType,
       commissionValue,
       commissionOnBuy,
@@ -165,6 +173,13 @@ router.post('/', verifyAdminToken, async (req, res) => {
       ? !!commissionOverride
       : (commissionValue !== undefined && parsedCommissionValue === 0 && ['USER', 'INSTRUMENT'].includes(level))
 
+    // Same rule for spread: an explicit 0 on a specific level means "no spread here",
+    // not "inherit from GLOBAL/SEGMENT".
+    const parsedSpreadValue = spreadValue !== undefined ? Number(spreadValue) : 0
+    const effectiveSpreadOverride = spreadOverride !== undefined
+      ? !!spreadOverride
+      : (spreadValue !== undefined && parsedSpreadValue === 0 && ['USER', 'INSTRUMENT', 'SEGMENT', 'ACCOUNT_TYPE'].includes(level))
+
     const charge = await Charges.create({
       level,
       userId: userId || null,
@@ -173,7 +188,8 @@ router.post('/', verifyAdminToken, async (req, res) => {
       accountTypeId: accountTypeId || null,
       adminId: req.admin._id,
       spreadType: spreadType || 'FIXED',
-      spreadValue: spreadValue || 0,
+      spreadValue: parsedSpreadValue,
+      spreadOverride: effectiveSpreadOverride,
       commissionType: commissionType || 'PER_LOT',
       commissionValue: parsedCommissionValue,
       commissionOnBuy: commissionOnBuy !== false,
@@ -195,6 +211,10 @@ router.post('/', verifyAdminToken, async (req, res) => {
       console.log(`Synced spread ${spreadValue} and commission ${commissionValue || 0} to AccountType ${accountTypeId}`)
     }
 
+    // Drop the live-quote spread cache so the new config applies immediately
+    // instead of after the 30s refresh window.
+    refreshSpreadConfig().catch(() => {})
+
     res.json({ success: true, message: 'Charge created', charge })
   } catch (error) {
     console.error('Error creating charge:', error)
@@ -213,6 +233,7 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
       accountTypeId,
       spreadType,
       spreadValue,
+      spreadOverride,
       commissionType,
       commissionValue,
       commissionOnBuy,
@@ -239,7 +260,19 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
     if (segment !== undefined) charge.segment = segment || null
     if (accountTypeId !== undefined) charge.accountTypeId = accountTypeId || null
     if (spreadType !== undefined) charge.spreadType = spreadType
-    if (spreadValue !== undefined) charge.spreadValue = spreadValue
+    if (spreadValue !== undefined) {
+      charge.spreadValue = Number(spreadValue)
+      // Mirror the commission rule: setting 0 on a specific level means "no spread
+      // here", so mark it as an explicit override rather than letting the merge
+      // treat it as unset and inherit the old GLOBAL/SEGMENT value.
+      if (spreadOverride !== undefined) {
+        charge.spreadOverride = !!spreadOverride
+      } else if (Number(spreadValue) === 0 && ['USER', 'INSTRUMENT', 'SEGMENT', 'ACCOUNT_TYPE'].includes(charge.level)) {
+        charge.spreadOverride = true
+      } else if (Number(spreadValue) > 0) {
+        charge.spreadOverride = false
+      }
+    }
     if (commissionType !== undefined) charge.commissionType = commissionType
     if (commissionValue !== undefined) {
       charge.commissionValue = Number(commissionValue)
@@ -262,17 +295,21 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
 
     await charge.save()
 
-    // Sync spread to AccountType if this is an ACCOUNT_TYPE level charge
+    // Sync spread to AccountType if this is an ACCOUNT_TYPE level charge.
+    // A cleared (0) spread must sync too, otherwise AccountType.minSpread keeps
+    // displaying the stale value the admin just removed.
     if (charge.level === 'ACCOUNT_TYPE' && charge.accountTypeId) {
       const updateData = {}
-      if (charge.spreadValue > 0) updateData.minSpread = charge.spreadValue
-      if (charge.commissionValue > 0) updateData.commission = charge.commissionValue
-      
+      if (charge.spreadValue > 0 || charge.spreadOverride) updateData.minSpread = charge.spreadValue
+      if (charge.commissionValue > 0 || charge.commissionOverride) updateData.commission = charge.commissionValue
+
       if (Object.keys(updateData).length > 0) {
         await AccountType.findByIdAndUpdate(charge.accountTypeId, updateData)
         console.log(`Synced spread/commission to AccountType ${charge.accountTypeId}:`, updateData)
       }
     }
+
+    refreshSpreadConfig().catch(() => {})
 
     res.json({ success: true, message: 'Charge updated', charge })
   } catch (error) {
@@ -293,6 +330,7 @@ router.delete('/:id', verifyAdminToken, async (req, res) => {
     }
 
     await Charges.findByIdAndDelete(req.params.id)
+    refreshSpreadConfig().catch(() => {})
     res.json({ success: true, message: 'Charge deleted' })
   } catch (error) {
     console.error('Error deleting charge:', error)
