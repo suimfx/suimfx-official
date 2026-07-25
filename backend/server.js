@@ -377,6 +377,19 @@ mongoose.connect(process.env.MONGODB_URI)
     } catch (e) {
       console.warn('[MongoDB] IBSettings.syncIndexes:', e.message)
     }
+    // Sync AccountType indexes. Older builds shipped a GLOBAL unique index on
+    // `name`, so once one admin created a "Standard"/"Demo"/etc. type, every
+    // other admin's attempt to create a same-named type failed with a duplicate-
+    // key error surfaced only as "Error creating account type". The schema now
+    // declares no such index, so syncIndexes drops the stray unique index and
+    // account-type names become per-admin again. (Dropping an index never fails
+    // on existing duplicates — only building a unique one would.)
+    try {
+      const AccountTypeModel = (await import('./models/AccountType.js')).default
+      await AccountTypeModel.syncIndexes()
+    } catch (e) {
+      console.warn('[MongoDB] AccountType.syncIndexes:', e.message)
+    }
     // One-time migration: backfill accountTypeName for existing trading accounts
     try {
       const TradingAccount = (await import('./models/TradingAccount.js')).default
