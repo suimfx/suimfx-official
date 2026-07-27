@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
-import { login } from '../api/auth'
+import { login, verify2faLogin } from '../api/auth'
 import { API_BASE_URL } from '../config/api'
 import suimfxLogo from '../assets/suimfxLogo.png'
 import { useBranding } from '../context/BrandingContext'
@@ -19,6 +19,9 @@ const Login = () => {
   })
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  // Login two-factor (email OTP) — set when the broker requires it
+  const [twoFactorEmail, setTwoFactorEmail] = useState('')
+  const [otpCode, setOtpCode] = useState('')
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -89,22 +92,42 @@ const Login = () => {
     try {
       const adminSlug = localStorage.getItem('adminSlug') || undefined
       const response = await login({ ...formData, adminSlug })
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('user', JSON.stringify(response.user))
-      // Store admin branding for sidebar logo
-      if (response.user.adminBranding && response.user.adminBranding.logo) {
-        localStorage.setItem('adminLogoUrl', `${API_BASE_URL}${response.user.adminBranding.logo}`)
-        localStorage.setItem('adminBrandName', response.user.adminBranding.brandName || '')
+      // Broker requires email 2FA — switch to the OTP step instead of logging in.
+      if (response.twoFactorRequired) {
+        setTwoFactorEmail(response.email || formData.email)
+        setOtpCode('')
+        setLoading(false)
+        return
       }
-      await refreshBranding()
-      if (isMobile) {
-        navigate('/mobile')
-      } else {
-        navigate('/dashboard')
-      }
+      await completeLogin(response)
     } catch (err) {
       setError(err.message)
     } finally {
+      setLoading(false)
+    }
+  }
+
+  // Shared post-login: store session + branding, then route in.
+  const completeLogin = async (response) => {
+    localStorage.setItem('token', response.token)
+    localStorage.setItem('user', JSON.stringify(response.user))
+    if (response.user.adminBranding && response.user.adminBranding.logo) {
+      localStorage.setItem('adminLogoUrl', `${API_BASE_URL}${response.user.adminBranding.logo}`)
+      localStorage.setItem('adminBrandName', response.user.adminBranding.brandName || '')
+    }
+    await refreshBranding()
+    navigate(isMobile ? '/mobile' : '/dashboard')
+  }
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      const response = await verify2faLogin(twoFactorEmail, otpCode.trim())
+      await completeLogin(response)
+    } catch (err) {
+      setError(err.message)
       setLoading(false)
     }
   }
@@ -135,6 +158,45 @@ const Login = () => {
             <p className="text-slate-400">Sign in to continue trading</p>
           </div>
 
+          {/* Two-factor OTP step (shown when the broker requires email 2FA) */}
+          {twoFactorEmail ? (
+            <form onSubmit={handleVerifyOtp} className="space-y-5">
+              <div className="text-center text-slate-400 text-sm">
+                We sent a 6-digit code to<br /><span className="text-white font-medium">{twoFactorEmail}</span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Enter code</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoFocus
+                  maxLength={6}
+                  placeholder="______"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3.5 text-white text-center text-2xl tracking-[0.5em] placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                />
+              </div>
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>
+              )}
+              <button
+                type="submit"
+                disabled={loading || otpCode.length < 4}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium py-3.5 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? 'Verifying...' : 'Verify & Sign In'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTwoFactorEmail(''); setOtpCode(''); setError('') }}
+                className="w-full text-sm text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                ← Back to login
+              </button>
+            </form>
+          ) : (
+          <>
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
@@ -217,6 +279,8 @@ const Login = () => {
           >
             Create an Account
           </Link>
+          </>
+          )}
 
           {/* PWA install — only renders when the browser supports it and app is not installed */}
           <div className="mt-4">

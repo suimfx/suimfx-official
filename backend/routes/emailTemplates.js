@@ -2,8 +2,18 @@ import express from 'express'
 import EmailTemplate from '../models/EmailTemplate.js'
 import EmailSettings from '../models/EmailSettings.js'
 import { testSMTPConnection } from '../services/emailService.js'
+import { verifyAdminToken } from '../middleware/rbac.js'
 
 const router = express.Router()
+
+// Email settings are per-tenant: a white-label ADMIN (e.g. FXCRESTAA) edits its
+// OWN row; the SUPER_ADMIN edits the global (adminId null) row used as fallback.
+const scopeAdminId = (req) => (req.userType === 'SUPER_ADMIN' ? null : (req.admin?._id || null))
+const findScopedSettings = async (adminId) => {
+  return adminId
+    ? await EmailSettings.findOne({ adminId })
+    : await EmailSettings.findOne({ $or: [{ adminId: null }, { adminId: { $exists: false } }] })
+}
 
 // Default email templates
 const defaultTemplates = [
@@ -714,12 +724,13 @@ router.post('/seed', async (req, res) => {
   }
 })
 
-// GET /api/email-templates/settings/smtp - Get email settings
-router.get('/settings/smtp', async (req, res) => {
+// GET /api/email-templates/settings/smtp - Get email settings (per-tenant)
+router.get('/settings/smtp', verifyAdminToken, async (req, res) => {
   try {
-    let settings = await EmailSettings.findOne()
+    const adminId = scopeAdminId(req)
+    let settings = await findScopedSettings(adminId)
     if (!settings) {
-      settings = await EmailSettings.create({})
+      settings = await EmailSettings.create({ adminId })
     }
     // Don't send password in response
     const safeSettings = {
@@ -732,16 +743,17 @@ router.get('/settings/smtp', async (req, res) => {
   }
 })
 
-// PUT /api/email-templates/settings/smtp - Update email settings
-router.put('/settings/smtp', async (req, res) => {
+// PUT /api/email-templates/settings/smtp - Update email settings (per-tenant)
+router.put('/settings/smtp', verifyAdminToken, async (req, res) => {
   try {
-    const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, fromEmail, fromName, otpVerificationEnabled, otpExpiryMinutes } = req.body
-    
-    let settings = await EmailSettings.findOne()
+    const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, fromEmail, fromName, otpVerificationEnabled, loginOtpEnabled, otpExpiryMinutes } = req.body
+
+    const adminId = scopeAdminId(req)
+    let settings = await findScopedSettings(adminId)
     if (!settings) {
-      settings = new EmailSettings()
+      settings = new EmailSettings({ adminId })
     }
-    
+
     settings.smtpHost = smtpHost
     settings.smtpPort = smtpPort
     settings.smtpUser = smtpUser
@@ -754,10 +766,13 @@ router.put('/settings/smtp', async (req, res) => {
     if (otpVerificationEnabled !== undefined) {
       settings.otpVerificationEnabled = otpVerificationEnabled
     }
+    if (loginOtpEnabled !== undefined) {
+      settings.loginOtpEnabled = loginOtpEnabled
+    }
     if (otpExpiryMinutes !== undefined) {
       settings.otpExpiryMinutes = otpExpiryMinutes
     }
-    
+
     await settings.save()
     res.json({ success: true, message: 'Email settings updated successfully' })
   } catch (error) {
@@ -765,17 +780,18 @@ router.put('/settings/smtp', async (req, res) => {
   }
 })
 
-// PUT /api/email-templates/settings/toggle-smtp - Toggle SMTP on/off
-router.put('/settings/toggle-smtp', async (req, res) => {
+// PUT /api/email-templates/settings/toggle-smtp - Toggle SMTP on/off (per-tenant)
+router.put('/settings/toggle-smtp', verifyAdminToken, async (req, res) => {
   try {
-    let settings = await EmailSettings.findOne()
+    const adminId = scopeAdminId(req)
+    let settings = await findScopedSettings(adminId)
     if (!settings) {
-      settings = new EmailSettings()
+      settings = new EmailSettings({ adminId })
     }
     settings.smtpEnabled = !settings.smtpEnabled
     await settings.save()
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       smtpEnabled: settings.smtpEnabled,
       message: settings.smtpEnabled ? 'SMTP enabled' : 'SMTP disabled'
     })
@@ -784,25 +800,25 @@ router.put('/settings/toggle-smtp', async (req, res) => {
   }
 })
 
-// POST /api/email-templates/settings/test - Test SMTP connection
-router.post('/settings/test', async (req, res) => {
+// POST /api/email-templates/settings/test - Test SMTP connection (per-tenant)
+router.post('/settings/test', verifyAdminToken, async (req, res) => {
   try {
-    const result = await testSMTPConnection()
+    const result = await testSMTPConnection(scopeAdminId(req))
     res.json(result)
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
 })
 
-// POST /api/email-templates/settings/send-test - Send a test email
-router.post('/settings/send-test', async (req, res) => {
+// POST /api/email-templates/settings/send-test - Send a test email (per-tenant)
+router.post('/settings/send-test', verifyAdminToken, async (req, res) => {
   try {
     const { toEmail } = req.body
     if (!toEmail) {
       return res.status(400).json({ success: false, message: 'Email address is required' })
     }
 
-    const settings = await EmailSettings.findOne()
+    const settings = await findScopedSettings(scopeAdminId(req))
     if (!settings || !settings.smtpHost) {
       return res.status(400).json({ success: false, message: 'SMTP settings not configured' })
     }
