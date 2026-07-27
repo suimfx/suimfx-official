@@ -48,7 +48,9 @@ router.post('/send-otp', async (req, res) => {
     }
 
     // Resolve the tenant so signup OTP respects that broker's own email settings.
-    const adminId = await resolveSignupAdminId(adminSlug, referralCode)
+    // Fall back to the custom-domain tenant (set by the hostname middleware) so a
+    // signup on e.g. fxcrestaa.com resolves even without an explicit slug in the body.
+    const adminId = (await resolveSignupAdminId(adminSlug, referralCode)) || req.tenantAdmin?._id || null
 
     // Check if OTP verification is enabled (per-tenant, global fallback)
     const otpEnabled = await isOTPEnabled(adminId)
@@ -153,8 +155,9 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' })
     }
 
-    // Check if OTP verification is required (per-tenant, resolved from slug/referral)
-    const signupAdminId = await resolveSignupAdminId(adminSlug, referralCode)
+    // Check if OTP verification is required (per-tenant, resolved from slug/referral,
+    // falling back to the custom-domain tenant).
+    const signupAdminId = (await resolveSignupAdminId(adminSlug, referralCode)) || req.tenantAdmin?._id || null
     const otpEnabled = await isOTPEnabled(signupAdminId)
     if (otpEnabled) {
       // Verify OTP was completed

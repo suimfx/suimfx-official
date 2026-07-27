@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import EmailSettings from '../models/EmailSettings.js'
 import EmailTemplate from '../models/EmailTemplate.js'
+import User from '../models/User.js'
 
 // Effective settings for a tenant (own row → global fallback). adminId null = global.
 const resolveSettings = async (adminId = null) => {
@@ -42,7 +43,18 @@ const replaceVariables = (content, variables) => {
 // unaffected. Pass a user's assignedAdmin to send from their broker's own email.
 export const sendTemplateEmail = async (templateSlug, toEmail, variables = {}, adminId = null) => {
   try {
-    const settings = await resolveSettings(adminId)
+    // If the caller didn't specify a tenant, resolve it from the recipient's own
+    // broker (assignedAdmin). This makes EVERY notification (KYC, deposit,
+    // withdrawal, challenge, …) send from that user's broker mailbox automatically,
+    // without changing each caller — with a global fallback for platform users.
+    let effectiveAdminId = adminId
+    if (!effectiveAdminId && toEmail) {
+      try {
+        const recipient = await User.findOne({ email: toEmail }).select('assignedAdmin').lean()
+        if (recipient?.assignedAdmin) effectiveAdminId = recipient.assignedAdmin
+      } catch (_) { /* fall back to global */ }
+    }
+    const settings = await resolveSettings(effectiveAdminId)
 
     // Check if SMTP is enabled
     if (!settings || !settings.smtpEnabled) {
