@@ -24,6 +24,9 @@ const BrandedSignup = () => {
     password: '',
     confirmPassword: ''
   })
+  // Signup email OTP (per-tenant; only shown when this broker requires it)
+  const [otpStep, setOtpStep] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
 
   useEffect(() => {
     fetchBrandInfo()
@@ -83,6 +86,33 @@ const BrandedSignup = () => {
     setError('')
   }
 
+  // The actual account creation (shared by the OTP and no-OTP paths).
+  const doSignup = async (otpVerified) => {
+    const response = await fetch(`${API_URL}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        adminSlug: slug,
+        adminId: brandInfo?.adminId,
+        referralCode: referralCode || undefined,
+        otpVerified
+      })
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Signup failed')
+    }
+    localStorage.setItem('token', data.token)
+    localStorage.setItem('user', JSON.stringify(data.user))
+    await refreshBranding()
+    navigate('/dashboard')
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -95,33 +125,52 @@ const BrandedSignup = () => {
     }
 
     try {
-      const response = await fetch(`${API_URL}/auth/signup`, {
+      // Ask backend whether this broker requires signup email OTP.
+      const otpRes = await fetch(`${API_URL}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
           email: formData.email,
-          phone: formData.phone,
-          password: formData.password,
+          firstName: formData.firstName,
           adminSlug: slug,
-          adminId: brandInfo?.adminId,
           referralCode: referralCode || undefined
         })
       })
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Signup failed')
+      const otpData = await otpRes.json()
+      if (!otpRes.ok) {
+        throw new Error(otpData.message || 'Could not start signup')
       }
-
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      await refreshBranding()
-      navigate('/dashboard')
+      if (otpData.otpRequired) {
+        // Show the code entry step; account is created after verification.
+        setOtpStep(true)
+        setLoading(false)
+        return
+      }
+      // No OTP for this broker → create the account directly.
+      await doSignup(false)
     } catch (err) {
       setError(err.message)
-    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyAndSignup = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      const vRes = await fetch(`${API_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, otp: otpCode.trim() })
+      })
+      const vData = await vRes.json()
+      if (!vData.success) {
+        throw new Error(vData.message || 'Invalid code')
+      }
+      await doSignup(true)
+    } catch (err) {
+      setError(err.message)
       setLoading(false)
     }
   }
@@ -185,8 +234,40 @@ const BrandedSignup = () => {
           </Link>
         </div>
 
-        <h1 className="text-2xl font-semibold text-white mb-6">Create account</h1>
+        <h1 className="text-2xl font-semibold text-white mb-6">{otpStep ? 'Verify your email' : 'Create account'}</h1>
 
+        {otpStep ? (
+          <form onSubmit={handleVerifyAndSignup} className="space-y-4">
+            <p className="text-gray-400 text-sm text-center">
+              Enter the code we sent to<br /><span className="text-white">{formData.email}</span>
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoFocus
+              maxLength={6}
+              placeholder="______"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+              className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-[0.5em] placeholder-gray-600 focus:outline-none focus:border-white"
+            />
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || otpCode.length < 4}
+              className="w-full bg-white text-black font-medium py-3 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Verifying...' : 'Verify & Create account'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOtpStep(false); setOtpCode(''); setError('') }}
+              className="w-full text-gray-400 text-sm hover:text-white transition-colors"
+            >
+              ← Back
+            </button>
+          </form>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
@@ -284,6 +365,7 @@ const BrandedSignup = () => {
             {loading ? 'Creating account...' : 'Sign up'}
           </button>
         </form>
+        )}
 
         <p className="text-center text-gray-500 text-sm mt-6">
           Already have an account?{' '}
