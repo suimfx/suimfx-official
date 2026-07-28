@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer'
 import EmailSettings from '../models/EmailSettings.js'
 import EmailTemplate from '../models/EmailTemplate.js'
 import User from '../models/User.js'
+import Admin from '../models/Admin.js'
 
 // Effective settings for a tenant (own row → global fallback). adminId null = global.
 const resolveSettings = async (adminId = null) => {
@@ -55,6 +56,23 @@ export const sendTemplateEmail = async (templateSlug, toEmail, variables = {}, a
       } catch (_) { /* fall back to global */ }
     }
     const settings = await resolveSettings(effectiveAdminId)
+
+    // Brand the email body for the recipient's broker. Every caller passes
+    // `platformName: settings?.platformName || 'Suimfx'`, but EmailSettings has no
+    // `platformName` field, so it always fell back to the hardcoded 'Suimfx' — even
+    // for tenant users. Override platformName/supportEmail from the resolved tenant
+    // so {{platformName}} in the templates shows that admin's brand. Global users
+    // keep whatever the caller passed.
+    if (effectiveAdminId) {
+      try {
+        const brandAdmin = await Admin.findById(effectiveAdminId).select('brandName').lean()
+        const brand = brandAdmin?.brandName || settings?.fromName
+        const override = {}
+        if (brand) override.platformName = brand
+        if (settings?.fromEmail) override.supportEmail = settings.fromEmail
+        variables = { ...variables, ...override }
+      } catch (_) { /* keep caller-provided values */ }
+    }
 
     // Check if SMTP is enabled
     if (!settings || !settings.smtpEnabled) {
