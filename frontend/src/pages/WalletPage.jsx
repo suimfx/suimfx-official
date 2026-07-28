@@ -52,6 +52,9 @@ const WalletPage = () => {
   const [loading, setLoading] = useState(true)
   const [showDepositModal, setShowDepositModal] = useState(false)
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
+  // Withdrawal 2FA (email OTP) — set when the broker requires it
+  const [withdrawOtpStep, setWithdrawOtpStep] = useState(false)
+  const [withdrawOtp, setWithdrawOtp] = useState('')
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null)
   const [amount, setAmount] = useState('')
   const [transactionRef, setTransactionRef] = useState('')
@@ -537,6 +540,7 @@ const WalletPage = () => {
         body: JSON.stringify({
           userId: user._id,
           amount: parseFloat(amount),
+          otp: withdrawOtp || undefined,
           paymentMethod:
             selectedBankAccount.type === 'UPI' ? 'UPI' :
             selectedBankAccount.type === 'Crypto' ? 'Manual Crypto' :
@@ -561,10 +565,19 @@ const WalletPage = () => {
         })
       })
       const data = await res.json()
-      
+
+      // Broker requires withdrawal 2FA — show the OTP step and wait for the code.
+      if (res.ok && data.otpRequired) {
+        setWithdrawOtpStep(true)
+        setError('')
+        return
+      }
+
       if (res.ok) {
         setSuccess('Withdrawal request submitted successfully!')
         setShowWithdrawModal(false)
+        setWithdrawOtpStep(false)
+        setWithdrawOtp('')
         setAmount('')
         setSelectedBankAccount(null)
         fetchWallet()
@@ -1274,6 +1287,8 @@ const WalletPage = () => {
                   setShowWithdrawModal(false)
                   setAmount('')
                   setSelectedBankAccount(null)
+                  setWithdrawOtpStep(false)
+                  setWithdrawOtp('')
                   setError('')
                 }}
                 className={isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
@@ -1352,6 +1367,22 @@ const WalletPage = () => {
               )}
             </div>
 
+            {withdrawOtpStep && (
+              <div className="mb-4">
+                <label className="block text-gray-400 text-sm mb-2">Verification code (sent to your email)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={withdrawOtp}
+                  onChange={(e) => setWithdrawOtp(e.target.value.replace(/\D/g, ''))}
+                  placeholder="______"
+                  className={`w-full rounded-lg px-4 py-3 text-center text-xl tracking-[0.4em] placeholder-gray-600 focus:outline-none focus:border-accent-green border ${isDarkMode ? 'bg-dark-700 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
+                />
+                <p className="text-gray-500 text-xs mt-1">Enter the code emailed to you to confirm this withdrawal.</p>
+              </div>
+            )}
+
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
             <div className="flex gap-3">
@@ -1360,6 +1391,8 @@ const WalletPage = () => {
                   setShowWithdrawModal(false)
                   setAmount('')
                   setSelectedBankAccount(null)
+                  setWithdrawOtpStep(false)
+                  setWithdrawOtp('')
                   setError('')
                 }}
                 className="flex-1 bg-dark-700 text-white py-3 rounded-lg hover:bg-dark-600 transition-colors"
@@ -1368,9 +1401,10 @@ const WalletPage = () => {
               </button>
               <button
                 onClick={handleWithdraw}
-                className="flex-1 bg-accent-green text-black font-medium py-3 rounded-lg hover:bg-accent-green/90 transition-colors"
+                disabled={withdrawOtpStep && withdrawOtp.length < 4}
+                className="flex-1 bg-accent-green text-black font-medium py-3 rounded-lg hover:bg-accent-green/90 transition-colors disabled:opacity-50"
               >
-                Submit Withdrawal
+                {withdrawOtpStep ? 'Verify & Withdraw' : 'Submit Withdrawal'}
               </button>
             </div>
           </div>

@@ -47,9 +47,15 @@ const emailSettingsSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  // Login two-factor: email an OTP on sign-in before issuing the token.
-  // Separate flag so enabling login 2FA does not change signup behaviour.
+  // Login two-factor (deprecated / unused — 2FA moved to withdrawals). Kept so
+  // existing rows don't error; no code path reads it anymore.
   loginOtpEnabled: {
+    type: Boolean,
+    default: false
+  },
+  // Withdrawal two-factor: email an OTP when a user requests a withdrawal, and
+  // require it before the request is submitted.
+  withdrawalOtpEnabled: {
     type: Boolean,
     default: false
   },

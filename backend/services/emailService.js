@@ -133,11 +133,11 @@ export const isOTPEnabled = async (adminId = null) => {
   return settings.smtpEnabled && settings.otpVerificationEnabled
 }
 
-// Login two-factor (email OTP) enabled for this tenant (SMTP + loginOtpEnabled).
-export const isLoginOtpEnabled = async (adminId = null) => {
+// Withdrawal two-factor (email OTP) enabled for this tenant (SMTP + withdrawalOtpEnabled).
+export const isWithdrawalOtpEnabled = async (adminId = null) => {
   const settings = await resolveSettings(adminId)
   if (!settings) return false
-  return settings.smtpEnabled && settings.loginOtpEnabled
+  return settings.smtpEnabled && settings.withdrawalOtpEnabled
 }
 
 // Get OTP expiry in minutes for a tenant (falls back to 10).
@@ -164,7 +164,7 @@ export default {
   sendTemplateEmail,
   generateOTP,
   isOTPEnabled,
-  isLoginOtpEnabled,
+  isWithdrawalOtpEnabled,
   getOTPExpiry,
   testSMTPConnection
 }

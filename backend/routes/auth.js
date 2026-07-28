@@ -4,7 +4,7 @@ import User from '../models/User.js'
 import Admin from '../models/Admin.js'
 import OTP from '../models/OTP.js'
 import EmailSettings from '../models/EmailSettings.js'
-import { sendTemplateEmail, generateOTP, isOTPEnabled, isLoginOtpEnabled, getOTPExpiry } from '../services/emailService.js'
+import { sendTemplateEmail, generateOTP, isOTPEnabled, getOTPExpiry } from '../services/emailService.js'
 
 const router = express.Router()
 
@@ -309,47 +309,6 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' })
     }
 
-    // ── Login two-factor (per-tenant, gated) ────────────────────────────────
-    // Only kicks in for users whose broker (assignedAdmin) has login OTP enabled
-    // — e.g. FXCRESTAA. Everyone else logs in exactly as before. This route is
-    // the USER login only (admins/employees use separate routes), so 2FA here
-    // never affects staff. Fails closed: if the OTP email can't be sent we do
-    // NOT issue a token — the admin can disable the toggle to recover, and
-    // admin logins are unaffected.
-    if (await isLoginOtpEnabled(user.assignedAdmin || null)) {
-      const otp = generateOTP()
-      const expiryMinutes = await getOTPExpiry(user.assignedAdmin || null)
-      await OTP.deleteMany({ email: user.email, purpose: 'login' })
-      await OTP.create({
-        email: user.email,
-        otp,
-        purpose: 'login',
-        expiresAt: new Date(Date.now() + expiryMinutes * 60 * 1000)
-      })
-      const settings = await EmailSettings.getForAdmin(user.assignedAdmin || null)
-      const sent = await sendTemplateEmail('email_verification', user.email, {
-        otp,
-        firstName: user.firstName || 'User',
-        email: user.email,
-        expiryMinutes: expiryMinutes.toString(),
-        platformName: settings?.fromName || 'Trading Platform',
-        supportEmail: settings?.fromEmail || '',
-        year: new Date().getFullYear().toString()
-      }, user.assignedAdmin || null)
-
-      if (!sent.success) {
-        console.error('[2FA] login OTP email failed for', user.email, '-', sent.message)
-        return res.status(503).json({
-          message: 'Could not send your login code right now. Please try again in a moment or contact support.'
-        })
-      }
-      return res.json({
-        twoFactorRequired: true,
-        email: user.email,
-        message: 'A login code has been sent to your email.'
-      })
-    }
-
     // Generate token
     const token = generateToken(user._id)
 
@@ -387,75 +346,6 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error)
     res.status(500).json({ message: 'Error logging in', error: error.message })
-  }
-})
-
-// POST /api/auth/verify-2fa-login - Verify the login OTP and complete sign-in
-router.post('/verify-2fa-login', async (req, res) => {
-  try {
-    const { email, otp } = req.body
-    if (!email || !otp) {
-      return res.status(400).json({ message: 'Email and code are required' })
-    }
-
-    const record = await OTP.findOne({ email, purpose: 'login', otp: otp.toString().trim() })
-    if (!record) {
-      return res.status(400).json({ message: 'Invalid code. Please check and try again.' })
-    }
-    if (record.expiresAt < new Date()) {
-      await OTP.deleteOne({ _id: record._id })
-      return res.status(400).json({ message: 'Code expired. Please log in again to get a new one.' })
-    }
-    // One-time use — clear all login OTPs for this email
-    await OTP.deleteMany({ email, purpose: 'login' })
-
-    const user = await User.findOne({ email })
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
-    }
-    // Re-check account state in case it changed between password step and now
-    if (user.isBanned) {
-      return res.status(403).json({ message: 'Your account has been permanently banned. Please contact support.', reason: user.banReason || 'Account banned' })
-    }
-    if (user.isBlocked) {
-      return res.status(403).json({ message: 'Your account has been temporarily blocked. Please contact support.', reason: user.blockReason || 'Account blocked' })
-    }
-
-    const token = generateToken(user._id)
-
-    let adminBranding = null
-    if (user.assignedAdmin) {
-      const assignedAdmin = await Admin.findById(user.assignedAdmin).select('brandName logo urlSlug')
-      if (assignedAdmin) {
-        adminBranding = {
-          brandName: assignedAdmin.brandName || '',
-          logo: assignedAdmin.logo || '',
-          urlSlug: assignedAdmin.urlSlug || ''
-        }
-      }
-    }
-
-    res.json({
-      message: 'Login successful',
-      user: {
-        _id: user._id,
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phone: user.phone,
-        profileImage: user.profileImage,
-        assignedAdmin: user.assignedAdmin,
-        adminUrlSlug: user.adminUrlSlug,
-        adminBranding,
-        kycApproved: user.kycApproved,
-        createdAt: user.createdAt
-      },
-      token
-    })
-  } catch (error) {
-    console.error('2FA login verify error:', error)
-    res.status(500).json({ message: 'Error verifying code', error: error.message })
   }
 })
 

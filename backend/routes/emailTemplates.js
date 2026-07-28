@@ -746,7 +746,7 @@ router.get('/settings/smtp', verifyAdminToken, async (req, res) => {
 // PUT /api/email-templates/settings/smtp - Update email settings (per-tenant)
 router.put('/settings/smtp', verifyAdminToken, async (req, res) => {
   try {
-    const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, fromEmail, fromName, otpVerificationEnabled, loginOtpEnabled, otpExpiryMinutes } = req.body
+    const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, fromEmail, fromName, otpVerificationEnabled, withdrawalOtpEnabled, otpExpiryMinutes } = req.body
 
     const adminId = scopeAdminId(req)
     let settings = await findScopedSettings(adminId)
@@ -766,8 +766,8 @@ router.put('/settings/smtp', verifyAdminToken, async (req, res) => {
     if (otpVerificationEnabled !== undefined) {
       settings.otpVerificationEnabled = otpVerificationEnabled
     }
-    if (loginOtpEnabled !== undefined) {
-      settings.loginOtpEnabled = loginOtpEnabled
+    if (withdrawalOtpEnabled !== undefined) {
+      settings.withdrawalOtpEnabled = withdrawalOtpEnabled
     }
     if (otpExpiryMinutes !== undefined) {
       settings.otpExpiryMinutes = otpExpiryMinutes

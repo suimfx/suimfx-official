@@ -8,8 +8,9 @@ import AdminWalletTransaction from '../models/AdminWalletTransaction.js'
 import Bonus from '../models/Bonus.js'
 import UserBonus from '../models/UserBonus.js'
 import { findBonusesForUserDeposit, selectApplicableBonus } from '../utils/bonusScope.js'
-import { sendTemplateEmail } from '../services/emailService.js'
+import { sendTemplateEmail, generateOTP, getOTPExpiry, isWithdrawalOtpEnabled } from '../services/emailService.js'
 import EmailSettings from '../models/EmailSettings.js'
+import OTP from '../models/OTP.js'
 import { verifyAdminToken, requireSidebarPermission, requireEmployeePermission, PERMISSIONS } from '../middleware/rbac.js'
 import { getAdminUserIds } from '../utils/adminFilter.js'
 
@@ -126,7 +127,7 @@ router.post('/deposit', async (req, res) => {
 // POST /api/wallet/withdraw - Create withdrawal request
 router.post('/withdraw', async (req, res) => {
   try {
-    const { userId, amount, paymentMethod, bankAccountId, bankAccountDetails } = req.body
+    const { userId, amount, paymentMethod, bankAccountId, bankAccountDetails, otp } = req.body
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: 'Invalid amount' })
@@ -141,6 +142,48 @@ router.post('/withdraw', async (req, res) => {
     // Check balance
     if (wallet.balance < amount) {
       return res.status(400).json({ message: 'Insufficient balance' })
+    }
+
+    // ── Withdrawal two-factor (per-tenant, gated) ───────────────────────────
+    // If the user's broker has withdrawal 2FA on, email a one-time code first and
+    // require it before the request is created. Two calls: the first (no otp)
+    // sends the code and returns otpRequired; the second (with otp) verifies and
+    // proceeds. Fails closed on email error so a withdrawal can't skip the check.
+    const withdrawUser = await User.findById(userId)
+    if (withdrawUser && await isWithdrawalOtpEnabled(withdrawUser.assignedAdmin || null)) {
+      if (!otp) {
+        const code = generateOTP()
+        const expiryMinutes = await getOTPExpiry(withdrawUser.assignedAdmin || null)
+        await OTP.deleteMany({ email: withdrawUser.email, purpose: 'withdrawal' })
+        await OTP.create({
+          email: withdrawUser.email,
+          otp: code,
+          purpose: 'withdrawal',
+          expiresAt: new Date(Date.now() + expiryMinutes * 60 * 1000)
+        })
+        const sent = await sendTemplateEmail('email_verification', withdrawUser.email, {
+          otp: code,
+          firstName: withdrawUser.firstName || withdrawUser.email.split('@')[0],
+          email: withdrawUser.email,
+          expiryMinutes: expiryMinutes.toString(),
+          year: new Date().getFullYear().toString()
+        }, withdrawUser.assignedAdmin || null)
+        if (!sent.success) {
+          console.error('[Withdraw 2FA] OTP email failed for', withdrawUser.email, '-', sent.message)
+          return res.status(503).json({ message: 'Could not send your withdrawal code right now. Please try again shortly.' })
+        }
+        return res.json({ otpRequired: true, message: 'A verification code has been sent to your email.' })
+      }
+      // otp provided → verify
+      const rec = await OTP.findOne({ email: withdrawUser.email, purpose: 'withdrawal', otp: otp.toString().trim() })
+      if (!rec) {
+        return res.status(400).json({ message: 'Invalid code. Please check and try again.' })
+      }
+      if (rec.expiresAt < new Date()) {
+        await OTP.deleteOne({ _id: rec._id })
+        return res.status(400).json({ message: 'Code expired. Please start the withdrawal again.' })
+      }
+      await OTP.deleteMany({ email: withdrawUser.email, purpose: 'withdrawal' })
     }
 
     // Create transaction with bank account details

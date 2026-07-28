@@ -42,7 +42,7 @@ const AdminEmailTemplates = () => {
     fromEmail: '',
     fromName: 'Trading Platform',
     otpVerificationEnabled: true,
-    loginOtpEnabled: false,
+    withdrawalOtpEnabled: false,
     otpExpiryMinutes: 10
   })
   const [smtpConnected, setSmtpConnected] = useState(false)
@@ -751,14 +751,14 @@ const AdminEmailTemplates = () => {
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-white font-medium">Login Two-Factor (2FA)</p>
-                      <p className="text-gray-500 text-xs">Email a one-time code on every user sign-in</p>
+                      <p className="text-white font-medium">Withdrawal 2FA (OTP)</p>
+                      <p className="text-gray-500 text-xs">Email a one-time code when a user requests a withdrawal</p>
                     </div>
                     <button
-                      onClick={() => setSmtpSettings({ ...smtpSettings, loginOtpEnabled: !smtpSettings.loginOtpEnabled })}
-                      className={`w-12 h-6 rounded-full transition-colors ${smtpSettings.loginOtpEnabled ? 'bg-green-500' : 'bg-gray-600'}`}
+                      onClick={() => setSmtpSettings({ ...smtpSettings, withdrawalOtpEnabled: !smtpSettings.withdrawalOtpEnabled })}
+                      className={`w-12 h-6 rounded-full transition-colors ${smtpSettings.withdrawalOtpEnabled ? 'bg-green-500' : 'bg-gray-600'}`}
                     >
-                      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${smtpSettings.loginOtpEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${smtpSettings.withdrawalOtpEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
                     </button>
                   </div>
 
