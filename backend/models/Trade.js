@@ -173,6 +173,19 @@ const tradeSchema = new mongoose.Schema({
     enum: ['A', 'B'],
     default: 'B'
   },
+  // Which A-Book venue this trade actually went to. Recorded at open and read
+  // back at close/modify — the user may be re-tagged while the position is open,
+  // so the trade, not the user, decides where the close is sent.
+  aBookDestination: {
+    type: String,
+    enum: ['CORECEN', 'MT5', null],
+    default: null
+  },
+  mt5AccountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Mt5Account',
+    default: null
+  },
   aBookExecuted: {
     type: Boolean,
     default: false

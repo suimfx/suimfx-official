@@ -27,7 +27,8 @@ import {
   User,
   Bitcoin,
   BookOpen,
-  Globe2
+  Globe2,
+  Link2
 } from 'lucide-react'
 import defaultLogo from '../assets/suimfxLogo.png'
 import { API_BASE_URL } from '../config/api'
@@ -128,6 +129,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
     { name: 'User Management', icon: Users, path: '/admin/users', sidebarKey: 'userManagement' },
     { name: 'Trade Management', icon: TrendingUp, path: '/admin/trades', sidebarKey: 'tradeManagement' },
     { name: 'Book Management', icon: BookOpen, path: '/admin/book-management', sidebarKey: 'bookManagement' },
+    { name: 'MT5 Trade', icon: Link2, path: '/admin/mt5', sidebarKey: 'mt5Trade' },
     { name: 'Fund Management', icon: Wallet, path: '/admin/funds', sidebarKey: 'fundManagement' },
     { name: 'Bank Settings', icon: Building2, path: '/admin/bank-settings', sidebarKey: 'bankSettings' },
     { name: 'Manual crypto', icon: Bitcoin, path: '/admin/manual-crypto', sidebarKey: 'bankSettings' },
@@ -153,8 +155,9 @@ const AdminLayout = ({ children, title, subtitle }) => {
   const hasSidebarPermission = (sidebarKey) => {
     if (!admin) return false
     
-    // Super Admin Management is ONLY for the real Super Admin account (not platform staff)
-    if (sidebarKey === 'superAdminManagement') {
+    // Super-Admin-only sections (not platform staff). MT5 Trade sits here because
+    // the MetaApi token and the cross-tenant A-Book user list are platform-level.
+    if (sidebarKey === 'superAdminManagement' || sidebarKey === 'mt5Trade') {
       const isRealSuperAdmin =
         admin.sessionKind === 'super_admin' ||
         (admin.role === 'SUPER_ADMIN' && !admin.permissions && admin.sessionKind !== 'employee')

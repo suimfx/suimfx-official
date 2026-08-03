@@ -6,6 +6,7 @@ import TradeSettings from '../models/TradeSettings.js'
 import AdminLog from '../models/AdminLog.js'
 import ibEngine from './ibEngineNew.js'
 import lpService from './lpService.js'
+import aBookRouter from './aBookRouter.js'
 
 class TradeEngine {
   constructor() {
@@ -341,7 +342,7 @@ class TradeEngine {
     // Generate trade ID
     const tradeId = await Trade.generateTradeId()
 
-    const userForBook = await User.findById(userId).select('bookType firstName email')
+    const userForBook = await User.findById(userId).select('bookType firstName email mt5AccountId')
     // Demo accounts can NEVER be A-book — LP must not see demo volume regardless
     // of what User.bookType says. Force B-book at creation so the stored trade
     // can't be routed to LP by any later path.
@@ -387,18 +388,29 @@ class TradeEngine {
       await this.applyPnlToAccount(tradingAccountId, -commission)
     }
 
-    if (orderType === 'MARKET' && userBookType === 'A' && !account.isDemo && lpService.isConfigured() && userForBook) {
+    // A-Book hedge. The router picks MT5 or Corecen per user, so no
+    // lpService.isConfigured() gate here — an MT5-tagged user must route even
+    // when Corecen is not set up at all.
+    if (orderType === 'MARKET' && userBookType === 'A' && !account.isDemo && userForBook) {
       try {
-        const lpResult = await lpService.pushTradeToCorecen(trade, userForBook)
-        if (lpResult.success) {
+        const hedge = await aBookRouter.routeOpen(trade, userForBook)
+        if (hedge.success) {
           trade.lpPushed = true
           trade.lpPushedAt = new Date()
-          await trade.save()
+          trade.lpSyncStatus = 'PUSHED'
+          trade.aBookDestination = hedge.destination
+          if (hedge.destination === 'MT5') {
+            trade.mt5AccountId = hedge.mt5AccountId
+            trade.aBookOrderId = hedge.positionId || null
+            trade.aBookExecuted = true
+          }
         } else {
-          console.error(`[TradeEngine] Failed to push A-Book trade to LP: ${lpResult.error || lpResult.message}`)
+          trade.lpSyncStatus = 'FAILED'
+          console.error(`[TradeEngine] Failed to push A-Book trade: ${hedge.error || hedge.message}`)
         }
-      } catch (lpError) {
-        console.error('[TradeEngine] Error pushing trade to LP:', lpError)
+        await trade.save()
+      } catch (hedgeError) {
+        console.error('[TradeEngine] Error pushing A-Book trade:', hedgeError)
       }
     }
 
@@ -545,18 +557,21 @@ class TradeEngine {
     }
 
     // Demo-account trades must never reach LP — even if somehow stored with bookType='A'
-    if (trade.bookType === 'A' && !trade.tradingAccountId?.isDemo && lpService.isConfigured()) {
+    if (trade.bookType === 'A' && !trade.tradingAccountId?.isDemo) {
       try {
-        const lpResult = await lpService.closeTradeOnCorecen(trade)
-        if (lpResult.success) {
+        const hedge = await aBookRouter.routeClose(trade)
+        if (hedge.success) {
           trade.lpClosedAt = new Date()
+          trade.lpSyncStatus = 'CLOSED'
           await trade.save().catch(() => {})
-          console.log(`[TradeEngine] A-Book trade ${trade.tradeId} closed on Corecen LP`)
+          console.log(`[TradeEngine] A-Book trade ${trade.tradeId} closed on ${hedge.destination}`)
         } else {
-          console.error(`[TradeEngine] Failed to close A-Book trade on LP: ${lpResult.error}`)
+          trade.lpSyncStatus = 'CLOSE_FAILED'
+          await trade.save().catch(() => {})
+          console.error(`[TradeEngine] Failed to close A-Book trade: ${hedge.error || hedge.message}`)
         }
-      } catch (lpError) {
-        console.error('[TradeEngine] Error closing trade on LP:', lpError)
+      } catch (hedgeError) {
+        console.error('[TradeEngine] Error closing A-Book trade:', hedgeError)
       }
     }
 
@@ -641,6 +656,17 @@ class TradeEngine {
     }
 
     await trade.save()
+
+    // Mirror the new SL/TP onto the MT5 hedge. Fire-and-forget: a hedge-side
+    // failure must not fail the user's modify, which already succeeded locally.
+    // Corecen is deliberately not wired here — lpService.updateTradeOnCorecen()
+    // exists but has never had a caller, so switching it on now would change
+    // existing A-Book behaviour that nobody asked to change.
+    if (trade.bookType === 'A' && trade.mt5AccountId && trade.status === 'OPEN') {
+      aBookRouter
+        .routeModify(trade)
+        .catch((e) => console.error('[TradeEngine] MT5 SL/TP sync failed:', e.message))
+    }
 
     // Log admin action
     if (adminId) {
@@ -870,21 +896,30 @@ class TradeEngine {
           trade.openedAt = new Date()
           await trade.save()
 
-          if (trade.bookType === 'A' && lpService.isConfigured()) {
-            // Demo-account trades must never reach LP
+          if (trade.bookType === 'A') {
+            // Demo-account trades must never reach a hedge venue
             const pendingAccount = await TradingAccount.findById(trade.tradingAccountId).select('isDemo')
             if (pendingAccount && !pendingAccount.isDemo) {
-              const u = await User.findById(trade.userId).select('bookType firstName email')
+              const u = await User.findById(trade.userId).select('bookType firstName email mt5AccountId')
               if (u) {
                 try {
-                  const lpResult = await lpService.pushTradeToCorecen(trade, u)
-                  if (lpResult.success) {
+                  const hedge = await aBookRouter.routeOpen(trade, u)
+                  if (hedge.success) {
                     trade.lpPushed = true
                     trade.lpPushedAt = new Date()
-                    await trade.save()
+                    trade.lpSyncStatus = 'PUSHED'
+                    trade.aBookDestination = hedge.destination
+                    if (hedge.destination === 'MT5') {
+                      trade.mt5AccountId = hedge.mt5AccountId
+                      trade.aBookOrderId = hedge.positionId || null
+                      trade.aBookExecuted = true
+                    }
+                  } else {
+                    trade.lpSyncStatus = 'FAILED'
                   }
+                  await trade.save()
                 } catch (e) {
-                  console.error('[TradeEngine] LP push after pending fill:', e)
+                  console.error('[TradeEngine] A-Book push after pending fill:', e)
                 }
               }
             }
