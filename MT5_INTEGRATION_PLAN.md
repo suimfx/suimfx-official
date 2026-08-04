@@ -211,3 +211,96 @@ Both must use the `sweepRunning` re-entrancy guard pattern already established i
 | 5 | Monitoring, reconciliation, failed-sync panel |
 
 Phase 2 is the checkpoint: real accounts must connect and report their symbol list before any trade-routing code is written.
+
+---
+
+# Phase B — Reverse sync (MT5 → platform)
+
+> Status: **planned, not started.** Not needed yet — write this only when the operator actually wants MT5-side events to close client trades.
+
+Today sync is one-way. If a position is closed on the MT5 side — manually, by its
+SL/TP, or by the broker's own stop-out — the platform trade stays `OPEN` and keeps
+running on platform prices. The hedge is gone and nobody is told. This phase closes
+that gap.
+
+## Mechanism: poll, not streaming
+
+MetaApi offers a streaming connection with `onPositionRemoved` / `onDealAdded`
+listeners. Skip it. It needs a second long-lived connection per account on top of
+the RPC one, plus ~25 listener stubs (see the old `metaApiService.js` in git
+`22c791f` for how much boilerplate that is), and it buys latency we do not need —
+a hedge does not care about 10 seconds.
+
+Poll `mt5Service.getPositions()` on a sweep instead. It already exists, it reuses
+the pooled RPC connection, and the whole thing is one function.
+
+## The sweep
+
+Add to `server.js` next to the existing interval sweeps, with the same
+`sweepRunning` re-entrancy guard (MetaApi calls are slow — overlap is certain
+without it). Every 10s, per active `Mt5Account`:
+
+1. `const live = new Set((await mt5Service.getPositions(acc.metaApiAccountId)).map(p => p.id))`
+2. Load platform trades: `{ status: 'OPEN', mt5AccountId: acc._id, aBookOrderId: { $ne: null } }`
+3. Any trade whose `aBookOrderId` is **not** in `live` was closed on the MT5 side
+4. Close it on the platform via `tradeEngine.closeTrade(trade._id, price, price, 'MT5')`
+
+Matching is by `aBookOrderId` (the MetaApi position id we already store at open).
+No `clientId` needed — it was removed because MetaApi rejected our format, and
+nothing here wants it back.
+
+## Three guards, all load-bearing
+
+**1. Never treat an error as "everything closed."** If `getPositions()` throws,
+times out, or the account is disconnected, `live` is empty — and step 3 would then
+close *every* hedged trade on that account at once. Bail out of the whole account
+on any error; do not fall through with a partial or empty set. This is the single
+most dangerous failure mode in this phase.
+
+**2. Grace period on freshly pushed trades.** A position opened a second ago may
+not be in `getPositions()` yet, which reads as "closed on MT5" and would
+immediately close a trade that just opened. Skip trades whose `lpPushedAt` is
+newer than ~60s.
+
+**3. No echo loop.** A platform-initiated close already calls `closePosition()`.
+The next sweep sees the position gone and must not close the trade a second time.
+The `status: 'OPEN'` filter covers the settled case; the in-flight case needs the
+close path to mark the trade before it awaits MetaApi, or a short skip window on
+`lpClosedAt`.
+
+## Model changes
+
+- `Trade.closedBy` enum: add `'MT5'` (currently `USER | SL | TP | STOP_OUT | ADMIN | null`)
+- Nothing else. `aBookOrderId` and `mt5AccountId` already carry the link.
+
+## Open decisions — ask before building
+
+**a) What close price does the client get?**
+- **(i) MT5's actual fill** — fetch the closing deal (`getDealsByPosition`) and pass
+  that price to `closeTrade`. Book and hedge agree exactly, which is the entire
+  point of A-book. Costs one extra call per closed position.
+- **(ii) Current platform price** — simpler, consistent with "platform is the source
+  of truth", but the client's P&L and the hedge's P&L drift apart on every
+  MT5-side close. Recommend (i).
+
+**b) Partial closes on MT5.** If someone closes 0.05 of a 0.10 lot position, the
+position survives with a smaller volume. The platform has no partial-close concept
+for a single trade. Options: ignore volume drift and only act on full disappearance
+(lazy, recommended to start), or flag it in the reconciliation view for manual
+handling.
+
+**c) Positions on the hedge account that we did not open** (someone traded the MT5
+account by hand). Recommend: never act on them, only surface them in the
+reconciliation view — closing something the platform does not own is worse than
+leaving it.
+
+## Build order
+
+| Step | Scope |
+|---|---|
+| 1 | `closedBy: 'MT5'`, the sweep with all three guards, close at current price |
+| 2 | Switch to MT5's actual fill price if decision (a) lands on (i) |
+| 3 | Surface drift (partial closes, unknown positions) in the reconciliation view |
+
+Step 1 alone removes the silent-unhedged-position problem, which is the whole
+reason to build this.
