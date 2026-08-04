@@ -131,17 +131,17 @@ class MT5Service {
       const volume = this.normalizeVolume(trade.quantity)
       const sl = (trade.sl || trade.stopLoss) > 0 ? trade.sl || trade.stopLoss : undefined
       const tp = (trade.tp || trade.takeProfit) > 0 ? trade.tp || trade.takeProfit : undefined
-      // clientId is what ties an MT5 position back to our trade during
-      // reconciliation. No comment: MetaApi caps comment + clientId at 26 chars
-      // combined, and "suimfx <tradeId>" alongside the clientId blew past that
-      // and got every order rejected with a bare "Validation failed". The
-      // clientId already carries the trade id, so the comment added nothing.
-      const options = { clientId: trade.tradeId }
-
+      // No clientId and no comment. MetaApi rejected our tradeId as a clientId
+      // ("Value must match required pattern") and rejects comment + clientId
+      // over its combined length cap — between them they failed every order.
+      // Neither is load-bearing: close and modify both address the position by
+      // the positionId MetaApi returns, which we store in Trade.aBookOrderId.
+      // ponytail: if reconciliation later needs a tag on the MT5 side, look up
+      // MetaApi's exact clientId pattern first instead of assuming ours fits.
       const result =
         String(trade.side).toUpperCase() === 'BUY'
-          ? await conn.createMarketBuyOrder(symbol, volume, sl, tp, options)
-          : await conn.createMarketSellOrder(symbol, volume, sl, tp, options)
+          ? await conn.createMarketBuyOrder(symbol, volume, sl, tp)
+          : await conn.createMarketSellOrder(symbol, volume, sl, tp)
 
       const positionId = result?.positionId || result?.orderId || null
       console.log(`[MT5] Pushed ${trade.tradeId} -> ${symbol} ${volume} lots, position ${positionId}`)
