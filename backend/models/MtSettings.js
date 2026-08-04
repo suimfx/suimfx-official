@@ -10,8 +10,9 @@ const mtSettingsSchema = new mongoose.Schema(
   {
     key: { type: String, default: 'metaapi_config', unique: true },
     metaApiToken: { type: String, default: '' },
-    region: { type: String, default: '' }, // '' = MetaApi default region
     enabled: { type: Boolean, default: false },
+    // No region field on purpose — the JS SDK resolves its own region and
+    // passing one makes every subscribe fail. See mt5Service._client().
   },
   { timestamps: true }
 )

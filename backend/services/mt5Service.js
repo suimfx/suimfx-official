@@ -9,6 +9,15 @@ const require = createRequire(import.meta.url)
 let MetaApi = null
 const loadSdk = () => (MetaApi ||= require('metaapi.cloud-sdk').default)
 
+// MetaApi puts the useful part of a validation error in `details` — an array of
+// { parameter, message } — while `message` is just "Validation failed".
+function describeMetaApiError(error) {
+  const details = error?.details
+  if (!Array.isArray(details) || details.length === 0) return error?.message || String(error)
+  const parts = details.map((d) => `${d.parameter || '?'}: ${d.message || ''}`.trim())
+  return `${error.message} (${parts.join('; ')})`
+}
+
 class MT5Service {
   constructor() {
     // metaApiAccountId -> Promise<RPCConnection>. The promise (not the resolved
@@ -32,11 +41,18 @@ class MT5Service {
     const s = await this.getSettings()
     if (!s?.enabled || !s.metaApiToken) return null
     // Token changed under us — drop every pooled connection, they authenticated
-    // with the old one.
+    // with the old one. Closed without awaiting: awaiting a pending connect here
+    // would deadlock, since that connect is itself waiting on _client().
     if (!this.client || this.clientToken !== s.metaApiToken) {
-      this.client = new (loadSdk())(s.metaApiToken, s.region ? { region: s.region } : {})
+      // No region option. MetaApi's own error text says it plainly: "make sure
+      // you do not pass region option to MetaApi constructor for javascript and
+      // python SDKs" — the JS SDK resolves the region itself, and forcing one
+      // makes every subscribe fail with a region-mismatch TimeoutError.
+      this.client = new (loadSdk())(s.metaApiToken)
       this.clientToken = s.metaApiToken
+      const stale = [...this.connections.values()]
       this.connections.clear()
+      stale.forEach((p) => p.then((c) => c.close()).catch(() => {}))
     }
     return this.client
   }
@@ -51,8 +67,18 @@ class MT5Service {
       await account.waitDeployed()
     }
     const conn = account.getRPCConnection()
-    await conn.connect()
-    await conn.waitSynchronized()
+    try {
+      await conn.connect()
+      await conn.waitSynchronized()
+    } catch (e) {
+      // Once connect() has been called the SDK retries subscribe in the
+      // background forever. Dropping our reference is not enough — a half-open
+      // connection to an account that never syncs (wrong region, broker offline)
+      // will spam MetaApi and the logs every few minutes for the life of the
+      // process. Close it explicitly before giving up.
+      try { await conn.close() } catch (_) { /* already gone */ }
+      throw e
+    }
     return conn
   }
 
@@ -70,8 +96,13 @@ class MT5Service {
     return this.connections.get(metaApiAccountId)
   }
 
-  dropConnection(metaApiAccountId) {
+  async dropConnection(metaApiAccountId) {
+    const pending = this.connections.get(metaApiAccountId)
     this.connections.delete(metaApiAccountId)
+    if (!pending) return
+    try {
+      await (await pending).close()
+    } catch (_) { /* never connected, or already closed */ }
   }
 
   // Our symbol -> the broker's symbol. Explicit override wins, else suffix.
@@ -100,8 +131,12 @@ class MT5Service {
       const volume = this.normalizeVolume(trade.quantity)
       const sl = (trade.sl || trade.stopLoss) > 0 ? trade.sl || trade.stopLoss : undefined
       const tp = (trade.tp || trade.takeProfit) > 0 ? trade.tp || trade.takeProfit : undefined
-      // clientId is what ties an MT5 position back to our trade during reconciliation.
-      const options = { clientId: trade.tradeId, comment: `suimfx ${trade.tradeId}` }
+      // clientId is what ties an MT5 position back to our trade during
+      // reconciliation. No comment: MetaApi caps comment + clientId at 26 chars
+      // combined, and "suimfx <tradeId>" alongside the clientId blew past that
+      // and got every order rejected with a bare "Validation failed". The
+      // clientId already carries the trade id, so the comment added nothing.
+      const options = { clientId: trade.tradeId }
 
       const result =
         String(trade.side).toUpperCase() === 'BUY'
@@ -112,8 +147,12 @@ class MT5Service {
       console.log(`[MT5] Pushed ${trade.tradeId} -> ${symbol} ${volume} lots, position ${positionId}`)
       return { success: true, positionId, data: result }
     } catch (error) {
-      console.error(`[MT5] Push failed for ${trade.tradeId}:`, error.message)
-      return { success: false, error: error.message }
+      // MetaApi's "Validation failed" message alone says nothing — the offending
+      // parameter is only in error.details. Surface it or every rejection turns
+      // into a guessing game.
+      const why = describeMetaApiError(error)
+      console.error(`[MT5] Push failed for ${trade.tradeId}: ${why}`)
+      return { success: false, error: why }
     }
   }
 
@@ -133,8 +172,9 @@ class MT5Service {
         console.warn(`[MT5] Position ${trade.aBookOrderId} already closed on MT5`)
         return { success: true, warning: 'Position was already closed on MT5' }
       }
-      console.error(`[MT5] Close failed for ${trade.tradeId}:`, error.message)
-      return { success: false, error: error.message }
+      const why = describeMetaApiError(error)
+      console.error(`[MT5] Close failed for ${trade.tradeId}: ${why}`)
+      return { success: false, error: why }
     }
   }
 
@@ -149,8 +189,9 @@ class MT5Service {
       )
       return { success: true }
     } catch (error) {
-      console.error(`[MT5] SL/TP update failed for ${trade.tradeId}:`, error.message)
-      return { success: false, error: error.message }
+      const why = describeMetaApiError(error)
+      console.error(`[MT5] SL/TP update failed for ${trade.tradeId}: ${why}`)
+      return { success: false, error: why }
     }
   }
 

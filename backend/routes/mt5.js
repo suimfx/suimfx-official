@@ -27,7 +27,6 @@ router.get('/settings', async (req, res) => {
       settings: {
         metaApiToken: maskToken(s?.metaApiToken),
         hasToken: !!s?.metaApiToken,
-        region: s?.region || '',
         enabled: !!s?.enabled,
       },
     })
@@ -38,13 +37,18 @@ router.get('/settings', async (req, res) => {
 
 router.put('/settings', async (req, res) => {
   try {
-    const { metaApiToken, region, enabled } = req.body
+    const { metaApiToken, enabled } = req.body
     const update = { key: 'metaapi_config' }
     if (!isMasked(metaApiToken)) update.metaApiToken = metaApiToken.trim()
-    if (region !== undefined) update.region = region
     if (enabled !== undefined) update.enabled = !!enabled
 
-    await MtSettings.findOneAndUpdate({ key: 'metaapi_config' }, { $set: update }, { upsert: true })
+    // $unset region: rows saved before it was removed still carry a value, and
+    // leaving it there invites someone re-wiring it into the SDK constructor.
+    await MtSettings.findOneAndUpdate(
+      { key: 'metaapi_config' },
+      { $set: update, $unset: { region: '' } },
+      { upsert: true }
+    )
     res.json({ success: true, message: 'MetaApi settings saved' })
   } catch (e) {
     res.status(500).json({ success: false, message: e.message })

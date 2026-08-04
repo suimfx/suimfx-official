@@ -35,7 +35,7 @@ const AdminMT5Trade = () => {
   const [msg, setMsg] = useState(null) // { type: 'ok' | 'err', text }
   const [busy, setBusy] = useState('')
 
-  const [settings, setSettings] = useState({ metaApiToken: '', region: '', enabled: false, hasToken: false })
+  const [settings, setSettings] = useState({ metaApiToken: '', enabled: false, hasToken: false })
   const [showToken, setShowToken] = useState(false)
 
   const [accounts, setAccounts] = useState([])
@@ -98,7 +98,6 @@ const AdminMT5Trade = () => {
       method: 'PUT',
       body: JSON.stringify({
         metaApiToken: settings.metaApiToken,
-        region: settings.region,
         enabled: settings.enabled
       })
     })
@@ -193,16 +192,6 @@ const AdminMT5Trade = () => {
         <p className="text-xs text-gray-500 mt-1">
           app.metaapi.cloud → Token. The saved token is never sent back to this page in full.
         </p>
-      </div>
-
-      <div>
-        <label className="block text-sm text-gray-400 mb-1">Region (optional)</label>
-        <input
-          className={input}
-          value={settings.region}
-          placeholder="new-york / london / singapore — blank uses MetaApi's default"
-          onChange={(e) => setSettings({ ...settings, region: e.target.value })}
-        />
       </div>
 
       <label className="flex items-center gap-2 cursor-pointer">
