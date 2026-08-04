@@ -148,6 +148,9 @@ router.post('/accounts/:id/test', async (req, res) => {
     if (result.success) {
       account.login = result.login
       account.server = result.server
+      account.balance = result.balance ?? null
+      account.equity = result.equity ?? null
+      account.currency = result.currency || ''
     }
     await account.save()
 

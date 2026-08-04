@@ -24,6 +24,11 @@ const TABS = [
   { key: 'settings', label: 'Settings' }
 ]
 
+const money = (n) =>
+  n === null || n === undefined
+    ? '—'
+    : Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 const AdminMT5Trade = () => {
   const { isDarkMode } = useTheme()
   const [tab, setTab] = useState('accounts')
@@ -283,6 +288,14 @@ const AdminMT5Trade = () => {
             </div>
 
             <div className="text-right text-xs text-gray-400">
+              {acc.balance !== null && acc.balance !== undefined && (
+                <div className="mb-2">
+                  <div className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {money(acc.balance)} {acc.currency}
+                  </div>
+                  <div>equity {money(acc.equity)}</div>
+                </div>
+              )}
               <div>{acc.taggedUsers} tagged user(s)</div>
               <div>{acc.openTrades} open position(s)</div>
             </div>
@@ -333,7 +346,8 @@ const AdminMT5Trade = () => {
       ))}
 
       <p className="text-xs text-gray-500">
-        First Test on a fresh account can take 30–60s — MetaApi has to deploy it before it will answer.
+        Test also refreshes the balance shown above — it is as fresh as the last check, not live.
+        First Test on a fresh account can take 30–60s, MetaApi has to deploy it before it will answer.
       </p>
     </div>
   )

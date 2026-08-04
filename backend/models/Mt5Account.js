@@ -20,6 +20,13 @@ const mt5AccountSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     lastError: { type: String, default: '' },
     lastCheckedAt: { type: Date, default: null },
+
+    // Last known account state, written by POST /accounts/:id/test. Deliberately
+    // not polled — it is as fresh as the last Test, and lastCheckedAt says when
+    // that was. Add a poll only if a live figure turns out to matter.
+    balance: { type: Number, default: null },
+    equity: { type: Number, default: null },
+    currency: { type: String, default: '' },
   },
   { timestamps: true }
 )
