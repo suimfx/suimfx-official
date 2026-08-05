@@ -36,10 +36,39 @@ export async function routeClose(trade) {
   return { success: false, message: 'No A-Book destination configured' }
 }
 
+/**
+ * Write the outcome of a routeOpen() onto the trade and save it. Three callers
+ * need exactly this — openTrade, the pending-order fill, and the manual retry —
+ * so it lives here rather than being copied into each of them.
+ *
+ * aBookError holds the venue's rejection text ("Unknown symbol", "not enough
+ * money"). Without it a failed hedge is only visible in the server logs, which
+ * is no use to the admin who has to fix it.
+ */
+export async function recordOpenResult(trade, hedge) {
+  if (hedge.success) {
+    trade.lpPushed = true
+    trade.lpPushedAt = new Date()
+    trade.lpSyncStatus = 'PUSHED'
+    trade.aBookDestination = hedge.destination
+    trade.aBookError = ''
+    if (hedge.destination === 'MT5') {
+      trade.mt5AccountId = hedge.mt5AccountId
+      trade.aBookOrderId = hedge.positionId || null
+      trade.aBookExecuted = true
+    }
+  } else {
+    trade.lpSyncStatus = 'FAILED'
+    trade.aBookError = hedge.error || hedge.message || 'Push failed'
+  }
+  await trade.save()
+  return hedge
+}
+
 export async function routeModify(trade) {
   const acc = await activeAccount(trade.mt5AccountId)
   if (!acc) return { success: false, message: 'Not an MT5 trade' }
   return { ...(await mt5Service.updateTrade(trade, acc)), destination: 'MT5' }
 }
 
-export default { routeOpen, routeClose, routeModify }
+export default { routeOpen, routeClose, routeModify, recordOpenResult }

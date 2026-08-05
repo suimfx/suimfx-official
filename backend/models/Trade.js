@@ -186,6 +186,13 @@ const tradeSchema = new mongoose.Schema({
     ref: 'Mt5Account',
     default: null
   },
+  // The venue's rejection text when the hedge push failed ("Unknown symbol",
+  // "not enough money"). Stored rather than only logged so the admin can see
+  // and retry a failed hedge from the MT5 Trade page instead of reading logs.
+  aBookError: {
+    type: String,
+    default: ''
+  },
   aBookExecuted: {
     type: Boolean,
     default: false

@@ -394,21 +394,10 @@ class TradeEngine {
     if (orderType === 'MARKET' && userBookType === 'A' && !account.isDemo && userForBook) {
       try {
         const hedge = await aBookRouter.routeOpen(trade, userForBook)
-        if (hedge.success) {
-          trade.lpPushed = true
-          trade.lpPushedAt = new Date()
-          trade.lpSyncStatus = 'PUSHED'
-          trade.aBookDestination = hedge.destination
-          if (hedge.destination === 'MT5') {
-            trade.mt5AccountId = hedge.mt5AccountId
-            trade.aBookOrderId = hedge.positionId || null
-            trade.aBookExecuted = true
-          }
-        } else {
-          trade.lpSyncStatus = 'FAILED'
+        await aBookRouter.recordOpenResult(trade, hedge)
+        if (!hedge.success) {
           console.error(`[TradeEngine] Failed to push A-Book trade: ${hedge.error || hedge.message}`)
         }
-        await trade.save()
       } catch (hedgeError) {
         console.error('[TradeEngine] Error pushing A-Book trade:', hedgeError)
       }
@@ -904,20 +893,7 @@ class TradeEngine {
               if (u) {
                 try {
                   const hedge = await aBookRouter.routeOpen(trade, u)
-                  if (hedge.success) {
-                    trade.lpPushed = true
-                    trade.lpPushedAt = new Date()
-                    trade.lpSyncStatus = 'PUSHED'
-                    trade.aBookDestination = hedge.destination
-                    if (hedge.destination === 'MT5') {
-                      trade.mt5AccountId = hedge.mt5AccountId
-                      trade.aBookOrderId = hedge.positionId || null
-                      trade.aBookExecuted = true
-                    }
-                  } else {
-                    trade.lpSyncStatus = 'FAILED'
-                  }
-                  await trade.save()
+                  await aBookRouter.recordOpenResult(trade, hedge)
                 } catch (e) {
                   console.error('[TradeEngine] A-Book push after pending fill:', e)
                 }

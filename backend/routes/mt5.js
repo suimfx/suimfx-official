@@ -4,6 +4,7 @@ import Mt5Account from '../models/Mt5Account.js'
 import User from '../models/User.js'
 import Trade from '../models/Trade.js'
 import mt5Service from '../services/mt5Service.js'
+import aBookRouter from '../services/aBookRouter.js'
 import { verifyAdminToken, requireSuperAdmin } from '../middleware/rbac.js'
 
 const router = express.Router()
@@ -280,6 +281,54 @@ router.put('/users/:userId/tag', async (req, res) => {
       success: true,
       message: mt5AccountId ? 'User tagged to MT5 account' : 'User untagged',
       user: { _id: user._id, email: user.email, mt5AccountId: user.mt5AccountId },
+    })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// ─── Failed hedge pushes ─────────────────────────────────────────────────────
+
+// Trades that opened on the platform but never reached a hedge venue. These are
+// live unhedged exposure, so they need to be visible somewhere other than the
+// server log.
+router.get('/sync/failed', async (req, res) => {
+  try {
+    const trades = await Trade.find({ lpSyncStatus: 'FAILED' })
+      .select('tradeId symbol side quantity openPrice status openedAt aBookError userId')
+      .populate('userId', 'firstName email mt5AccountId')
+      .sort({ openedAt: -1 })
+      .limit(100)
+      .lean()
+
+    res.json({ success: true, count: trades.length, trades })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// Re-push a failed hedge. Only for still-open trades — a closed one has no
+// exposure left to cover, and opening a position for it would create some.
+router.post('/sync/:tradeId/retry', async (req, res) => {
+  try {
+    const trade = await Trade.findById(req.params.tradeId)
+    if (!trade) return res.status(404).json({ success: false, message: 'Trade not found' })
+    if (trade.status !== 'OPEN') {
+      return res.status(400).json({
+        success: false,
+        message: `Trade is ${trade.status} — retrying would open a position with nothing to hedge.`,
+      })
+    }
+
+    const user = await User.findById(trade.userId).select('bookType firstName email mt5AccountId')
+    if (!user) return res.status(404).json({ success: false, message: 'Trade owner not found' })
+
+    const hedge = await aBookRouter.routeOpen(trade, user)
+    await aBookRouter.recordOpenResult(trade, hedge)
+
+    res.json({
+      success: !!hedge.success,
+      message: hedge.success ? `Hedged on ${hedge.destination}` : hedge.error || hedge.message,
     })
   } catch (e) {
     res.status(500).json({ success: false, message: e.message })

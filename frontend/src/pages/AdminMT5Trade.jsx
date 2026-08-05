@@ -21,6 +21,7 @@ import { useTheme } from '../context/ThemeContext'
 const TABS = [
   { key: 'accounts', label: 'MT5 Accounts' },
   { key: 'users', label: 'A-Book Users' },
+  { key: 'failed', label: 'Failed Syncs' },
   { key: 'settings', label: 'Settings' }
 ]
 
@@ -46,6 +47,8 @@ const AdminMT5Trade = () => {
   const [users, setUsers] = useState([])
   const [userSearch, setUserSearch] = useState('')
   const [taggedFilter, setTaggedFilter] = useState('')
+
+  const [failed, setFailed] = useState([])
 
   const card = `rounded-xl p-4 border ${isDarkMode ? 'bg-dark-800 border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`
   const input = `w-full px-3 py-2 rounded-lg border outline-none focus:border-accent-green ${
@@ -81,13 +84,20 @@ const AdminMT5Trade = () => {
     if (d.success) setUsers(d.users)
   }
 
+  const loadFailed = async () => {
+    const d = await call('/sync/failed')
+    if (d.success) setFailed(d.trades)
+  }
+
   useEffect(() => {
     loadSettings()
     loadAccounts()
+    loadFailed()
   }, [])
 
   useEffect(() => {
     if (tab === 'users') loadUsers()
+    if (tab === 'failed') loadFailed()
   }, [tab, taggedFilter])
 
   // ─── Settings ──────────────────────────────────────────────────────────────
@@ -168,6 +178,15 @@ const AdminMT5Trade = () => {
     setBusy('')
     flash(d.success ? 'ok' : 'err', d.message)
     loadUsers()
+    loadAccounts()
+  }
+
+  const retryFailed = async (t) => {
+    setBusy(`retry-${t._id}`)
+    const d = await call(`/sync/${t._id}/retry`, { method: 'POST' })
+    setBusy('')
+    flash(d.success ? 'ok' : 'err', d.message)
+    loadFailed()
     loadAccounts()
   }
 
@@ -418,6 +437,70 @@ const AdminMT5Trade = () => {
     </div>
   )
 
+  const renderFailed = () => (
+    <div className="space-y-4">
+      <div className={`${card} flex items-center justify-between`}>
+        <div className="text-sm">
+          {failed.length === 0
+            ? 'No failed hedges.'
+            : `${failed.length} trade(s) opened on the platform but never reached a hedge venue.`}
+        </div>
+        <button className={`${btn} bg-dark-700 text-gray-200 flex items-center gap-1`} onClick={loadFailed}>
+          <RefreshCw size={14} /> Refresh
+        </button>
+      </div>
+
+      {failed.length > 0 && (
+        <div className={`${card} !p-0 overflow-hidden`}>
+          <table className="w-full text-sm">
+            <thead className={isDarkMode ? 'bg-dark-700' : 'bg-gray-50'}>
+              <tr className="text-left text-gray-400">
+                <th className="p-3 font-medium">Trade</th>
+                <th className="p-3 font-medium">User</th>
+                <th className="p-3 font-medium">Why it failed</th>
+                <th className="p-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {failed.map((t) => (
+                <tr key={t._id} className="border-t border-gray-800 align-top">
+                  <td className="p-3">
+                    <div>
+                      {t.symbol} {t.side} {t.quantity}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {t.tradeId} · {t.status}
+                    </div>
+                  </td>
+                  <td className="p-3 text-xs text-gray-400">{t.userId?.email || '—'}</td>
+                  <td className="p-3 text-xs text-red-400 max-w-md">{t.aBookError || 'unknown'}</td>
+                  <td className="p-3">
+                    {t.status === 'OPEN' ? (
+                      <button
+                        className={`${btn} bg-dark-700 text-gray-200`}
+                        disabled={busy === `retry-${t._id}`}
+                        onClick={() => retryFailed(t)}
+                      >
+                        {busy === `retry-${t._id}` ? 'Retrying…' : 'Retry'}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-600">closed</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500">
+        An open trade here is live unhedged exposure. Fix the cause first — usually the account's symbol suffix or
+        its balance — then Retry. Closed trades cannot be retried: there is nothing left to hedge.
+      </p>
+    </div>
+  )
+
   const renderSymbolModal = () => {
     const shown = symbolModal.symbols.filter((s) => s.toLowerCase().includes(symbolFilter.toLowerCase()))
     return (
@@ -492,6 +575,11 @@ const AdminMT5Trade = () => {
               }`}
             >
               {t.label}
+              {t.key === 'failed' && failed.length > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 rounded text-xs bg-red-500/20 text-red-400">
+                  {failed.length}
+                </span>
+              )}
               {tab === t.key && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent-green" />}
             </button>
           ))}
@@ -500,6 +588,7 @@ const AdminMT5Trade = () => {
         {tab === 'settings' && renderSettings()}
         {tab === 'accounts' && renderAccounts()}
         {tab === 'users' && renderUsers()}
+        {tab === 'failed' && renderFailed()}
 
         {symbolModal && renderSymbolModal()}
       </div>
