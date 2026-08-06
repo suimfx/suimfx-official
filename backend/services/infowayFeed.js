@@ -46,7 +46,10 @@ const MAX_BACKOFF_MS = 30_000
 // short window. Doubles per consecutive 429, resets once the socket opens.
 // ponytail: blind escalation. Read Retry-After if Infoway ever sends one.
 const RATE_LIMIT_BACKOFF_MS = 120_000
-const MAX_RATE_LIMIT_BACKOFF_MS = 1_800_000
+// ponytail: 5-min ceiling. Was 30 min, which froze prices for up to half an hour
+// after a restart. 5 min still spaces attempts enough not to hammer the quota,
+// but bounds the stale-price window. Raise if 429s start re-tripping at 5 min.
+const MAX_RATE_LIMIT_BACKOFF_MS = 300_000
 
 // Crypto bases (without the USD/USDT quote). Used to (a) route a symbol to the
 // `crypto` business socket and (b) map our USD form to Infoway's USDT form.
