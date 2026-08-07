@@ -313,6 +313,28 @@ router.get('/history', async (req, res) => {
       }
     }
 
+    // Fill SHORT gaps (feed hiccups, e.g. an Infoway 429 outage) with flat
+    // carry-forward 1m bars so the chart is continuous instead of showing holes.
+    // Long gaps (> 3h → weekends / market closures) are left as real gaps.
+    const MAX_FILL_SEC = 3 * 3600
+    if (bars1m.length > 1) {
+      const filled = []
+      for (let i = 0; i < bars1m.length; i++) {
+        const cur = bars1m[i]
+        filled.push(cur)
+        const nxt = bars1m[i + 1]
+        if (nxt) {
+          const gap = nxt.time - cur.time
+          if (gap > 60 && gap <= MAX_FILL_SEC) {
+            for (let t = cur.time + 60; t < nxt.time; t += 60) {
+              filled.push({ time: t, open: cur.close, high: cur.close, low: cur.close, close: cur.close })
+            }
+          }
+        }
+      }
+      bars1m = filled
+    }
+
     if (bars1m.length > 0) {
       let aggregated
       if (targetSec <= 60) {
