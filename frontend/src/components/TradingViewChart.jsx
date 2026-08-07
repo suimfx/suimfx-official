@@ -38,13 +38,21 @@ const TradingViewChart = ({ symbol, interval = '5', isDarkMode = true, container
       const theme = isDarkMode ? 'dark' : 'light'
       const bg = isDarkMode ? '#0a0a0a' : '#ffffff'
 
+      // Chart exchange label follows the user's broker (Leofx/Forexmt24/Fxcrestaa),
+      // falling back to Suimfx for platform users.
+      let brandName = 'Suimfx'
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || '{}')
+        brandName = u?.adminBranding?.brandName || localStorage.getItem('adminBrandName') || 'Suimfx'
+      } catch { /* keep default */ }
+
       try {
         widgetRef.current = new window.TradingView.widget({
           symbol: (symbol || 'XAUUSD').toUpperCase(),
           interval: String(interval),
           container: el,
           library_path: '/charting_library/',
-          datafeed: new SuimfxDatafeed(),
+          datafeed: new SuimfxDatafeed(brandName),
           locale: 'en',
           timezone: 'Etc/UTC',
           theme,
