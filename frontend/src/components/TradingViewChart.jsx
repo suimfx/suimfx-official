@@ -5,6 +5,7 @@
 // price — that mismatch was the bug.
 import { useEffect, useRef } from 'react'
 import SuimfxDatafeed from '../services/suimfxDatafeed'
+import { useBranding } from '../context/BrandingContext'
 
 // Load the vendored charting library once (served from /public/charting_library).
 let _libPromise = null
@@ -25,6 +26,7 @@ function loadLibrary() {
 const TradingViewChart = ({ symbol, interval = '5', isDarkMode = true, containerId, style }) => {
   const chartId = containerId || 'tv_chart_container'
   const widgetRef = useRef(null)
+  const { branding } = useBranding()
 
   useEffect(() => {
     let cancelled = false
@@ -39,11 +41,13 @@ const TradingViewChart = ({ symbol, interval = '5', isDarkMode = true, container
       const bg = isDarkMode ? '#0a0a0a' : '#ffffff'
 
       // Chart exchange label follows the user's broker (Leofx/Forexmt24/Fxcrestaa),
-      // falling back to Suimfx for platform users.
+      // falling back to Suimfx for platform users. BrandingContext is the app's
+      // resolved per-tenant brand (from custom domain / slug / the logged-in user's
+      // /my-branding) — most reliable across login flows; localStorage is a fallback.
       let brandName = 'Suimfx'
       try {
         const u = JSON.parse(localStorage.getItem('user') || '{}')
-        brandName = u?.adminBranding?.brandName || localStorage.getItem('adminBrandName') || 'Suimfx'
+        brandName = branding?.brandName || u?.adminBranding?.brandName || localStorage.getItem('adminBrandName') || 'Suimfx'
       } catch { /* keep default */ }
 
       try {
@@ -79,7 +83,7 @@ const TradingViewChart = ({ symbol, interval = '5', isDarkMode = true, container
       const el = document.getElementById(chartId)
       if (el) el.innerHTML = ''
     }
-  }, [symbol, interval, isDarkMode, chartId])
+  }, [symbol, interval, isDarkMode, chartId, branding?.brandName])
 
   return (
     <div
