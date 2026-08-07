@@ -310,8 +310,11 @@ router.get('/history', async (req, res) => {
     // For crypto we also kick off the 7-day Binance backfill (fire-and-forget —
     // the datafeed re-polls every 2s so freshly-fetched bars show within seconds).
     const PriceBar = (await import('../models/PriceBar.js')).default
-    const { backfillFromBinance, isCryptoBackfillable } = await import('../services/barAggregator.js')
+    const { backfillFromBinance, backfillFromInfoway, isCryptoBackfillable } = await import('../services/barAggregator.js')
+    // Crypto → Binance (free, no key); everything else (forex/metals/indices) →
+    // Infoway's historical klines, the same source as our live feed.
     if (isCryptoBackfillable(sym)) backfillFromBinance(sym).catch(() => {})
+    else backfillFromInfoway(sym).catch(() => {})
     const pbDocs = await PriceBar.find({
       symbol: sym, resolution: '1',
       t: { $gte: fromSec * 1000, $lte: toSec * 1000 },
