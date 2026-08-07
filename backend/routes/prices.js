@@ -297,12 +297,36 @@ router.get('/history', async (req, res) => {
     const limit = Math.min(5000, parseInt(countback, 10) || 500)
 
     const minutesInRange = Math.ceil((toSec - fromSec) / 60) + 2
+    const docLimit = Math.max(minutesInRange, limit * (targetSec / 60))
     const docs = await Candle.find({
       symbol: sym, timeframe: '1m',
       time: { $gte: fromSec, $lte: toSec },
-    }).sort({ time: 1 }).limit(Math.max(minutesInRange, limit * (targetSec / 60))).lean()
+    }).sort({ time: 1 }).limit(docLimit).lean()
 
-    let bars1m = docs.map(d => ({ time: d.time, open: d.open, high: d.high, low: d.low, close: d.close }))
+    // Merge in the PriceBar series (live barAggregator + Binance backfill for
+    // crypto). This is what turns a crypto history gap into REAL candles instead
+    // of a flat carry-forward line: /history read only `Candle`, so the
+    // Binance-backfilled 1m bars that live in `PriceBar` never reached the chart.
+    // For crypto we also kick off the 7-day Binance backfill (fire-and-forget —
+    // the datafeed re-polls every 2s so freshly-fetched bars show within seconds).
+    const PriceBar = (await import('../models/PriceBar.js')).default
+    const { backfillFromBinance, isCryptoBackfillable } = await import('../services/barAggregator.js')
+    if (isCryptoBackfillable(sym)) backfillFromBinance(sym).catch(() => {})
+    const pbDocs = await PriceBar.find({
+      symbol: sym, resolution: '1',
+      t: { $gte: fromSec * 1000, $lte: toSec * 1000 },
+    }).sort({ t: 1 }).limit(docLimit).lean()
+
+    // Key every 1m bar by its minute (seconds); Candle wins when both have it.
+    const byMinute = new Map()
+    for (const b of pbDocs) {
+      const ts = Math.floor(b.t / 1000)
+      byMinute.set(ts, { time: ts, open: b.o, high: b.h, low: b.l, close: b.c })
+    }
+    for (const d of docs) {
+      byMinute.set(d.time, { time: d.time, open: d.open, high: d.high, low: d.low, close: d.close })
+    }
+    let bars1m = [...byMinute.values()].sort((a, b) => a.time - b.time)
 
     const current = getCurrentBar(sym)
     if (current && current.time >= fromSec && current.time <= toSec) {
