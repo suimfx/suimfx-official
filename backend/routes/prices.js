@@ -313,23 +313,39 @@ router.get('/history', async (req, res) => {
       }
     }
 
-    // Fill SHORT gaps (feed hiccups, e.g. an Infoway 429 outage) with flat
-    // carry-forward 1m bars so the chart is continuous instead of showing holes.
-    // Long gaps (> 3h → weekends / market closures) are left as real gaps.
-    const MAX_FILL_SEC = 3 * 3600
-    if (bars1m.length > 1) {
+    // Carry-forward continuity. The user wants NO breaks: when the feed was
+    // down (Infoway 429) or the market was closed there are simply no candles
+    // for that stretch, so we fill every interior gap AND the trailing edge up
+    // to `now` with flat 1m bars at the last known close ("last known price").
+    // A long real gap (weekend) therefore renders flat — that's the intended
+    // behaviour here, not a hole. Bounded by fillBudget so a pathological range
+    // can't generate unbounded bars.
+    const nowSec = Math.floor(Date.now() / 1000)
+    const fillTo = Math.min(toSec, nowSec)
+
+    // Window empty (stale data / mid-outage): seed from the most recent candle
+    // BEFORE the window so we can still carry a flat last-known series forward
+    // instead of returning a blank chart.
+    if (bars1m.length === 0) {
+      const prev = await Candle.findOne({ symbol: sym, timeframe: '1m', time: { $lt: fromSec } })
+        .sort({ time: -1 }).lean()
+      if (prev) {
+        const seedTime = Math.floor(fromSec / 60) * 60
+        bars1m = [{ time: seedTime, open: prev.close, high: prev.close, low: prev.close, close: prev.close }]
+      }
+    }
+
+    if (bars1m.length > 0) {
+      let fillBudget = 20000
       const filled = []
       for (let i = 0; i < bars1m.length; i++) {
         const cur = bars1m[i]
         filled.push(cur)
-        const nxt = bars1m[i + 1]
-        if (nxt) {
-          const gap = nxt.time - cur.time
-          if (gap > 60 && gap <= MAX_FILL_SEC) {
-            for (let t = cur.time + 60; t < nxt.time; t += 60) {
-              filled.push({ time: t, open: cur.close, high: cur.close, low: cur.close, close: cur.close })
-            }
-          }
+        // Interior gap → next real bar's time; last bar → carry forward to `fillTo`.
+        const stop = (i + 1 < bars1m.length) ? bars1m[i + 1].time : fillTo + 60
+        for (let t = cur.time + 60; t < stop && fillBudget > 0; t += 60) {
+          filled.push({ time: t, open: cur.close, high: cur.close, low: cur.close, close: cur.close })
+          fillBudget--
         }
       }
       bars1m = filled
