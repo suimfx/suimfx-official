@@ -71,12 +71,15 @@ const MobileTradingApp = () => {
     const cfg = adminSpreadsRef.current?.[symbol]
     const val = cfg?.spread
     if (!(val > 0)) return { bid: mid, ask: mid }
+    // Mirror the backend's spreadInPriceUnits so display == fill. Indices
+    // (US30/GER40, price > 100 but not USD-quoted) were wrongly treated as crypto
+    // by the old `mid >= 100 → val` branch; gate USD-direct on the USD suffix.
     let d
     if (cfg.spreadType === 'PERCENTAGE') d = mid * (val / 100)
     else if (symbol.includes('JPY')) d = val * 0.01
     else if (/^(XAU|XAG|XPT|XPD)/.test(symbol)) d = val * 0.01
-    else if (mid >= 100) d = val
-    else d = val * 0.0001
+    else if (mid >= 100 && symbol.endsWith('USD')) d = val               // crypto — USD directly
+    else d = val * 0.0001                                                // forex + indices
     // Configured value is the TOTAL spread → split half each side around the mid.
     const half = d / 2
     return { bid: mid - half, ask: mid + half }

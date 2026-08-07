@@ -190,12 +190,16 @@ const TradingPage = () => {
     const cfg = adminSpreadsRef.current?.[symbol]
     const val = cfg?.spread
     if (!(val > 0)) return { bid: mid, ask: mid }
+    // Mirror the backend's spreadInPriceUnits so display == fill. The old
+    // `mid >= 100 → val` branch mis-classified indices (price > 100 but not
+    // crypto, e.g. US30/GER40) as crypto. Crypto pairs end in USD (BTCUSD);
+    // indices do not — so gate the USD-direct branch on that.
     let d
     if (cfg.spreadType === 'PERCENTAGE') d = mid * (val / 100)
     else if (symbol.includes('JPY')) d = val * 0.01
     else if (/^(XAU|XAG|XPT|XPD)/.test(symbol)) d = val * 0.01
-    else if (mid >= 100) d = val
-    else d = val * 0.0001
+    else if (mid >= 100 && symbol.endsWith('USD')) d = val                // crypto — USD directly
+    else d = val * 0.0001                                                 // forex + indices
     // Configured value is the TOTAL spread → split half each side around the mid.
     const half = d / 2
     return { bid: mid - half, ask: mid + half }
