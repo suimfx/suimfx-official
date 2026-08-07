@@ -342,6 +342,14 @@ app.use(async (req, res, next) => {
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('Connected to MongoDB')
+    // Seed the price cache with last-known prices so instruments/quotes still show
+    // after a restart or while the feed is down, then keep persisting them.
+    try {
+      await lpPriceService.restorePrices()
+      lpPriceService.startPersistence()
+    } catch (e) {
+      console.warn('[LP Price Service] restore/persist init failed:', e.message)
+    }
     // Start OHLC candle flusher now that Mongoose is ready
     try {
       const { startPeriodicFlush } = await import('./services/candleAggregator.js')
