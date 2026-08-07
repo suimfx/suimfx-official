@@ -22,7 +22,6 @@ import PriceBar from '../models/PriceBar.js'
 
 const BUCKET_MS = 60 * 1000 // 1-minute base bucket
 const UPSERT_DEBOUNCE_MS = 2000
-const BACKFILL_STALE_THRESHOLD_MS = 5 * 60 * 1000 // skip backfill if recent bar exists
 const BACKFILL_DAYS = 7
 const BACKFILL_INTERVAL = '1m'
 const BACKFILL_LIMIT = 1000 // Binance API per-call max; we loop until we have 7 days
@@ -202,16 +201,11 @@ export async function backfillFromBinance(symbol) {
 
   const p = (async () => {
     try {
-      // Skip if we already have recent history (e.g. backend just restarted).
-      const newest = await PriceBar.findOne({ symbol: s, resolution: '1' })
-        .sort({ t: -1 })
-        .select('t')
-        .lean()
-      if (newest && Date.now() - newest.t < BACKFILL_STALE_THRESHOLD_MS) {
-        backfilledSymbols.add(s)
-        return { skipped: 'fresh-bars-exist' }
-      }
-
+      // Always sweep the full window — DON'T skip just because a recent bar
+      // exists. The live WS feed keeps the newest bar fresh even after it was
+      // down for a stretch, so "fresh newest bar" does NOT mean "no gaps". The
+      // upsert is $setOnInsert, so this only fills the minutes we're missing and
+      // never clobbers a live bar; backfilledSymbols still dedupes per process.
       const endMs = Date.now()
       const startMs = endMs - BACKFILL_DAYS * 24 * 60 * 60 * 1000
 
@@ -294,13 +288,11 @@ export async function backfillFromInfoway(symbol) {
 
   const p = (async () => {
     try {
-      const newest = await PriceBar.findOne({ symbol: s, resolution: '1' })
-        .sort({ t: -1 }).select('t').lean()
-      if (newest && Date.now() - newest.t < BACKFILL_STALE_THRESHOLD_MS) {
-        backfilledSymbols.add(s)
-        return { skipped: 'fresh-bars-exist' }
-      }
-
+      // Always sweep the full window — a fresh newest bar (kept alive by the live
+      // WS feed) does NOT mean the older history is gap-free. This is exactly the
+      // case that left forex/metals charts broken: the feed dropped for a stretch,
+      // came back, and the recent bar looked fresh so the old gap never filled.
+      // $setOnInsert only fills missing minutes; backfilledSymbols dedupes/process.
       let timestamp = Math.floor(Date.now() / 1000) // walk backward from now
       let totalInserted = 0
       for (let call = 0; call < INFOWAY_BACKFILL_MAX_CALLS; call++) {
