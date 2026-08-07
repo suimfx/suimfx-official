@@ -39,19 +39,13 @@ const MAX_BACKOFF_MS = 30_000
 // normal ceiling re-trips the limit on every attempt and the socket never comes
 // back (observed: the crypto feed stuck at 429 for 10+ minutes while retrying
 // every 30s). Rate limits get their own, much longer cooldown.
-// The cooldown itself escalates, because a flat one still burns ~30 attempts an
-// hour. Observed in production: after many restarts the crypto business kept
-// answering 429 to every attempt for 20+ minutes while `common` connected fine
-// on the same key — i.e. a quota that further attempts keep consuming, not a
-// short window. Doubles per consecutive 429, resets once the socket opens.
-// ponytail: blind escalation. Read Retry-After if Infoway ever sends one.
+// Flat, not escalating. An escalating version was tried on the theory that each
+// attempt consumes an allowance; production disproved it. Escalation walked both
+// sockets out to a 16 minute wait and the feed stayed dark for half an hour,
+// while a flat 120s had recovered in ~35 seconds on the deploy before it. The
+// 429 clears on its own once the previous process's connections are gone, which
+// is what the shutdown handler in server.js now takes care of directly.
 const RATE_LIMIT_BACKOFF_MS = 120_000
-// 30-min ceiling. A 5-min cap was tried for faster recovery, but against a
-// PERSISTENT 429 (Infoway throttling the whole account) frequent retries just
-// keep consuming the quota so it never clears. Spacing attempts far apart lets
-// Infoway's window reset. The durable fix is account-side (raise the connection
-// limit), not backoff tuning.
-const MAX_RATE_LIMIT_BACKOFF_MS = 1_800_000
 
 // Crypto bases (without the USD/USDT quote). Used to (a) route a symbol to the
 // `crypto` business socket and (b) map our USD form to Infoway's USDT form.
@@ -116,7 +110,6 @@ class BusinessFeed {
     this._ws = null
     this._hb = null
     this._rateLimited = false
-    this._rateLimitBackoff = RATE_LIMIT_BACKOFF_MS
   }
 
   start() {
@@ -146,7 +139,6 @@ class BusinessFeed {
     ws.on('open', () => {
       console.log(`[Infoway/${this.business}] connected`)
       this.backoff = INITIAL_BACKOFF_MS
-      this._rateLimitBackoff = RATE_LIMIT_BACKOFF_MS
       this._subscribe()
       this._startHeartbeat()
     })
@@ -167,10 +159,9 @@ class BusinessFeed {
 
   _scheduleReconnect() {
     if (this._stopped) return
-    const wait = this._rateLimited ? this._rateLimitBackoff : this.backoff
+    const wait = this._rateLimited ? RATE_LIMIT_BACKOFF_MS : this.backoff
     if (this._rateLimited) {
       console.warn(`[Infoway/${this.business}] rate limited — backing off ${wait / 1000}s`)
-      this._rateLimitBackoff = Math.min(this._rateLimitBackoff * 2, MAX_RATE_LIMIT_BACKOFF_MS)
     }
     this._rateLimited = false
     this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS)

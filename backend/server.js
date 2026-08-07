@@ -47,7 +47,7 @@ import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
 import lpPriceService from './services/lpPriceService.js'
-import { startInfowayFeed } from './services/infowayFeed.js'
+import { startInfowayFeed, stopInfowayFeed } from './services/infowayFeed.js'
 import AdminDomainConnection from './models/AdminDomainConnection.js'
 import { refreshDnsCheck } from './services/domainDnsService.js'
 import { renderBrandedHtml, resolveBrandingAdmin, renderBrandedManifest } from './services/htmlBrandingService.js'
@@ -606,6 +606,21 @@ app.get('*', async (req, res, next) => {
     return next()
   }
 })
+
+// Close the Infoway sockets before exiting. Without this, `pm2 restart` kills the
+// process with its WebSockets still open, and Infoway keeps counting them against
+// the API key until they time out server-side — so the new process's handshake
+// comes back 429 and the platform runs with no prices for minutes. Every sweep
+// (stop-out, SL/TP, pending orders) early-returns on an empty price cache, so
+// that gap is not cosmetic.
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    console.log(`[Shutdown] ${signal} — closing Infoway feed`)
+    try { stopInfowayFeed() } catch (e) { console.warn('[Shutdown] stopInfowayFeed:', e.message) }
+    // Give the close frames a moment to leave before the process dies.
+    setTimeout(() => process.exit(0), 500)
+  })
+}
 
 const PORT = process.env.PORT || 5000
 httpServer.listen(PORT, () => {
