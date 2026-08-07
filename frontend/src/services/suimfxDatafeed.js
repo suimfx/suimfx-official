@@ -134,7 +134,7 @@ async function fetchBinanceKlines(symbol, resolution, from, to) {
 
 async function fetchBackendHistory(symbol, resolution, from, to) {
   try {
-    const url = `${API_URL}/api/prices/history?symbol=${encodeURIComponent(symbol)}&resolution=${encodeURIComponent(resolution)}&from=${from}&to=${to}`
+    const url = `${API_URL}/prices/history?symbol=${encodeURIComponent(symbol)}&resolution=${encodeURIComponent(resolution)}&from=${from}&to=${to}`
     const response = await fetch(url)
     if (!response.ok) return null
     const data = await response.json()
