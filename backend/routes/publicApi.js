@@ -13,6 +13,8 @@ import express from 'express'
 import crypto from 'crypto'
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
+import tradeEngine from '../services/tradeEngine.js'
+import lpPriceService from '../services/lpPriceService.js'
 
 const router = express.Router()
 
@@ -110,6 +112,15 @@ router.get('/trades', requireApiKey, async (req, res) => {
 
     const trades = await Trade.find(query).sort({ openedAt: -1 }).skip(off).limit(lim).lean()
     const total = await Trade.countDocuments(query)
+
+    // Trade.floatingPnl is only ever 0 in the DB — open P&L is derived from the
+    // live price cache and never persisted. Fill it in here so partners get a
+    // real moving number instead of a column of zeros.
+    for (const t of trades) {
+      if (t.status !== 'OPEN') continue
+      const price = lpPriceService.getPrice(t.symbol)
+      if (price) t.floatingPnl = tradeEngine.calculateFloatingPnl(t, price.bid, price.ask)
+    }
 
     // One lookup for the page's accounts — the account id is the public
     // identity, so emails and real names never leave the platform.
