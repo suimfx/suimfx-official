@@ -184,6 +184,9 @@ const tradeSchema = new mongoose.Schema({
   }
 }, { timestamps: true })
 
+// Partner feed (/api/v1/trades) filters on openedAt over the whole collection.
+tradeSchema.index({ openedAt: -1 })
+
 // Generate unique trade ID
 tradeSchema.statics.generateTradeId = async function() {
   const prefix = 'T'

@@ -39,6 +39,7 @@ import employeeRoutes from './routes/employee.js'
 import employeeManagementRoutes from './routes/employeeManagement.js'
 import lpIntegrationRoutes from './routes/lpIntegration.js'
 import bookManagementRoutes from './routes/bookManagement.js'
+import publicApiRoutes from './routes/publicApi.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
@@ -88,7 +89,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-API-Key']
 }
 
 // Socket.IO for real-time updates
@@ -427,6 +428,7 @@ app.use('/api/employee', employeeRoutes)
 app.use('/api/employee-mgmt', employeeManagementRoutes)
 app.use('/api/lp', lpIntegrationRoutes)
 app.use('/api/book-management', bookManagementRoutes)
+app.use('/api/v1', publicApiRoutes)
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
