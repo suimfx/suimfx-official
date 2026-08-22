@@ -40,13 +40,15 @@ import employeeManagementRoutes from './routes/employeeManagement.js'
 import lpIntegrationRoutes from './routes/lpIntegration.js'
 import bookManagementRoutes from './routes/bookManagement.js'
 import publicApiRoutes from './routes/publicApi.js'
+import mt5Routes from './routes/mt5.js'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
 import lpPriceService from './services/lpPriceService.js'
-import { startInfowayFeed } from './services/infowayFeed.js'
+import { startInfowayFeed, stopInfowayFeed } from './services/infowayFeed.js'
 import AdminDomainConnection from './models/AdminDomainConnection.js'
 import { refreshDnsCheck } from './services/domainDnsService.js'
 import { renderBrandedHtml, resolveBrandingAdmin, renderBrandedManifest } from './services/htmlBrandingService.js'
@@ -128,11 +130,18 @@ lpPriceService.setOnConnectionChange((connected) => {
 lpPriceService.connect()
 console.log('[Market data] Corecen LP → POST /api/lp/prices/batch')
 
+// Re-entrancy guards. setInterval does not wait for the previous run, so a sweep
+// that takes longer than its interval used to overlap with itself — two passes then
+// closed the same trades and raced each other's account-balance writes.
+const sweepRunning = { stopOut: false, pending: false, slTp: false }
+
 // Background stop-out check every 5 seconds
 setInterval(async () => {
+  if (sweepRunning.stopOut) return
+  sweepRunning.stopOut = true
   try {
     if (priceCache.size === 0) return
-    
+
     const currentPrices = {}
     priceCache.forEach((data, symbol) => {
       currentPrices[symbol] = { bid: data.bid, ask: data.ask }
@@ -142,7 +151,9 @@ setInterval(async () => {
     if (result.stopOuts && result.stopOuts.length > 0) {
       console.log(`[STOP-OUT] ${result.stopOuts.length} accounts stopped out`)
     }
-  } catch (error) {}
+  } catch (error) {} finally {
+    sweepRunning.stopOut = false
+  }
 }, 5000)
 
 // Background pending-order check every 1 second.
@@ -151,6 +162,8 @@ setInterval(async () => {
 // /trade/check-pending — so orders go untriggered if the user closes the tab,
 // switches symbol, or simply isn't watching that pair.
 setInterval(async () => {
+  if (sweepRunning.pending) return
+  sweepRunning.pending = true
   try {
     if (priceCache.size === 0) return
 
@@ -176,11 +189,15 @@ setInterval(async () => {
     }
   } catch (error) {
     console.error('[PENDING AUTO] error:', error.message)
+  } finally {
+    sweepRunning.pending = false
   }
 }, 1000)
 
 // Background SL/TP check every 1 second
 setInterval(async () => {
+  if (sweepRunning.slTp) return
+  sweepRunning.slTp = true
   try {
     if (priceCache.size === 0) return
 
@@ -211,7 +228,9 @@ setInterval(async () => {
         })
       })
     }
-  } catch (error) {}
+  } catch (error) {} finally {
+    sweepRunning.slTp = false
+  }
 }, 1000)
 
 io.on('connection', (socket) => {
@@ -324,6 +343,14 @@ app.use(async (req, res, next) => {
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('Connected to MongoDB')
+    // Seed the price cache with last-known prices so instruments/quotes still show
+    // after a restart or while the feed is down, then keep persisting them.
+    try {
+      await lpPriceService.restorePrices()
+      lpPriceService.startPersistence()
+    } catch (e) {
+      console.warn('[LP Price Service] restore/persist init failed:', e.message)
+    }
     // Start OHLC candle flusher now that Mongoose is ready
     try {
       const { startPeriodicFlush } = await import('./services/candleAggregator.js')
@@ -360,6 +387,19 @@ mongoose.connect(process.env.MONGODB_URI)
     } catch (e) {
       console.warn('[MongoDB] IBSettings.syncIndexes:', e.message)
     }
+    // Sync AccountType indexes. Older builds shipped a GLOBAL unique index on
+    // `name`, so once one admin created a "Standard"/"Demo"/etc. type, every
+    // other admin's attempt to create a same-named type failed with a duplicate-
+    // key error surfaced only as "Error creating account type". The schema now
+    // declares no such index, so syncIndexes drops the stray unique index and
+    // account-type names become per-admin again. (Dropping an index never fails
+    // on existing duplicates — only building a unique one would.)
+    try {
+      const AccountTypeModel = (await import('./models/AccountType.js')).default
+      await AccountTypeModel.syncIndexes()
+    } catch (e) {
+      console.warn('[MongoDB] AccountType.syncIndexes:', e.message)
+    }
     // One-time migration: backfill accountTypeName for existing trading accounts
     try {
       const TradingAccount = (await import('./models/TradingAccount.js')).default
@@ -393,6 +433,31 @@ mongoose.connect(process.env.MONGODB_URI)
       }
     } catch (e) {
       console.warn('[Migration] bankSettings:', e.message)
+    }
+    // One-time migration: tag already-open follower trades as copy trades.
+    // isCopyTrade is set at creation from now on, but positions opened before this
+    // deploy have no flag — without backfilling them the SL/TP sweep would keep
+    // closing them independently of their master and their P&L would keep drifting.
+    try {
+      const CopyTrade = (await import('./models/CopyTrade.js')).default
+      const TradeModel = (await import('./models/Trade.js')).default
+      const openCopies = await CopyTrade.find({ status: 'OPEN' })
+        .select('followerTradeId masterTradeId')
+        .lean()
+      let tagged = 0
+      for (const ct of openCopies) {
+        if (!ct.followerTradeId) continue
+        const r = await TradeModel.updateOne(
+          { _id: ct.followerTradeId, isCopyTrade: { $ne: true } },
+          { $set: { isCopyTrade: true, copyMasterTradeId: ct.masterTradeId || null } }
+        )
+        tagged += r.modifiedCount || 0
+      }
+      if (tagged > 0) {
+        console.log(`[Migration] Tagged ${tagged} existing open follower trade(s) as copy trades`)
+      }
+    } catch (e) {
+      console.warn('[Migration] copy trade tagging:', e.message)
     }
   })
   .catch((err) => console.error('MongoDB connection error:', err))
@@ -429,20 +494,39 @@ app.use('/api/employee-mgmt', employeeManagementRoutes)
 app.use('/api/lp', lpIntegrationRoutes)
 app.use('/api/book-management', bookManagementRoutes)
 app.use('/api/v1', publicApiRoutes)
+app.use('/api/mt5', mt5Routes)
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
-// Serve APK download
-app.get('/downloads/Suimfx.apk', (req, res) => {
-  const apkPath = path.join(__dirname, 'apk', 'Suimfx.apk')
-  res.download(apkPath, 'Suimfx.apk', (err) => {
-    if (err) {
-      console.error('APK download error:', err)
-      res.status(404).json({ error: 'APK not found' })
+// Serve the Android APK for download.
+// The landing page historically linked to /suimfx.apk while the only backend
+// route was /downloads/Suimfx.apk — so the download hit the SPA fallback and
+// returned an empty (0-byte) response, which Android rejects with "problem
+// parsing the package". Accept every spelling/path, and refuse up front with a
+// clear 404 when the file is missing or empty instead of streaming 0 bytes.
+const APK_PATH = path.join(__dirname, 'apk', 'Suimfx.apk')
+const serveApk = (req, res) => {
+  try {
+    const stat = fs.existsSync(APK_PATH) ? fs.statSync(APK_PATH) : null
+    if (!stat || stat.size === 0) {
+      console.error(`[APK] not downloadable — ${stat ? 'file is 0 bytes' : 'file not found'} at ${APK_PATH}`)
+      return res.status(404).json({ error: 'App file is not available right now. Please try again later or contact support.' })
     }
-  })
-})
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive')
+    res.setHeader('Content-Length', stat.size)
+    res.download(APK_PATH, 'Suimfx.apk', (err) => {
+      if (err && !res.headersSent) {
+        console.error('[APK] download error:', err.message)
+        res.status(500).json({ error: 'APK download failed' })
+      }
+    })
+  } catch (e) {
+    console.error('[APK] serve error:', e.message)
+    if (!res.headersSent) res.status(500).json({ error: 'APK download failed' })
+  }
+}
+app.get(['/downloads/Suimfx.apk', '/downloads/suimfx.apk', '/suimfx.apk', '/Suimfx.apk'], serveApk)
 
 // Health check / dynamic branded HTML fallback.
 // Nginx proxies HTML page requests here (root, /register, /login, etc.) so that
@@ -524,6 +608,21 @@ app.get('*', async (req, res, next) => {
     return next()
   }
 })
+
+// Close the Infoway sockets before exiting. Without this, `pm2 restart` kills the
+// process with its WebSockets still open, and Infoway keeps counting them against
+// the API key until they time out server-side — so the new process's handshake
+// comes back 429 and the platform runs with no prices for minutes. Every sweep
+// (stop-out, SL/TP, pending orders) early-returns on an empty price cache, so
+// that gap is not cosmetic.
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    console.log(`[Shutdown] ${signal} — closing Infoway feed`)
+    try { stopInfowayFeed() } catch (e) { console.warn('[Shutdown] stopInfowayFeed:', e.message) }
+    // Give the close frames a moment to leave before the process dies.
+    setTimeout(() => process.exit(0), 500)
+  })
+}
 
 const PORT = process.env.PORT || 5000
 httpServer.listen(PORT, () => {

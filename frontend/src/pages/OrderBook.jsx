@@ -49,7 +49,8 @@ const OrderBook = () => {
   const [livePrices, setLivePrices] = useState({})
   const [historyFilter, setHistoryFilter] = useState('all') // all, today, week, month, year
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 20
+  const [detailTrade, setDetailTrade] = useState(null)
+  const itemsPerPage = 100
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
@@ -110,6 +111,26 @@ const OrderBook = () => {
     }
   }
 
+  // Pull the FULL closed-trade history for an account, not just the first page.
+  // The backend caps a single response at 200, so loop with offset until we've
+  // collected `total`. Without this the page only ever saw the default 50.
+  const fetchAllClosedTrades = async (accountId) => {
+    const pageSize = 200
+    const safetyCap = 20000 // hard stop so a bad `total` can't loop forever
+    let offset = 0
+    let all = []
+    while (offset < safetyCap) {
+      const res = await fetch(`${API_URL}/trade/history/${accountId}?limit=${pageSize}&offset=${offset}`)
+      const data = await res.json()
+      if (!data.success || !Array.isArray(data.trades) || data.trades.length === 0) break
+      all = all.concat(data.trades)
+      const total = typeof data.total === 'number' ? data.total : all.length
+      offset += data.trades.length
+      if (all.length >= total || data.trades.length < pageSize) break
+    }
+    return all
+  }
+
   const fetchAllTrades = async () => {
     setLoading(true)
     try {
@@ -129,11 +150,10 @@ const OrderBook = () => {
           allOpen = [...allOpen, ...openData.trades.map(t => ({ ...t, accountName: account.accountId }))]
         }
 
-        // Fetch closed trades (history)
-        const historyRes = await fetch(`${API_URL}/trade/history/${account._id}`)
-        const historyData = await historyRes.json()
-        if (historyData.success && historyData.trades) {
-          allClosed = [...allClosed, ...historyData.trades.map(t => ({ ...t, accountName: account.accountId }))]
+        // Fetch closed trades (full history, all pages)
+        const closed = await fetchAllClosedTrades(account._id)
+        if (closed.length > 0) {
+          allClosed = [...allClosed, ...closed.map(t => ({ ...t, accountName: account.accountId }))]
         }
 
         // Fetch pending orders
@@ -598,7 +618,7 @@ const OrderBook = () => {
                           </thead>
                           <tbody>
                             {getPaginatedHistory().map((trade) => (
-                              <tr key={trade._id} className={`border-b ${isDarkMode ? 'border-gray-800 hover:bg-dark-700/50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                              <tr key={trade._id} onClick={() => setDetailTrade(trade)} className={`border-b cursor-pointer ${isDarkMode ? 'border-gray-800 hover:bg-dark-700/50' : 'border-gray-200 hover:bg-gray-50'}`}>
                                 <td className="py-3 px-4 text-gray-400 text-xs">{formatDate(trade.closedAt)}</td>
                                 <td className="py-3 px-4 text-gray-400 text-sm">{trade.accountName}</td>
                                 <td className={`py-3 px-4 font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{trade.symbol}</td>
@@ -707,6 +727,59 @@ const OrderBook = () => {
           </div>
         </div>
       </main>
+
+      {/* Trade detail modal — full breakdown for a closed trade */}
+      {detailTrade && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setDetailTrade(null)}
+        >
+          <div
+            className={`w-full max-w-lg rounded-2xl border shadow-xl ${isDarkMode ? 'bg-dark-800 border-gray-700' : 'bg-white border-gray-200'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`flex items-center justify-between p-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className="flex items-center gap-2">
+                <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{detailTrade.symbol}</span>
+                <span className={`flex items-center gap-1 text-sm ${detailTrade.side === 'BUY' ? 'text-green-500' : 'text-red-500'}`}>
+                  {detailTrade.side === 'BUY' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{detailTrade.side}
+                </span>
+              </div>
+              <button onClick={() => setDetailTrade(null)} className="text-gray-400 hover:text-white">✕</button>
+            </div>
+            <div className="p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {[
+                ['Trade ID', detailTrade.tradeId || '-'],
+                ['Account', detailTrade.accountName || '-'],
+                ['Type', detailTrade.orderType || 'MARKET'],
+                ['Quantity (lots)', detailTrade.quantity],
+                ['Open Price', detailTrade.openPrice?.toFixed(5) ?? '-'],
+                ['Close Price', detailTrade.closePrice?.toFixed(5) ?? '-'],
+                ['Stop Loss', (detailTrade.sl ?? detailTrade.stopLoss) || '-'],
+                ['Take Profit', (detailTrade.tp ?? detailTrade.takeProfit) || '-'],
+                ['Leverage', detailTrade.leverage ? `1:${detailTrade.leverage}` : '-'],
+                ['Margin Used', detailTrade.marginUsed != null ? `$${Number(detailTrade.marginUsed).toFixed(2)}` : '-'],
+                ['Commission', `$${Number(detailTrade.commission || 0).toFixed(2)}`],
+                ['Swap', `$${Number(detailTrade.swap || 0).toFixed(2)}`],
+                ['Opened', formatDate(detailTrade.openedAt)],
+                ['Closed', formatDate(detailTrade.closedAt)],
+                ['Closed By', detailTrade.closedBy || '-'],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-gray-500 text-xs">{label}</p>
+                  <p className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{value}</p>
+                </div>
+              ))}
+              <div className="col-span-2 pt-2 border-t border-gray-700/50">
+                <p className="text-gray-500 text-xs">Realized P&L</p>
+                <p className={`text-lg font-bold ${(detailTrade.realizedPnl || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(detailTrade.realizedPnl || 0) >= 0 ? '+' : ''}${(detailTrade.realizedPnl || 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

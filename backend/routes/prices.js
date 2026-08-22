@@ -297,12 +297,39 @@ router.get('/history', async (req, res) => {
     const limit = Math.min(5000, parseInt(countback, 10) || 500)
 
     const minutesInRange = Math.ceil((toSec - fromSec) / 60) + 2
+    const docLimit = Math.max(minutesInRange, limit * (targetSec / 60))
     const docs = await Candle.find({
       symbol: sym, timeframe: '1m',
       time: { $gte: fromSec, $lte: toSec },
-    }).sort({ time: 1 }).limit(Math.max(minutesInRange, limit * (targetSec / 60))).lean()
+    }).sort({ time: 1 }).limit(docLimit).lean()
 
-    let bars1m = docs.map(d => ({ time: d.time, open: d.open, high: d.high, low: d.low, close: d.close }))
+    // Merge in the PriceBar series (live barAggregator + Binance backfill for
+    // crypto). This is what turns a crypto history gap into REAL candles instead
+    // of a flat carry-forward line: /history read only `Candle`, so the
+    // Binance-backfilled 1m bars that live in `PriceBar` never reached the chart.
+    // For crypto we also kick off the 7-day Binance backfill (fire-and-forget —
+    // the datafeed re-polls every 2s so freshly-fetched bars show within seconds).
+    const PriceBar = (await import('../models/PriceBar.js')).default
+    const { backfillFromBinance, backfillFromInfoway, isCryptoBackfillable } = await import('../services/barAggregator.js')
+    // Crypto → Binance (free, no key); everything else (forex/metals/indices) →
+    // Infoway's historical klines, the same source as our live feed.
+    if (isCryptoBackfillable(sym)) backfillFromBinance(sym).catch(() => {})
+    else backfillFromInfoway(sym).catch(() => {})
+    const pbDocs = await PriceBar.find({
+      symbol: sym, resolution: '1',
+      t: { $gte: fromSec * 1000, $lte: toSec * 1000 },
+    }).sort({ t: 1 }).limit(docLimit).lean()
+
+    // Key every 1m bar by its minute (seconds); Candle wins when both have it.
+    const byMinute = new Map()
+    for (const b of pbDocs) {
+      const ts = Math.floor(b.t / 1000)
+      byMinute.set(ts, { time: ts, open: b.o, high: b.h, low: b.l, close: b.c })
+    }
+    for (const d of docs) {
+      byMinute.set(d.time, { time: d.time, open: d.open, high: d.high, low: d.low, close: d.close })
+    }
+    let bars1m = [...byMinute.values()].sort((a, b) => a.time - b.time)
 
     const current = getCurrentBar(sym)
     if (current && current.time >= fromSec && current.time <= toSec) {
@@ -311,6 +338,44 @@ router.get('/history', async (req, res) => {
       } else {
         bars1m.push({ ...current })
       }
+    }
+
+    // Carry-forward continuity. The user wants NO breaks: when the feed was
+    // down (Infoway 429) or the market was closed there are simply no candles
+    // for that stretch, so we fill every interior gap AND the trailing edge up
+    // to `now` with flat 1m bars at the last known close ("last known price").
+    // A long real gap (weekend) therefore renders flat — that's the intended
+    // behaviour here, not a hole. Bounded by fillBudget so a pathological range
+    // can't generate unbounded bars.
+    const nowSec = Math.floor(Date.now() / 1000)
+    const fillTo = Math.min(toSec, nowSec)
+
+    // Window empty (stale data / mid-outage): seed from the most recent candle
+    // BEFORE the window so we can still carry a flat last-known series forward
+    // instead of returning a blank chart.
+    if (bars1m.length === 0) {
+      const prev = await Candle.findOne({ symbol: sym, timeframe: '1m', time: { $lt: fromSec } })
+        .sort({ time: -1 }).lean()
+      if (prev) {
+        const seedTime = Math.floor(fromSec / 60) * 60
+        bars1m = [{ time: seedTime, open: prev.close, high: prev.close, low: prev.close, close: prev.close }]
+      }
+    }
+
+    if (bars1m.length > 0) {
+      let fillBudget = 20000
+      const filled = []
+      for (let i = 0; i < bars1m.length; i++) {
+        const cur = bars1m[i]
+        filled.push(cur)
+        // Interior gap → next real bar's time; last bar → carry forward to `fillTo`.
+        const stop = (i + 1 < bars1m.length) ? bars1m[i + 1].time : fillTo + 60
+        for (let t = cur.time + 60; t < stop && fillBudget > 0; t += 60) {
+          filled.push({ time: t, open: cur.close, high: cur.close, low: cur.close, close: cur.close })
+          fillBudget--
+        }
+      }
+      bars1m = filled
     }
 
     if (bars1m.length > 0) {

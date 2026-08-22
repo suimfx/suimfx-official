@@ -152,11 +152,46 @@ const tradeSchema = new mongoose.Schema({
     default: null
   },
 
+  // Copy trading. A follower trade mirrors its master exactly: it opens at the
+  // master's fill price and must close at the master's close price. The background
+  // SL/TP sweep therefore skips these — letting a follower hit the copied SL/TP on
+  // its own would close it at a different price than the master and make the two
+  // P&Ls diverge.
+  isCopyTrade: {
+    type: Boolean,
+    default: false
+  },
+  copyMasterTradeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Trade',
+    default: null
+  },
+
   // Book Management + Corecen LP
   bookType: {
     type: String,
     enum: ['A', 'B'],
     default: 'B'
+  },
+  // Which A-Book venue this trade actually went to. Recorded at open and read
+  // back at close/modify — the user may be re-tagged while the position is open,
+  // so the trade, not the user, decides where the close is sent.
+  aBookDestination: {
+    type: String,
+    enum: ['CORECEN', 'MT5', null],
+    default: null
+  },
+  mt5AccountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Mt5Account',
+    default: null
+  },
+  // The venue's rejection text when the hedge push failed ("Unknown symbol",
+  // "not enough money"). Stored rather than only logged so the admin can see
+  // and retry a failed hedge from the MT5 Trade page instead of reading logs.
+  aBookError: {
+    type: String,
+    default: ''
   },
   aBookExecuted: {
     type: Boolean,

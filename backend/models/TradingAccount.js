@@ -28,6 +28,14 @@ const tradingAccountSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Negative-balance protection: balance floors at 0, so a loss larger than
+  // balance+credit cannot be fully deducted. The shortfall is accumulated here
+  // instead of vanishing, so closed-trade P&L still reconciles against the
+  // balance movement in audits.
+  unrecoveredLoss: {
+    type: Number,
+    default: 0
+  },
   leverage: {
     type: String,
     required: true

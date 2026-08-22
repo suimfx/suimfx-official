@@ -268,7 +268,12 @@ class CopyTradingEngine {
           masterTrade.stopLoss,
           masterTrade.takeProfit,
           null, // userLeverage - use account default
-          { skipSpread: true } // Don't apply spread again - master's price already includes it
+          {
+            skipSpread: true, // Don't apply spread again - master's price already includes it
+            // Tag the mirror so the background SL/TP sweep leaves it alone; it closes
+            // only when the master closes, at the master's price.
+            copyMasterTradeId: masterTrade._id
+          }
         )
 
         // Record successful copy trade

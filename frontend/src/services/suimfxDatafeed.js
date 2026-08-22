@@ -134,7 +134,7 @@ async function fetchBinanceKlines(symbol, resolution, from, to) {
 
 async function fetchBackendHistory(symbol, resolution, from, to) {
   try {
-    const url = `${API_URL}/api/prices/history?symbol=${encodeURIComponent(symbol)}&resolution=${encodeURIComponent(resolution)}&from=${from}&to=${to}`
+    const url = `${API_URL}/prices/history?symbol=${encodeURIComponent(symbol)}&resolution=${encodeURIComponent(resolution)}&from=${from}&to=${to}`
     const response = await fetch(url)
     if (!response.ok) return null
     const data = await response.json()
@@ -270,7 +270,9 @@ class SuimfxDatafeed {
     this._liveBar = {}
     this._streamUnsub = null
     this._streamActive = false
-    this._startStream()
+    // Live bars now come from polling the server's DB-aggregated /history (see
+    // subscribeBars), not from client-side tick bucketing — so we no longer start
+    // the price-stream bar builder here.
   }
 
   _startStream() {
@@ -458,23 +460,29 @@ class SuimfxDatafeed {
 
   subscribeBars(symbolInfo, resolution, onTick, listenerGuid) {
     const symbol = (symbolInfo.name || symbolInfo.ticker).toUpperCase()
-    this._subscribers[listenerGuid] = { symbol, resolution, onTick }
+    const resSec = RESOLUTION_MAP[resolution] || 300
+    // Pull the latest bar from the server's DB-aggregated /history (the same
+    // source getBars uses) instead of bucketing raw ticks on the client. One
+    // source of truth — the DB, aggregated per timeframe server-side — means the
+    // live bar always lines up with history, so candles don't break/misalign on
+    // timeframe changes or feed hiccups.
+    const poll = async () => {
+      try {
+        const now = Math.floor(Date.now() / 1000)
+        const from = now - resSec * 3
+        const bars = await fetchBackendHistory(symbol, resolution, from, now)
+        if (bars && bars.length) onTick(bars[bars.length - 1])
+      } catch (_) { /* transient — next poll retries */ }
+    }
+    const timer = setInterval(poll, 2000)
+    this._subscribers[listenerGuid] = { symbol, resolution, timer }
+    poll()
   }
 
   unsubscribeBars(listenerGuid) {
     const sub = this._subscribers[listenerGuid]
+    if (sub && sub.timer) clearInterval(sub.timer)
     delete this._subscribers[listenerGuid]
-
-    // If nothing else is watching this (symbol, resolution) pair, drop its
-    // live-bar state so a re-subscribe gets a fresh seed from getBars.
-    if (sub) {
-      const stillWatched = Object.values(this._subscribers).some(
-        s => s.symbol === sub.symbol && s.resolution === sub.resolution
-      )
-      if (!stillWatched && this._liveBar[sub.symbol]) {
-        delete this._liveBar[sub.symbol][sub.resolution]
-      }
-    }
   }
 
   destroy() {

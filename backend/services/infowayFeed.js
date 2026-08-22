@@ -32,6 +32,20 @@ const WS_BASE = process.env.INFOWAY_WS_URL || 'wss://data.infoway.io/ws'
 const HEARTBEAT_MS = 25_000
 const INITIAL_BACKOFF_MS = 1_000
 const MAX_BACKOFF_MS = 30_000
+// Infoway answers the WS handshake with HTTP 429 when too many connections have
+// been opened for the API key recently — which is exactly what a restart looks
+// like, since the old process's sockets are still counted until they expire
+// server-side. Its window is longer than MAX_BACKOFF_MS, so retrying at the
+// normal ceiling re-trips the limit on every attempt and the socket never comes
+// back (observed: the crypto feed stuck at 429 for 10+ minutes while retrying
+// every 30s). Rate limits get their own, much longer cooldown.
+// Flat, not escalating. An escalating version was tried on the theory that each
+// attempt consumes an allowance; production disproved it. Escalation walked both
+// sockets out to a 16 minute wait and the feed stayed dark for half an hour,
+// while a flat 120s had recovered in ~35 seconds on the deploy before it. The
+// 429 clears on its own once the previous process's connections are gone, which
+// is what the shutdown handler in server.js now takes care of directly.
+const RATE_LIMIT_BACKOFF_MS = 120_000
 
 // Crypto bases (without the USD/USDT quote). Used to (a) route a symbol to the
 // `crypto` business socket and (b) map our USD form to Infoway's USDT form.
@@ -95,6 +109,7 @@ class BusinessFeed {
     this._stopped = false
     this._ws = null
     this._hb = null
+    this._rateLimited = false
   }
 
   start() {
@@ -136,14 +151,19 @@ class BusinessFeed {
       }
     })
     ws.on('error', (err) => {
-      // 'error' is always followed by 'close'; just log here.
+      // 'error' is always followed by 'close'; just record + log here.
+      if (/\b429\b/.test(err.message)) this._rateLimited = true
       console.warn(`[Infoway/${this.business}] socket error: ${err.message}`)
     })
   }
 
   _scheduleReconnect() {
     if (this._stopped) return
-    const wait = this.backoff
+    const wait = this._rateLimited ? RATE_LIMIT_BACKOFF_MS : this.backoff
+    if (this._rateLimited) {
+      console.warn(`[Infoway/${this.business}] rate limited — backing off ${wait / 1000}s`)
+    }
+    this._rateLimited = false
     this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS)
     setTimeout(() => { if (!this._stopped) this._connect() }, wait)
   }

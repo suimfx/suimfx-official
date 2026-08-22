@@ -22,10 +22,17 @@ import PriceBar from '../models/PriceBar.js'
 
 const BUCKET_MS = 60 * 1000 // 1-minute base bucket
 const UPSERT_DEBOUNCE_MS = 2000
-const BACKFILL_STALE_THRESHOLD_MS = 5 * 60 * 1000 // skip backfill if recent bar exists
 const BACKFILL_DAYS = 7
 const BACKFILL_INTERVAL = '1m'
 const BACKFILL_LIMIT = 1000 // Binance API per-call max; we loop until we have 7 days
+
+// Infoway historical klines — for forex / metals / indices (the "common"
+// business, the SAME source as our live WS feed, so history and live agree).
+// POST batch_kline with the apiKey header; max 500 candles per call; walk
+// backward by `timestamp` to page through older history.
+const INFOWAY_KLINE_URL = process.env.INFOWAY_KLINE_URL || 'https://data.infoway.io/common/v2/batch_kline'
+const INFOWAY_KLINE_MAX = 500
+const INFOWAY_BACKFILL_MAX_CALLS = 20 // 20 × 500 = ~6.9 days of 1m history
 
 // liveBars[symbol] = { t, o, h, l, c, v, dirty, lastUpsertAt }
 const liveBars = new Map()
@@ -194,16 +201,11 @@ export async function backfillFromBinance(symbol) {
 
   const p = (async () => {
     try {
-      // Skip if we already have recent history (e.g. backend just restarted).
-      const newest = await PriceBar.findOne({ symbol: s, resolution: '1' })
-        .sort({ t: -1 })
-        .select('t')
-        .lean()
-      if (newest && Date.now() - newest.t < BACKFILL_STALE_THRESHOLD_MS) {
-        backfilledSymbols.add(s)
-        return { skipped: 'fresh-bars-exist' }
-      }
-
+      // Always sweep the full window — DON'T skip just because a recent bar
+      // exists. The live WS feed keeps the newest bar fresh even after it was
+      // down for a stretch, so "fresh newest bar" does NOT mean "no gaps". The
+      // upsert is $setOnInsert, so this only fills the minutes we're missing and
+      // never clobbers a live bar; backfilledSymbols still dedupes per process.
       const endMs = Date.now()
       const startMs = endMs - BACKFILL_DAYS * 24 * 60 * 60 * 1000
 
@@ -257,6 +259,90 @@ export async function backfillFromBinance(symbol) {
       return { inserted: totalInserted }
     } catch (err) {
       console.error(`[barAggregator] Binance backfill error for ${s}:`, err.message)
+      return { error: err.message }
+    } finally {
+      backfillInFlight.delete(s)
+    }
+  })()
+
+  backfillInFlight.set(s, p)
+  return p
+}
+
+/**
+ * One-shot backfill of historical 1m bars from Infoway's batch_kline REST API,
+ * for NON-crypto symbols (forex, metals, indices). Crypto keeps using Binance
+ * (free, no key). Same store, same idempotent upsert as live/Binance bars, so
+ * /history sees continuous history instead of flat carry-forward lines.
+ *
+ * Needs INFOWAY_API_KEY; no-ops without it (e.g. local dev). Gentle on Infoway:
+ * dedupes per process + per in-flight symbol, caps total calls, spaces requests.
+ */
+export async function backfillFromInfoway(symbol) {
+  const s = String(symbol || '').toUpperCase()
+  const apiKey = process.env.INFOWAY_API_KEY
+  if (!apiKey) return { skipped: 'no-api-key' }
+  if (toBinanceSymbol(s)) return { skipped: 'is-crypto' } // crypto → Binance
+  if (backfilledSymbols.has(s)) return { skipped: 'already-backfilled' }
+  if (backfillInFlight.has(s)) return backfillInFlight.get(s)
+
+  const p = (async () => {
+    try {
+      // Always sweep the full window — a fresh newest bar (kept alive by the live
+      // WS feed) does NOT mean the older history is gap-free. This is exactly the
+      // case that left forex/metals charts broken: the feed dropped for a stretch,
+      // came back, and the recent bar looked fresh so the old gap never filled.
+      // $setOnInsert only fills missing minutes; backfilledSymbols dedupes/process.
+      let timestamp = Math.floor(Date.now() / 1000) // walk backward from now
+      let totalInserted = 0
+      for (let call = 0; call < INFOWAY_BACKFILL_MAX_CALLS; call++) {
+        const resp = await fetch(INFOWAY_KLINE_URL, {
+          method: 'POST',
+          headers: { apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ klineType: 1, klineNum: INFOWAY_KLINE_MAX, codes: s, timestamp }),
+        })
+        if (!resp.ok) {
+          console.warn(`[barAggregator] Infoway backfill ${s} HTTP ${resp.status}`)
+          break
+        }
+        const json = await resp.json()
+        const list = json && json.data && json.data[0] && json.data[0].respList
+        if (!Array.isArray(list) || list.length === 0) break
+
+        const ops = list.map(k => {
+          const tMs = parseInt(k.t, 10) * 1000
+          return {
+            updateOne: {
+              filter: { symbol: s, resolution: '1', t: tMs },
+              update: {
+                $setOnInsert: {
+                  symbol: s, resolution: '1', t: tMs,
+                  o: parseFloat(k.o), h: parseFloat(k.h),
+                  l: parseFloat(k.l), c: parseFloat(k.c),
+                  v: parseFloat(k.v) || 0, src: 'infoway-backfill',
+                },
+                $set: { updatedAt: new Date() },
+              },
+              upsert: true,
+            },
+          }
+        })
+        const res = await PriceBar.bulkWrite(ops, { ordered: false })
+        totalInserted += res.upsertedCount || 0
+
+        // Oldest bar in this page → next page ends just before it.
+        const oldest = list.reduce((m, k) => Math.min(m, parseInt(k.t, 10)), Infinity)
+        if (!Number.isFinite(oldest) || oldest >= timestamp) break
+        timestamp = oldest - 1
+        if (list.length < INFOWAY_KLINE_MAX) break
+        await new Promise(r => setTimeout(r, 150)) // space out — don't trip Infoway rate limits
+      }
+
+      backfilledSymbols.add(s)
+      console.log(`[barAggregator] Infoway backfill complete: ${s} → +${totalInserted} new 1m bars`)
+      return { inserted: totalInserted }
+    } catch (err) {
+      console.error(`[barAggregator] Infoway backfill error for ${s}:`, err.message)
       return { error: err.message }
     } finally {
       backfillInFlight.delete(s)

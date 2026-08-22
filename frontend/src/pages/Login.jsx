@@ -91,17 +91,12 @@ const Login = () => {
       const response = await login({ ...formData, adminSlug })
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
-      // Store admin branding for sidebar logo
       if (response.user.adminBranding && response.user.adminBranding.logo) {
         localStorage.setItem('adminLogoUrl', `${API_BASE_URL}${response.user.adminBranding.logo}`)
         localStorage.setItem('adminBrandName', response.user.adminBranding.brandName || '')
       }
       await refreshBranding()
-      if (isMobile) {
-        navigate('/mobile')
-      } else {
-        navigate('/dashboard')
-      }
+      navigate(isMobile ? '/mobile' : '/dashboard')
     } catch (err) {
       setError(err.message)
     } finally {

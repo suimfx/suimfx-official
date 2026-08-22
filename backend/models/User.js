@@ -145,7 +145,26 @@ const userSchema = new mongoose.Schema({
     ref: 'Admin',
     default: null
   },
-  
+
+  // MT5 hedging (A-Book only). One user points at at most one MT5 account, but
+  // many users may share the same one — the single field gives both rules for
+  // free. Null = this user's A-Book flow keeps going to Corecen.
+  mt5AccountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Mt5Account',
+    default: null,
+    index: true
+  },
+  mt5TaggedAt: {
+    type: Date,
+    default: null
+  },
+  mt5TaggedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
+
   createdAt: {
     type: Date,
     default: Date.now

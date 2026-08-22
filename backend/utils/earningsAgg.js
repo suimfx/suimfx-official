@@ -16,8 +16,13 @@ export const SPREAD_DOLLARS_STAGE = {
   $addFields: {
     _spreadDollars: {
       $cond: [
-        { $gt: [{ $ifNull: ['$spreadEarning', 0] }, 0] },
-        '$spreadEarning',
+        // Trust the stored value whenever the field EXISTS — including a real 0
+        // (spread configured as 0, or a copy trade opened with skipSpread). Testing
+        // `> 0` instead made those trades fall through to the legacy formula below,
+        // which re-derives dollars from `spread` (the raw pip/cent config that is
+        // still stored on the trade) and invented earnings that were never charged.
+        { $ne: [{ $type: '$spreadEarning' }, 'missing'] },
+        { $ifNull: ['$spreadEarning', 0] },
         {
           $multiply: [
             { $ifNull: ['$spread', 0] },

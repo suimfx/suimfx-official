@@ -32,6 +32,21 @@ export const login = async (credentials) => {
   return data
 }
 
+export const verify2faLogin = async (email, otp) => {
+  const response = await fetch(`${API_URL}/verify-2fa-login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, otp }),
+  })
+  const data = await response.json()
+  if (!response.ok) {
+    throw new Error(data.message || 'Verification failed')
+  }
+  return data
+}
+
 export const getCurrentUser = async (token) => {
   const response = await fetch(`${API_URL}/me`, {
     headers: {

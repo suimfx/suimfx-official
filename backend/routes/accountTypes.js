@@ -97,21 +97,37 @@ router.get('/all', verifyAdminToken, async (req, res) => {
 router.post('/', verifyAdminToken, async (req, res) => {
   try {
     const { name, description, minDeposit, leverage, exposureLimit, minSpread, commission, isDemo, demoBalance } = req.body
+
+    const cleanName = (name || '').toString().trim()
+    if (!cleanName) {
+      return res.status(400).json({ message: 'Account type name is required' })
+    }
+    const demo = isDemo === true || isDemo === 'true'
     const accountType = new AccountType({
-      name,
-      description,
-      minDeposit,
-      leverage,
-      exposureLimit,
-      minSpread: minSpread || 0,
-      commission: commission || 0,
-      isDemo: isDemo || false,
-      demoBalance: isDemo ? (demoBalance || 10000) : 0,
+      name: cleanName,
+      description: (description || '').toString().trim(),
+      minDeposit: Number(minDeposit) || 0,
+      leverage: (leverage || '1:100').toString().trim() || '1:100',
+      exposureLimit: Number(exposureLimit) || 0,
+      minSpread: Number(minSpread) || 0,
+      commission: Number(commission) || 0,
+      isDemo: demo,
+      demoBalance: demo ? (Number(demoBalance) || 10000) : 0,
       adminId: req.admin._id
     })
     await accountType.save()
     res.status(201).json({ message: 'Account type created', accountType })
   } catch (error) {
+    console.error('[account-types] create error:', error.code, error.message)
+    // Legacy global-unique index on `name` (dropped on startup, but be graceful
+    // if a request races the migration).
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'An account type with this name already exists. Please use a different name.' })
+    }
+    if (error.name === 'ValidationError') {
+      const first = Object.values(error.errors)[0]
+      return res.status(400).json({ message: first?.message || 'Invalid account type data' })
+    }
     res.status(500).json({ message: 'Error creating account type', error: error.message })
   }
 })
@@ -129,21 +145,36 @@ router.put('/:id', verifyAdminToken, async (req, res) => {
     // (Sending `{ isDemo: undefined }` via findByIdAndUpdate would otherwise leave the field
     // unchanged, but `demoBalance: 0` is a legitimate write we DO want to persist.)
     const update = {}
-    if (name !== undefined) update.name = name
-    if (description !== undefined) update.description = description
-    if (minDeposit !== undefined) update.minDeposit = minDeposit
-    if (leverage !== undefined) update.leverage = leverage
-    if (exposureLimit !== undefined) update.exposureLimit = exposureLimit
-    if (minSpread !== undefined) update.minSpread = minSpread
-    if (commission !== undefined) update.commission = commission
-    if (isActive !== undefined) update.isActive = isActive
-    if (isDemo !== undefined) update.isDemo = isDemo
-    if (demoBalance !== undefined) update.demoBalance = demoBalance
+    if (name !== undefined) update.name = (name || '').toString().trim()
+    if (description !== undefined) update.description = (description || '').toString().trim()
+    if (minDeposit !== undefined) update.minDeposit = Number(minDeposit) || 0
+    if (leverage !== undefined) update.leverage = (leverage || '1:100').toString().trim() || '1:100'
+    if (exposureLimit !== undefined) update.exposureLimit = Number(exposureLimit) || 0
+    if (minSpread !== undefined) update.minSpread = Number(minSpread) || 0
+    if (commission !== undefined) update.commission = Number(commission) || 0
+    if (isActive !== undefined) update.isActive = isActive === true || isActive === 'true'
+    if (isDemo !== undefined) {
+      const demo = isDemo === true || isDemo === 'true'
+      update.isDemo = demo
+      // Keep demoBalance coherent with the flag: a live type must not carry a demo balance.
+      if (demoBalance !== undefined) update.demoBalance = demo ? (Number(demoBalance) || 10000) : 0
+      else if (!demo) update.demoBalance = 0
+    } else if (demoBalance !== undefined) {
+      update.demoBalance = Number(demoBalance) || 0
+    }
     // Adopt legacy null-adminId rows on first edit so subsequent ADMIN edits work.
     if (!existing.adminId) update.adminId = req.admin._id
-    const accountType = await AccountType.findByIdAndUpdate(req.params.id, update, { new: true })
+    const accountType = await AccountType.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })
     res.json({ message: 'Account type updated', accountType })
   } catch (error) {
+    console.error('[account-types] update error:', error.code, error.message)
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'An account type with this name already exists. Please use a different name.' })
+    }
+    if (error.name === 'ValidationError') {
+      const first = Object.values(error.errors)[0]
+      return res.status(400).json({ message: first?.message || 'Invalid account type data' })
+    }
     res.status(500).json({ message: 'Error updating account type', error: error.message })
   }
 })

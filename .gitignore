@@ -39,3 +39,6 @@ coverage/
 *.seed
 *.pid.lock
 .cache/
+
+# MetaApi SDK local history cache
+backend/.metaapi/

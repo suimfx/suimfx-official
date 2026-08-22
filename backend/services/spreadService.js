@@ -57,7 +57,9 @@ async function load() {
 
     const next = { global: null, segment: {}, instrument: {} }
     for (const c of charges) {
-      if (!(c.spreadValue > 0)) continue
+      // Keep an explicit zero (spreadOverride) — dropping it here would make the
+      // resolver fall through to the SEGMENT/GLOBAL entry the admin just cleared.
+      if (!(c.spreadValue > 0) && !c.spreadOverride) continue
       const entry = { spreadValue: c.spreadValue, spreadType: c.spreadType || 'FIXED' }
       if (c.level === 'INSTRUMENT' && c.instrumentSymbol) next.instrument[c.instrumentSymbol] = entry
       else if (c.level === 'SEGMENT' && c.segment) next.segment[c.segment] = entry

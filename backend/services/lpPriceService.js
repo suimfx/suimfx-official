@@ -5,6 +5,7 @@
 
 import { processBidAsk } from './candleAggregator.js'
 import { ingestTick } from './barAggregator.js'
+import LastPrice from '../models/LastPrice.js'
 
 const priceCache = new Map()
 let onPriceUpdateCallback = null
@@ -77,6 +78,57 @@ function updatePrices(ticks) {
       onPriceUpdateCallback(tick.symbol, price)
     }
   }
+}
+
+// Seed the in-memory cache from the last persisted prices so instruments/quotes
+// still show (as last known) after a restart or while the feed is down. Must run
+// after Mongoose has connected.
+async function restorePrices() {
+  try {
+    const docs = await LastPrice.find({}).lean()
+    for (const d of docs) {
+      if (!(d.bid > 0) && !(d.ask > 0)) continue
+      const mid = d.mid ?? d.bid ?? d.ask
+      priceCache.set(d.symbol, {
+        bid: mid, ask: mid, spread: 0, mid,
+        timestamp: d.timestamp || 0,
+        source: d.source || 'LAST_KNOWN',
+        stale: true,
+      })
+    }
+    console.log(`[LP Price Service] Restored ${priceCache.size} last-known prices from DB`)
+  } catch (e) {
+    console.warn('[LP Price Service] restore failed:', e.message)
+  }
+}
+
+// Persist the whole cache so the next restart / outage has last-known prices.
+async function persistPrices() {
+  if (priceCache.size === 0) return
+  const ops = []
+  priceCache.forEach((p, symbol) => {
+    if (!(p.mid > 0)) return
+    ops.push({
+      updateOne: {
+        filter: { symbol },
+        update: { $set: { symbol, bid: p.bid, ask: p.ask, mid: p.mid, timestamp: p.timestamp, source: p.source } },
+        upsert: true,
+      },
+    })
+  })
+  if (ops.length === 0) return
+  try {
+    await LastPrice.bulkWrite(ops, { ordered: false })
+  } catch (e) {
+    console.warn('[LP Price Service] persist failed:', e.message)
+  }
+}
+
+let _persistTimer = null
+function startPersistence(intervalMs = 15000) {
+  if (_persistTimer) return
+  _persistTimer = setInterval(() => { persistPrices() }, intervalMs)
+  console.log(`[LP Price Service] last-price persistence every ${intervalMs}ms`)
 }
 
 function connect() {
@@ -153,6 +205,9 @@ export {
   getConnectionStatus,
   categorizeSymbol,
   updatePrices,
+  restorePrices,
+  persistPrices,
+  startPersistence,
   SYMBOL_MAP,
   ALL_SYMBOLS,
 }
@@ -171,6 +226,9 @@ export default {
   getConnectionStatus,
   categorizeSymbol,
   updatePrices,
+  restorePrices,
+  persistPrices,
+  startPersistence,
   SYMBOL_MAP,
   ALL_SYMBOLS,
 }

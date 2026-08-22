@@ -13,10 +13,29 @@ const generateToken = (userId) => {
   return jwt.sign({ id: userId, iat: Math.floor(Date.now() / 1000) }, process.env.JWT_SECRET, { expiresIn: '13d' })
 }
 
+// Resolve which admin (tenant) a signup belongs to, from the branded slug or a
+// referral code — so signup OTP / emails use that tenant's own email settings.
+// Mirrors the assignment logic in the signup route. Returns an adminId or null.
+const resolveSignupAdminId = async (adminSlug, referralCode) => {
+  try {
+    if (adminSlug) {
+      const a = await Admin.findOne({ urlSlug: adminSlug.toLowerCase(), status: 'ACTIVE' }).select('_id')
+      if (a) return a._id
+    }
+    if (referralCode) {
+      const a = await Admin.findOne({ referralCode: referralCode.toUpperCase(), status: 'ACTIVE' }).select('_id')
+      if (a) return a._id
+      const ib = await User.findOne({ referralCode, isIB: true, ibStatus: 'ACTIVE' }).select('assignedAdmin')
+      if (ib?.assignedAdmin) return ib.assignedAdmin
+    }
+  } catch (_) { /* fall back to global */ }
+  return null
+}
+
 // POST /api/auth/send-otp - Send OTP for email verification
 router.post('/send-otp', async (req, res) => {
   try {
-    const { email, firstName } = req.body
+    const { email, firstName, adminSlug, referralCode } = req.body
 
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email is required' })
@@ -28,15 +47,20 @@ router.post('/send-otp', async (req, res) => {
       return res.status(400).json({ success: false, message: 'User already exists with this email' })
     }
 
-    // Check if OTP verification is enabled
-    const otpEnabled = await isOTPEnabled()
+    // Resolve the tenant so signup OTP respects that broker's own email settings.
+    // Fall back to the custom-domain tenant (set by the hostname middleware) so a
+    // signup on e.g. fxcrestaa.com resolves even without an explicit slug in the body.
+    const adminId = (await resolveSignupAdminId(adminSlug, referralCode)) || req.tenantAdmin?._id || null
+
+    // Check if OTP verification is enabled (per-tenant, global fallback)
+    const otpEnabled = await isOTPEnabled(adminId)
     if (!otpEnabled) {
       return res.json({ success: true, otpRequired: false, message: 'OTP verification is disabled' })
     }
 
     // Generate OTP
     const otp = generateOTP()
-    const expiryMinutes = await getOTPExpiry()
+    const expiryMinutes = await getOTPExpiry(adminId)
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
 
     // Delete any existing OTPs for this email
@@ -50,12 +74,12 @@ router.post('/send-otp', async (req, res) => {
       expiresAt
     })
 
-    // Get platform name from settings
-    const settings = await EmailSettings.findOne()
+    // Get platform name from the tenant's settings (global fallback)
+    const settings = await EmailSettings.getForAdmin(adminId)
     const platformName = settings?.fromName || 'Trading Platform'
     const supportEmail = settings?.fromEmail || 'support@example.com'
 
-    // Send OTP email
+    // Send OTP email from the tenant's own mailbox
     const emailResult = await sendTemplateEmail('email_verification', email, {
       otp,
       firstName: firstName || 'User',
@@ -64,7 +88,7 @@ router.post('/send-otp', async (req, res) => {
       platformName,
       supportEmail,
       year: new Date().getFullYear().toString()
-    })
+    }, adminId)
 
     if (emailResult.success) {
       res.json({ success: true, otpRequired: true, message: 'OTP sent to your email' })
@@ -131,8 +155,10 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' })
     }
 
-    // Check if OTP verification is required
-    const otpEnabled = await isOTPEnabled()
+    // Check if OTP verification is required (per-tenant, resolved from slug/referral,
+    // falling back to the custom-domain tenant).
+    const signupAdminId = (await resolveSignupAdminId(adminSlug, referralCode)) || req.tenantAdmin?._id || null
+    const otpEnabled = await isOTPEnabled(signupAdminId)
     if (otpEnabled) {
       // Verify OTP was completed
       const otpRecord = await OTP.findOne({ email, purpose: 'signup', verified: true })
@@ -217,8 +243,8 @@ router.post('/signup', async (req, res) => {
       await Admin.findByIdAndUpdate(assignedAdmin, { $inc: { 'stats.totalUsers': 1 } })
     }
 
-    // Send welcome email (get platform name from settings)
-    const emailSettings = await EmailSettings.findOne()
+    // Send welcome email from the user's own broker (global fallback)
+    const emailSettings = await EmailSettings.getForAdmin(assignedAdmin || null)
     sendTemplateEmail('welcome', email, {
       firstName: user.firstName,
       email: user.email,
@@ -226,7 +252,7 @@ router.post('/signup', async (req, res) => {
       loginUrl: 'http://localhost:5173/login',
       supportEmail: emailSettings?.fromEmail || 'support@example.com',
       year: new Date().getFullYear().toString()
-    })
+    }, assignedAdmin || null)
 
     // Generate token
     const token = generateToken(user._id)
@@ -498,14 +524,14 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(404).json({ success: false, message: 'No account found with this email' })
     }
 
-    // Check if SMTP is enabled
-    const emailSettings = await EmailSettings.findOne()
+    // Check if SMTP is enabled (per-tenant: the user's broker, else global)
+    const emailSettings = await EmailSettings.getForAdmin(user.assignedAdmin || null)
     const smtpEnabled = emailSettings?.smtpEnabled || false
 
     if (smtpEnabled) {
       // Send OTP for password reset
       const otp = generateOTP()
-      const expiryMinutes = getOTPExpiry()
+      const expiryMinutes = await getOTPExpiry(user.assignedAdmin || null)
 
       // Save OTP
       const otpRecord = await OTP.create({
@@ -523,10 +549,10 @@ router.post('/forgot-password', async (req, res) => {
           email: user.email,
           otp,
           expiryMinutes,
-          platformName: 'Suimfx',
+          platformName: emailSettings?.fromName || 'Suimfx',
           supportEmail: emailSettings?.fromEmail || 'support@suimfx.com',
           year: new Date().getFullYear().toString()
-        })
+        }, user.assignedAdmin || null)
 
         res.json({
           success: true,

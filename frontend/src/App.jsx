@@ -48,6 +48,7 @@ import EmployeeLogin from './pages/EmployeeLogin'
 import BrandedEmployeeLogin from './pages/BrandedEmployeeLogin'
 import AdminProfile from './pages/AdminProfile'
 import AdminBookManagement from './pages/AdminBookManagement'
+import AdminMT5Trade from './pages/AdminMT5Trade'
 import SuperAdminManagement from './pages/SuperAdminManagement'
 import ProtectedAdminRoute from './components/ProtectedAdminRoute'
 import { BrandingProvider } from './context/BrandingContext'
@@ -84,6 +85,7 @@ function App() {
           <Route path="/admin/payment-methods" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminPaymentMethods /></ProtectedAdminRoute>} />
           <Route path="/admin/trades" element={<ProtectedAdminRoute requiredPermission="tradeManagement"><AdminTradeManagement /></ProtectedAdminRoute>} />
           <Route path="/admin/book-management" element={<ProtectedAdminRoute requiredPermission="bookManagement"><AdminBookManagement /></ProtectedAdminRoute>} />
+          <Route path="/admin/mt5" element={<ProtectedAdminRoute requireSuperAdmin><AdminMT5Trade /></ProtectedAdminRoute>} />
           <Route path="/admin/funds" element={<ProtectedAdminRoute requiredPermission="fundManagement"><AdminFundManagement /></ProtectedAdminRoute>} />
           <Route path="/admin/bank-settings" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminBankSettings /></ProtectedAdminRoute>} />
           <Route path="/admin/manual-crypto" element={<ProtectedAdminRoute requiredPermission="bankSettings"><AdminManualCrypto /></ProtectedAdminRoute>} />

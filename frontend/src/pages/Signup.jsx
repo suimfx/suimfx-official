@@ -164,7 +164,7 @@ const Signup = () => {
       const res = await fetch(`${API_URL}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, firstName: formData.firstName })
+        body: JSON.stringify({ email: formData.email, firstName: formData.firstName, adminSlug: localStorage.getItem('adminSlug') || undefined, referralCode: referralCode || undefined })
       })
       const data = await res.json()
 
@@ -240,7 +240,7 @@ const Signup = () => {
         const res = await fetch(`${API_URL}/auth/send-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email, firstName: formData.firstName })
+          body: JSON.stringify({ email: formData.email, firstName: formData.firstName, adminSlug: localStorage.getItem('adminSlug') || undefined, referralCode: referralCode || undefined })
         })
         const data = await res.json()
 
