@@ -52,6 +52,8 @@ curl -H "X-API-Key: YOUR_API_KEY" \
       "username": "ACC100234",
       "symbol": "EURUSD",
       "position": "Buy",
+      "lot_size": 0.10,
+      "used_margin": 100.00,
       "open_amount": 1000.00,
       "close_amount": 1050.00,
       "pnl": 50.00,
@@ -64,6 +66,8 @@ curl -H "X-API-Key: YOUR_API_KEY" \
       "username": "ACC100234",
       "symbol": "BTCUSD",
       "position": "Sell",
+      "lot_size": 0.05,
+      "used_margin": 250.00,
       "open_amount": 2500.00,
       "close_amount": null,
       "pnl": -18.40,
@@ -86,6 +90,8 @@ curl -H "X-API-Key: YOUR_API_KEY" \
 | `username` | Trading account id. Emails and real names are never exposed. |
 | `symbol` | Instrument, e.g. `EURUSD`, `BTCUSD`, `XAUUSD` |
 | `position` | `Buy` or `Sell` |
+| `lot_size` | Volume traded, in lots — `0.10` is a tenth of a standard lot |
+| `used_margin` | Margin locked for this position, in account currency |
 | `open_amount` | Position value at open, in account currency: `open price × lots × contract size` |
 | `close_amount` | Same at close. `null` while the position is still open. |
 | `pnl` | Realised P&L for closed trades; live floating P&L for open ones. Negative = loss. |

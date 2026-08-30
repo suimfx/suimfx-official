@@ -67,6 +67,8 @@ export function formatTrade (trade, username) {
     username,
     symbol: trade.symbol,
     position: trade.side === 'BUY' ? 'Buy' : 'Sell',
+    lot_size: trade.quantity,
+    used_margin: Number((trade.marginUsed || 0).toFixed(2)),
     open_amount: amountAt(trade.openPrice, trade),
     close_amount: amountAt(closed ? trade.closePrice : null, trade),
     pnl: Number(((closed ? trade.realizedPnl : trade.floatingPnl) || 0).toFixed(2)),
