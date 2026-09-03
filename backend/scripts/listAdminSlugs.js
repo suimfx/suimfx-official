@@ -4,8 +4,12 @@
  */
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-dotenv.config()
+// Resolve backend/.env from this file, not the cwd — this is run over ssh and
+// from cron, where the working directory is rarely backend/.
+dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.env') })
 
 const { default: Admin } = await import('../models/Admin.js')
 const { default: User } = await import('../models/User.js')
