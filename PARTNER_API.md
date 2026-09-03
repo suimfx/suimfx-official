@@ -2,6 +2,12 @@
 
 Read-only feed of live (open) and closed positions.
 
+**A-Book only.** The feed carries real-money trades that were hedged out to a
+liquidity provider. Demo accounts and B-Book (internal) trades never appear.
+
+Each API key is scoped to one broker, so the key you were given returns that
+broker's trades and nothing else.
+
 ## Auth
 
 Send the API key on every request, either way:
@@ -109,6 +115,7 @@ curl -H "X-API-Key: YOUR_API_KEY" \
 
 ## Notes
 
-- Only real-money trading accounts are included; prop/challenge accounts are excluded.
+- A-Book trades only. Demo, B-Book and prop/challenge trades are excluded.
+- Your key is scoped to a single broker; you cannot see other brokers' trades.
 - `pnl` on open positions moves with the market. Poll every 5-15s for a live board.
 - Newest first, sorted by open time.

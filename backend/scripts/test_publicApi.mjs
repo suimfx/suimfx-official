@@ -1,6 +1,6 @@
 // Self-check for the partner trade feed mapping. Run: node scripts/test_publicApi.mjs
 import assert from 'assert'
-import { formatTrade } from '../routes/publicApi.js'
+import { formatTrade, loadKeys } from '../routes/publicApi.js'
 
 const base = {
   tradeId: 'T123', symbol: 'EURUSD', quantity: 0.01, contractSize: 100000,
@@ -37,4 +37,23 @@ assert.strictEqual(open.used_margin, 10, 'used margin is reported on open trades
 // A trade stored before marginUsed existed must not break the feed.
 assert.strictEqual(formatTrade({ ...base, marginUsed: undefined, side: 'BUY', status: 'OPEN' }, 'x').used_margin, 0)
 
-console.log('publicApi mapping: OK')
+// ── Key scoping ──────────────────────────────────────────────────────────────
+assert.deepStrictEqual(
+  loadKeys('all:suimfx_aaa, forexmt24:suimfx_bbb ,leofx:suimfx_ccc'),
+  [
+    { scope: 'all', key: 'suimfx_aaa' },
+    { scope: 'forexmt24', key: 'suimfx_bbb' },
+    { scope: 'leofx', key: 'suimfx_ccc' }
+  ]
+)
+
+// A key issued before scoping existed keeps working, platform-wide.
+assert.deepStrictEqual(loadKeys('suimfx_legacy'), [{ scope: 'all', key: 'suimfx_legacy' }])
+
+// A slug is case-insensitive, but the key itself must never be lowercased.
+assert.deepStrictEqual(loadKeys('FxCrestaa:suimfx_AbC'), [{ scope: 'fxcrestaa', key: 'suimfx_AbC' }])
+
+assert.deepStrictEqual(loadKeys(''), [], 'no keys configured means no access, not open access')
+assert.deepStrictEqual(loadKeys('leofx:'), [], 'a scope with an empty key must not authenticate')
+
+console.log('publicApi mapping + key scoping: OK')

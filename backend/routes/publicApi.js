@@ -2,19 +2,31 @@
  * Public Partner API — read-only trade feed for external integrators.
  *
  * Auth: X-API-Key: <key>   or   Authorization: Bearer <key>
- * Keys live in PUBLIC_API_KEYS (comma-separated) so a partner can be revoked
- * without a code change.
  *
- * Only real-money TradingAccount trades are exposed. Prop/challenge accounts
- * are simulated capital and are deliberately excluded from the public feed.
+ * Keys live in PUBLIC_API_KEYS as comma-separated `scope:key` pairs, so a
+ * partner can be added or revoked without a code change:
+ *
+ *   PUBLIC_API_KEYS=all:suimfx_aaa,forexmt24:suimfx_bbb,leofx:suimfx_ccc
+ *
+ * The scope is an Admin.urlSlug — that key then sees only that broker's own
+ * trades, which is what lets three brokers each get their own feed. The scope
+ * `all` sees every tenant. A bare key with no `scope:` prefix means `all`.
+ *
+ * The feed is A-Book only: real money that was hedged out to a liquidity
+ * provider. B-Book (internal) and demo trades never appear. Demo accounts are
+ * forced to B-Book at creation and are never hedged, so filtering on bookType
+ * excludes them by construction. Prop/challenge accounts are simulated capital
+ * and are excluded too.
  */
 
 import express from 'express'
 import crypto from 'crypto'
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
+import Admin from '../models/Admin.js'
 import tradeEngine from '../services/tradeEngine.js'
 import lpPriceService from '../services/lpPriceService.js'
+import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
@@ -22,11 +34,18 @@ const MAX_DAYS = 90
 const DEFAULT_DAYS = 30
 const MAX_LIMIT = 500
 
-function loadKeys () {
-  return (process.env.PUBLIC_API_KEYS || '')
+/** Parsed as [{ scope, key }]. A bare entry with no `scope:` prefix is `all`. */
+export function loadKeys (raw = process.env.PUBLIC_API_KEYS || '') {
+  return raw
     .split(',')
-    .map(k => k.trim())
+    .map(entry => entry.trim())
     .filter(Boolean)
+    .map(entry => {
+      const sep = entry.lastIndexOf(':')
+      if (sep === -1) return { scope: 'all', key: entry }
+      return { scope: entry.slice(0, sep).trim().toLowerCase(), key: entry.slice(sep + 1).trim() }
+    })
+    .filter(e => e.key)
 }
 
 // Constant-time compare over digests so unequal key lengths don't throw and
@@ -45,10 +64,29 @@ function requireApiKey (req, res, next) {
 
   const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim()
   const presented = (req.headers['x-api-key'] || bearer || '').trim()
-  if (!presented || !keys.some(k => keyMatches(presented, k))) {
+  const matched = presented && keys.find(k => keyMatches(presented, k.key))
+  if (!matched) {
     return res.status(401).json({ success: false, message: 'Invalid or missing API key' })
   }
+  req.apiScope = matched.scope
   next()
+}
+
+/**
+ * Trades visible to this key. `all` means every tenant; any other scope is an
+ * Admin.urlSlug and narrows to that broker's own users.
+ * Returns null for `all`, or an array of user ids to match on.
+ *
+ * ponytail: loads the whole user-id list per request. Fine at a few thousand
+ * users per broker; if a tenant outgrows that, denormalise assignedAdmin onto
+ * Trade and filter on it directly.
+ */
+async function scopeUserIds (scope) {
+  if (scope === 'all') return null
+
+  const admin = await Admin.findOne({ urlSlug: scope }).select('_id role')
+  if (!admin) return []
+  return getAdminUserIds(admin)
 }
 
 /**
@@ -87,7 +125,12 @@ router.get('/trades', requireApiKey, async (req, res) => {
   try {
     const { status = 'all', days, from, to, limit, offset } = req.query
 
-    const query = { accountType: 'TradingAccount' }
+    // A-Book only. Demo accounts are forced to B-Book at creation and never
+    // hedged, so this one condition also keeps demo trades out of the feed.
+    const query = { accountType: 'TradingAccount', bookType: 'A' }
+
+    const userIds = await scopeUserIds(req.apiScope)
+    if (userIds) query.userId = { $in: userIds }
 
     const wanted = String(status).toLowerCase()
     if (wanted === 'open') query.status = 'OPEN'
