@@ -301,7 +301,21 @@ const MobileTradingApp = () => {
 
       }, 5000)
 
-      return () => clearInterval(interval)
+      // Server push when this account's trades change — a copy trade opened or
+      // closed by the master, an admin close, SL/TP — so the app updates now
+      // rather than on the next 5s poll above.
+      const unsubscribeTrades = priceStreamService.subscribeAccount('mobileTradingApp', selectedAccount._id, ({ event, trade }) => {
+        fetchOpenTrades()
+        fetchPendingOrders()
+        fetchAccountSummary()
+        if (event === 'closed') fetchTradeHistory()
+        if (event === 'opened' && trade?.isCopyTrade) showTradeToast(trade)
+      })
+
+      return () => {
+        clearInterval(interval)
+        unsubscribeTrades()
+      }
 
     }
 

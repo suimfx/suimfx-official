@@ -388,19 +388,36 @@ class TradeEngine {
       await this.applyPnlToAccount(tradingAccountId, -commission)
     }
 
+    this.notifyAccount(tradingAccountId, 'opened', trade)
+
+    // Mirror to followers as soon as the master's trade exists — before the
+    // master's own hedge below, which can take 30-60s on a cold MT5 connection.
+    // A copy mirror is never re-copied, so a follower who is also a master
+    // doesn't cascade. Pending orders are copied when they fill instead.
+    if (orderType === 'MARKET' && !options.copyMasterTradeId) {
+      this.copyToFollowersAsync(trade)
+    }
+
     // A-Book hedge. The router picks MT5 or Corecen per user, so no
     // lpService.isConfigured() gate here — an MT5-tagged user must route even
     // when Corecen is not set up at all.
     if (orderType === 'MARKET' && userBookType === 'A' && !account.isDemo && userForBook) {
-      try {
-        const hedge = await aBookRouter.routeOpen(trade, userForBook)
-        await aBookRouter.recordOpenResult(trade, hedge)
-        if (!hedge.success) {
-          console.error(`[TradeEngine] Failed to push A-Book trade: ${hedge.error || hedge.message}`)
+      const hedging = (async () => {
+        try {
+          const hedge = await aBookRouter.routeOpen(trade, userForBook)
+          await aBookRouter.recordOpenResult(trade, hedge)
+          if (!hedge.success) {
+            console.error(`[TradeEngine] Failed to push A-Book trade: ${hedge.error || hedge.message}`)
+          }
+        } catch (hedgeError) {
+          console.error('[TradeEngine] Error pushing A-Book trade:', hedgeError)
         }
-      } catch (hedgeError) {
-        console.error('[TradeEngine] Error pushing A-Book trade:', hedgeError)
-      }
+      })()
+      // A copy mirror must not wait on its hedge. The copy engine links the
+      // follower trade to the master (CopyTrade) only after this returns, and a
+      // master close landing before that link exists would leave the follower's
+      // position open for good.
+      if (!options.copyMasterTradeId) await hedging
     }
 
     return trade
@@ -523,8 +540,14 @@ class TradeEngine {
 
     await trade.save()
 
+    // Followers close at the master's price, so start them now — not after the
+    // master's IB commission and A-Book hedge close below, which can take
+    // seconds (30-60s on a cold MT5 connection).
+    this.closeFollowerTradesAsync(trade._id, closePrice)
+
     // Update account balance with proper credit handling
     await this.applyPnlToAccount(trade.tradingAccountId, realizedPnl)
+    this.notifyAccount(trade.tradingAccountId, 'closed', trade)
 
     // Log admin action if applicable
     if (adminId) {
@@ -564,10 +587,52 @@ class TradeEngine {
       }
     }
 
-    // Close follower trades if this is a master trade
-    this.closeFollowerTradesAsync(trade._id, closePrice)
-
     return { trade, realizedPnl }
+  }
+
+  // Tell the account's open screens that its trades changed, so they refetch
+  // now instead of on the next 5s poll. Sent to the account's room only — the
+  // trading page joins it through the socket 'subscribe' event.
+  notifyAccount(tradingAccountId, event, trade) {
+    // closeTrade populates tradingAccountId, so it may be a document, not an id
+    const id = String(tradingAccountId?._id || tradingAccountId || '')
+    if (!id || !global.io) return
+    global.io.to(`account:${id}`).emit('tradesChanged', {
+      tradingAccountId: id,
+      event,
+      trade: {
+        _id: trade._id,
+        tradeId: trade.tradeId,
+        symbol: trade.symbol,
+        side: trade.side,
+        orderType: trade.orderType,
+        status: trade.status,
+        quantity: trade.quantity,
+        openPrice: trade.openPrice,
+        pendingPrice: trade.pendingPrice,
+        closePrice: trade.closePrice,
+        realizedPnl: trade.realizedPnl,
+        openedAt: trade.openedAt,
+        createdAt: trade.createdAt,
+        isCopyTrade: trade.isCopyTrade
+      }
+    })
+  }
+
+  // Async copy to followers (non-blocking). A no-op unless the trade's account
+  // belongs to an ACTIVE master.
+  async copyToFollowersAsync(trade) {
+    try {
+      const MasterTrader = (await import('../models/MasterTrader.js')).default
+      const master = await MasterTrader.findOne({ tradingAccountId: trade.tradingAccountId, status: 'ACTIVE' })
+      if (!master) return
+      const copyTradingEngine = (await import('./copyTradingEngine.js')).default
+      const results = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
+      const ok = results.filter(r => r.status === 'SUCCESS').length
+      console.log(`[CopyTrade] OPEN ${trade.tradeId}: copied to ${ok}/${results.length} followers`)
+    } catch (error) {
+      console.error(`[CopyTrade] Error copying ${trade.tradeId} to followers:`, error)
+    }
   }
 
   // Async close follower trades (non-blocking)
@@ -885,6 +950,15 @@ class TradeEngine {
           trade.openedAt = new Date()
           await trade.save()
 
+          this.notifyAccount(trade.tradingAccountId, 'opened', trade)
+
+          // A master's pending order that just filled is copied to followers now —
+          // placement-time copy is suppressed for PENDING, so this is the only
+          // trigger. Started before the hedge and not awaited: this runs inside
+          // the 1s pending sweep, so a slow copy would also hold back every other
+          // pending order waiting to fill.
+          this.copyToFollowersAsync(trade)
+
           if (trade.bookType === 'A') {
             // Demo-account trades must never reach a hedge venue
             const pendingAccount = await TradingAccount.findById(trade.tradingAccountId).select('isDemo')
@@ -899,34 +973,6 @@ class TradeEngine {
                 }
               }
             }
-          }
-
-          // If this pending order belongs to a master trader, propagate the
-          // now-OPEN trade to followers. Without this, master's pending orders
-          // would never reach followers (the placement-time copy is suppressed
-          // for PENDING status, and there is no other trigger between PENDING
-          // and OPEN).
-          try {
-            const MasterTrader = (await import('../models/MasterTrader.js')).default
-            const master = await MasterTrader.findOne({
-              tradingAccountId: trade.tradingAccountId,
-              status: 'ACTIVE'
-            })
-            if (master) {
-              const copyTradingEngine = (await import('./copyTradingEngine.js')).default
-              const copyResults = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
-              const successCount = copyResults.filter(r => r.status === 'SUCCESS').length
-              console.log(`[CopyTrade] Pending order ${trade.tradeId} fired — copied to ${successCount}/${copyResults.length} followers`)
-            } else {
-              const anyMaster = await MasterTrader.findOne({ tradingAccountId: trade.tradingAccountId })
-              if (anyMaster) {
-                console.log(`[CopyTrade] Pending ${trade.tradeId} fired but master ${anyMaster._id} status=${anyMaster.status} (need ACTIVE) — skipping copy`)
-              } else {
-                console.log(`[CopyTrade] Pending ${trade.tradeId} fired but no MasterTrader linked to tradingAccountId=${trade.tradingAccountId}`)
-              }
-            }
-          } catch (copyError) {
-            console.error(`[CopyTrade] Error copying triggered pending ${trade.tradeId}:`, copyError)
           }
 
           executedTrades.push({

@@ -385,6 +385,7 @@ router.post('/close/:tradeId', requireEmployeePermission(PERMISSIONS.EMPLOYEE.CL
     } else {
       await tradeEngine.applyPnlToAccount(trade.tradingAccountId, realizedPnl)
     }
+    tradeEngine.notifyAccount(trade.tradingAccountId, 'closed', trade)
 
     // Check if this is a master trader's trade and close follower trades
     let followerResults = []

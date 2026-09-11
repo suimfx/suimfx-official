@@ -247,44 +247,16 @@ router.post('/open', async (req, res) => {
       leverage // Pass user-selected leverage
     )
 
-    // Check if this is a master trader and copy to followers.
-    // PENDING orders (BUY_LIMIT / SELL_LIMIT / BUY_STOP / SELL_STOP) must NOT
-    // be copied at placement time — the copy engine would otherwise hand the
-    // follower a MARKET trade at master's trigger price (which is not the
-    // current market price). Pending orders are propagated when they actually
-    // fire inside tradeEngine.checkPendingOrders.
-    let copyResults = []
-    if (trade.status === 'OPEN') {
-      const master = await MasterTrader.findOne({
-        tradingAccountId,
-        status: 'ACTIVE'
-      })
-
-      if (master) {
-        try {
-          copyResults = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
-          console.log(`[CopyTrade] OPEN ${trade.tradeId}: copied to ${copyResults.filter(r => r.status === 'SUCCESS').length}/${copyResults.length} followers`)
-        } catch (copyError) {
-          console.error('[CopyTrade] Error copying trade to followers:', copyError)
-        }
-      } else {
-        // Diagnose silent misses — was a master record there at all?
-        const anyMaster = await MasterTrader.findOne({ tradingAccountId })
-        if (anyMaster) {
-          console.log(`[CopyTrade] OPEN ${trade.tradeId}: master ${anyMaster._id} exists but status=${anyMaster.status} (need ACTIVE) — skipping copy`)
-        } else {
-          console.log(`[CopyTrade] OPEN ${trade.tradeId}: no MasterTrader linked to tradingAccountId=${tradingAccountId} — not a master, skipping copy`)
-        }
-      }
-    } else if (trade.status === 'PENDING') {
-      console.log(`[CopyTrade] Master ${userId} placed pending order ${trade.tradeId} — copy deferred until trigger`)
-    }
+    // Copying to followers happens inside tradeEngine.openTrade, which starts it
+    // before the master's own A-Book hedge rather than after this response.
+    // PENDING orders are copied when they fill, in tradeEngine.checkPendingOrders
+    // — copying at placement would hand followers a MARKET trade at the trigger
+    // price, not the current one.
 
     res.json({
       success: true,
       message: 'Trade opened successfully',
-      trade,
-      copyResults: copyResults.length > 0 ? copyResults : undefined
+      trade
     })
   } catch (error) {
     console.error('Error opening trade:', error)

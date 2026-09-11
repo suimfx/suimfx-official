@@ -296,14 +296,14 @@ class CopyTradingEngine {
           tradingDay
         })
 
-        // Update follower stats
-        follower.stats.totalCopiedTrades += 1
-        follower.stats.activeCopiedTrades += 1
-        await follower.save()
-
-        // Update master stats
-        master.stats.totalCopiedVolume += followerLotSize
-        await master.save()
+        // Atomic $inc, not doc.save(): every follower runs in parallel against the
+        // same `master` document, and Mongoose rejects parallel saves of one doc —
+        // the copy had succeeded but came back FAILED. $inc also can't lose an
+        // update when two master trades copy to the same follower at once.
+        await Promise.all([
+          CopyFollower.updateOne({ _id: follower._id }, { $inc: { 'stats.totalCopiedTrades': 1, 'stats.activeCopiedTrades': 1 } }),
+          MasterTrader.updateOne({ _id: master._id }, { $inc: { 'stats.totalCopiedVolume': followerLotSize } })
+        ])
 
         console.log(`[CopyTrade] SUCCESS: Copied trade to follower ${follower._id}, lot size: ${followerLotSize}`)
         
@@ -397,26 +397,17 @@ class CopyTradingEngine {
         copyTrade.closedAt = new Date()
         await copyTrade.save()
 
-        // Update follower stats
-        const follower = await CopyFollower.findById(copyTrade.followerId)
-        if (follower) {
-          follower.stats.activeCopiedTrades -= 1
-          if (result.realizedPnl >= 0) {
-            follower.stats.totalProfit += result.realizedPnl
-            follower.dailyProfit += result.realizedPnl
-          } else {
-            follower.stats.totalLoss += Math.abs(result.realizedPnl)
-            follower.dailyLoss += Math.abs(result.realizedPnl)
-          }
-          await follower.save()
-        }
-
-        // Update master stats
-        const master = await MasterTrader.findById(copyTrade.masterId)
-        if (master) {
-          master.stats.totalProfitGenerated += result.realizedPnl
-          await master.save()
-        }
+        // Atomic $inc: followers close in parallel against one master document,
+        // and a read-modify-write there (or on a follower with several copies
+        // closing at once) silently loses updates.
+        const pnl = result.realizedPnl
+        const followerInc = pnl >= 0
+          ? { 'stats.activeCopiedTrades': -1, 'stats.totalProfit': pnl, dailyProfit: pnl }
+          : { 'stats.activeCopiedTrades': -1, 'stats.totalLoss': -pnl, dailyLoss: -pnl }
+        await Promise.all([
+          CopyFollower.updateOne({ _id: copyTrade.followerId }, { $inc: followerInc }),
+          MasterTrader.updateOne({ _id: copyTrade.masterId }, { $inc: { 'stats.totalProfitGenerated': pnl } })
+        ])
 
         console.log(`[CopyTrade] Closed follower trade ${copyTrade.followerTradeId}, PnL: ${result.realizedPnl}`)
         return {
