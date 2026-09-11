@@ -10,6 +10,8 @@ import binanceApiService from '../services/binanceApi'
 
 import priceStreamService from '../services/priceStream'
 
+import { showTradeToast } from '../components/TradeToast'
+
 import { useTheme } from '../context/ThemeContext'
 
 import { API_URL } from '../config/api'
@@ -1634,7 +1636,7 @@ const TradingPage = () => {
 
         setTradeSuccess(`${side} order executed successfully!`)
 
-        addTradeNotification('order', `${side} ${selectedInstrument.symbol} @ ${side === 'BUY' ? ask.toFixed(5) : bid.toFixed(5)}`)
+        showTradeToast(data.trade)
 
         fetchOpenTrades()
 
@@ -1824,6 +1826,8 @@ const TradingPage = () => {
       if (data.success) {
 
         setTradeSuccess(`${pendingOrderType} order placed successfully!`)
+
+        showTradeToast(data.trade)
 
         fetchPendingOrders()
 

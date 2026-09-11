@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
+import { showTradeToast } from '../components/TradeToast'
+
 import {
 
   Home, BarChart2, TrendingUp, LineChart, MoreHorizontal,
@@ -899,7 +901,7 @@ const MobileTradingApp = () => {
 
           fetchPendingOrders()
 
-          showNotification(`${pendingOrderType.replace('_', ' ')} order placed!`, 'success')
+          showTradeToast(data.trade)
 
           setEntryPrice('')
 
@@ -907,7 +909,7 @@ const MobileTradingApp = () => {
 
           fetchOpenTrades()
 
-          showNotification('Order executed successfully!', 'success')
+          showTradeToast(data.trade)
 
         }
 
@@ -2741,7 +2743,7 @@ const MobileTradingApp = () => {
 
                     fetchAccountSummary()
 
-                    showNotification('Sell order executed!', 'success')
+                    showTradeToast(data.trade)
 
                   } else {
 
@@ -2835,7 +2837,7 @@ const MobileTradingApp = () => {
 
                     fetchAccountSummary()
 
-                    showNotification('Buy order executed!', 'success')
+                    showTradeToast(data.trade)
 
                   } else {
 

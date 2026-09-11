@@ -52,6 +52,7 @@ import AdminMT5Trade from './pages/AdminMT5Trade'
 import SuperAdminManagement from './pages/SuperAdminManagement'
 import ProtectedAdminRoute from './components/ProtectedAdminRoute'
 import { BrandingProvider } from './context/BrandingContext'
+import TradeToasts from './components/TradeToast'
 
 function App() {
   return (
@@ -114,6 +115,7 @@ function App() {
           <Route path="/:slug/login" element={<BrandedLogin />} />
           <Route path="/:slug/signup" element={<BrandedSignup />} />
         </Routes>
+        <TradeToasts />
       </BrandingProvider>
     </Router>
   )
