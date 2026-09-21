@@ -63,11 +63,6 @@ const httpServer = createServer(app)
 // Allowed origins for CORS - use env variable or defaults
 const envOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []
 const defaultOrigins = [
-  'https://suimfx.com', 
-  'https://www.suimfx.com', 
-  'https://trade.suimfx.com',
-  'https://admin.suimfx.com',
-  'https://api.suimfx.com',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:3000',

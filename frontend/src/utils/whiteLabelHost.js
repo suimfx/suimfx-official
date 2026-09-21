@@ -6,7 +6,7 @@
  * resolve as somebody else's brand. Keep this in step with the backend's
  * PLATFORM_DOMAINS (backend/utils/platformHost.js).
  */
-export const PLATFORM_DOMAINS = ['forexmt24.com', 'suimfx.com']
+export const PLATFORM_DOMAINS = ['forexmt24.com']
 
 export function normalizeHost (h) {
   if (!h) return ''

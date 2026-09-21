@@ -11,7 +11,7 @@
  * `forexmt24.com` also matches api./trade./admin./www. of it.
  */
 
-const DEFAULT_PLATFORM_DOMAINS = ['forexmt24.com', 'suimfx.com']
+const DEFAULT_PLATFORM_DOMAINS = ['forexmt24.com']
 
 function parseDomains (raw) {
   return String(raw || '')

@@ -26,7 +26,7 @@ the result to your own page.
 ## Endpoint
 
 ```
-GET https://api.suimfx.com/api/v1/trades
+GET https://forexmt24.com/api/v1/trades
 ```
 
 ### Query parameters
@@ -44,7 +44,7 @@ GET https://api.suimfx.com/api/v1/trades
 
 ```bash
 curl -H "X-API-Key: YOUR_API_KEY" \
-  "https://api.suimfx.com/api/v1/trades?status=all&days=30&limit=100"
+  "https://forexmt24.com/api/v1/trades?status=all&days=30&limit=100"
 ```
 
 ### Response
