@@ -16,11 +16,16 @@ const { default: User } = await import('../models/User.js')
 
 await mongoose.connect(process.env.MONGODB_URI)
 
-const admins = await Admin.find().select('urlSlug brandName role email').sort({ role: 1, urlSlug: 1 })
+const { default: AdminDomainConnection } = await import('../models/AdminDomainConnection.js')
+
+const admins = await Admin.find().select('urlSlug brandName role email customDomain logo').sort({ role: 1, urlSlug: 1 })
 
 const rows = await Promise.all(admins.map(async a => ({
+  id: String(a._id),
   scope: a.urlSlug,
   brand: a.brandName || '—',
+  domain: a.customDomain || '—',
+  logo: a.logo ? a.logo.replace('/uploads/logos/', '') : '—',
   role: a.role,
   users: a.role === 'SUPER_ADMIN'
     ? await User.countDocuments({ $or: [{ assignedAdmin: null }, { assignedAdmin: { $exists: false } }] })
@@ -28,6 +33,11 @@ const rows = await Promise.all(admins.map(async a => ({
 })))
 
 console.table(rows)
+
+const conns = await AdminDomainConnection.find().select('hostname status adminId').lean()
+console.log('\nDomain connection records:')
+console.table(conns.map(c => ({ hostname: c.hostname, status: c.status, adminId: String(c.adminId) })))
+
 console.log('\nUse the "scope" value in PUBLIC_API_KEYS, e.g.  leofx:suimfx_<key>')
 
 await mongoose.disconnect()
