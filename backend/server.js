@@ -40,7 +40,7 @@ import employeeManagementRoutes from './routes/employeeManagement.js'
 import lpIntegrationRoutes from './routes/lpIntegration.js'
 import bookManagementRoutes from './routes/bookManagement.js'
 import publicApiRoutes from './routes/publicApi.js'
-import { isPlatformHost, platformOrigins, originHost } from './utils/platformHost.js'
+import { isPlatformHost, platformOrigins, originHost, hostVariants } from './utils/platformHost.js'
 import mt5Routes from './routes/mt5.js'
 import path from 'path'
 import fs from 'fs'
@@ -317,8 +317,11 @@ app.use(async (req, res, next) => {
     // Single Admin model import
     const AdminModel = (await import('./models/Admin.js')).default
 
+    // Match www and non-www: a broker saves one spelling, users type both.
+    const hostnames = hostVariants(hostname)
+
     // First: check active domain connections
-    const conn = await AdminDomainConnection.findOne({ hostname, status: 'connected' }).lean()
+    const conn = await AdminDomainConnection.findOne({ hostname: { $in: hostnames }, status: 'connected' }).lean()
     if (conn) {
       const admin = await AdminModel.findById(conn.adminId)
         .select('_id email firstName lastName brandName urlSlug customDomain logo referralCode')
@@ -326,7 +329,7 @@ app.use(async (req, res, next) => {
       if (admin) { req.tenantAdmin = admin; req.tenantDomain = hostname }
     } else {
       // Fallback: check Admin.customDomain field directly
-      const admin = await AdminModel.findOne({ customDomain: hostname })
+      const admin = await AdminModel.findOne({ customDomain: { $in: hostnames } })
         .select('_id email firstName lastName brandName urlSlug customDomain logo referralCode')
         .lean()
       if (admin) { req.tenantAdmin = admin; req.tenantDomain = hostname }

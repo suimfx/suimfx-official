@@ -3,7 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import Admin from '../models/Admin.js'
 import User from '../models/User.js'
-import { isPlatformHost } from '../utils/platformHost.js'
+import { isPlatformHost, hostVariants } from '../utils/platformHost.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -89,7 +89,7 @@ async function resolveAdminFromUrl(req) {
       const key = `host:${hostname}`
       const hit = cacheGet(key)
       if (hit !== null) return hit
-      const admin = await Admin.findOne({ customDomain: hostname })
+      const admin = await Admin.findOne({ customDomain: { $in: hostVariants(hostname) } })
         .select(ADMIN_FIELDS)
         .lean()
       cacheSet(key, admin || null)

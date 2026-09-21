@@ -31,6 +31,18 @@ export function isPlatformHost (hostname) {
   return PLATFORM_DOMAINS.some(d => h === d || h.endsWith(`.${d}`))
 }
 
+/**
+ * A hostname plus its www / non-www twin, for tenant domain lookups.
+ * A broker saves one spelling ("irafx.com") but users type both, and an exact
+ * match then leaves www. visitors with no brand at all.
+ */
+export function hostVariants (hostname) {
+  const h = String(hostname || '').toLowerCase().trim().replace(/:\d+$/, '')
+  if (!h) return []
+  const bare = h.replace(/^www\./, '')
+  return [...new Set([h, bare, `www.${bare}`])]
+}
+
 /** Hostname of an Origin header value; '' when missing or malformed. */
 export function originHost (origin) {
   try {
