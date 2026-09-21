@@ -534,7 +534,7 @@ app.get(['/downloads/Suimfx.apk', '/downloads/suimfx.apk', '/suimfx.apk', '/Suim
 // link-preview crawlers (WhatsApp, Telegram, FB, Twitter) see per-tenant <title>
 // and Open Graph tags instead of the hardcoded "Suimfx" in the static index.html.
 app.get('/api-health', (req, res) => {
-  res.json({ message: 'Suimfx API is running' })
+  res.json({ message: 'Forexmt24 API is running' })
 })
 
 // Diagnostic: returns exactly what the OG/title tags would be for the current
@@ -595,7 +595,7 @@ app.get('*', async (req, res, next) => {
 
   const acceptsHtml = (req.headers.accept || '').includes('text/html')
   if (!acceptsHtml && req.path === '/') {
-    return res.json({ message: 'Suimfx API is running' })
+    return res.json({ message: 'Forexmt24 API is running' })
   }
 
   try {
