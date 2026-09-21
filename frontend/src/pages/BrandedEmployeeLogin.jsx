@@ -3,8 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowRight, AlertCircle } from 'lucide-react'
 import { API_URL, API_BASE_URL } from '../config/api'
 
-const isPlatformHost = (h) =>
-  h === 'suimfx.com' || h.endsWith('.suimfx.com') || h === 'localhost' || h === '127.0.0.1'
+import { isPlatformHost as isPlatformDomainHost, isLocalDevHost } from '../utils/whiteLabelHost'
+
+const isPlatformHost = (h) => isPlatformDomainHost(h) || isLocalDevHost(h)
 
 const fetchWithTimeout = (url, ms = 6000) => {
   const controller = new AbortController()

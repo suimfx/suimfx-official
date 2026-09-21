@@ -33,7 +33,7 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
     // If no brand info provided, leave the default /manifest.json in place
     if (!brandName && !logoUrl) return
 
-    const name = (brandName && brandName.trim()) || 'Suimfx'
+    const name = (brandName && brandName.trim()) || 'Forexmt24'
     const shortName = name.length > 12 ? name.slice(0, 12) : name
 
     const icon = logoUrl || '/suimfxLogo.png'

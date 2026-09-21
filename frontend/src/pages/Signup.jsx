@@ -347,7 +347,7 @@ const Signup = () => {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <Link to="/">
-              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Suimfx'} className="h-24 w-auto" />
+              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Forexmt24'} className="h-24 w-auto" />
             </Link>
           </div>
 

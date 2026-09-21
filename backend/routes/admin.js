@@ -401,9 +401,9 @@ router.put('/users/:id/ban', requireEmployeePermission(PERMISSIONS.EMPLOYEE.MANA
           email: user.email,
           reason: reason || 'Policy violation',
           date: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'Suimfx',
-          loginUrl: settings?.loginUrl || 'https://suimfx.com/login',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          loginUrl: settings?.loginUrl || 'https://forexmt24.com/login',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
       }

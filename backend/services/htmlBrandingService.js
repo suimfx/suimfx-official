@@ -3,6 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import Admin from '../models/Admin.js'
 import User from '../models/User.js'
+import { isPlatformHost } from '../utils/platformHost.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -84,7 +85,7 @@ async function resolveAdminFromUrl(req) {
     const fwdHost = (req.headers['x-forwarded-host'] || '').split(',')[0].split(':')[0].toLowerCase().trim()
     const rawHost = (req.headers.host || '').split(':')[0].toLowerCase().trim()
     const hostname = fwdHost || rawHost
-    if (hostname && !hostname.endsWith('suimfx.com') && hostname !== 'localhost') {
+    if (hostname && !isPlatformHost(hostname) && hostname !== 'localhost') {
       const key = `host:${hostname}`
       const hit = cacheGet(key)
       if (hit !== null) return hit
@@ -132,7 +133,7 @@ async function resolveAdminFromUrl(req) {
  *  1. req.tenantAdmin — attached by the custom-domain middleware in server.js
  *  2. ?ref=<code>     — referral code → referring user's assignedAdmin
  *  3. /<slug>/...     — Admin.urlSlug on the first path segment
- *  4. hostname fallback so previews never leak "Suimfx" on a non-suimfx host
+ *  4. hostname fallback so previews never leak "Forexmt24" on a non-suimfx host
  */
 // Resolve which admin (if any) should brand this request, trying every
 // signal available. Exported so a diagnostic endpoint can reuse it.
@@ -147,7 +148,7 @@ export async function resolveBrandingAdmin(req) {
 /**
  * Returns a per-tenant PWA Web App Manifest (as a JS object) so the browser's
  * native "Add to Home Screen" / "Install app" prompt shows the admin's brand
- * name + logo instead of the default "Suimfx". Chrome reads /manifest.json
+ * name + logo instead of the default "Forexmt24". Chrome reads /manifest.json
  * directly (it does NOT honor the runtime blob-manifest swap reliably), so the
  * branding MUST be baked into the server response — same idea as renderBrandedHtml.
  */
@@ -156,19 +157,19 @@ export async function renderBrandedManifest(req) {
   const rawHost = (req.headers.host || '').split(':')[0].toLowerCase().trim()
   const hostHeader = fwdHost || rawHost
 
-  let name = 'Suimfx'
+  let name = 'Forexmt24'
   let logoPath = '/suimfxLogo.png'
 
   const brandingAdmin = await resolveBrandingAdmin(req)
   if (brandingAdmin) {
     const brand = (brandingAdmin.brandName || '').trim()
-    name = brand || brandingAdmin.customDomain || hostHeader || 'Suimfx'
+    name = brand || brandingAdmin.customDomain || hostHeader || 'Forexmt24'
     if (brandingAdmin.logo) {
       const raw = String(brandingAdmin.logo).trim()
       if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) logoPath = raw
       else logoPath = raw.startsWith('/') ? raw : '/' + raw
     }
-  } else if (hostHeader && !hostHeader.endsWith('suimfx.com') && hostHeader !== 'localhost') {
+  } else if (hostHeader && !isPlatformHost(hostHeader) && hostHeader !== 'localhost') {
     name = hostHeader
   }
 
@@ -206,9 +207,9 @@ export async function renderBrandedHtml(req) {
   const rawHost = (req.headers.host || '').split(':')[0].toLowerCase().trim()
   const hostHeader = fwdHost || rawHost
 
-  let titleText = 'Suimfx'
-  let siteName = 'Suimfx'
-  let description = 'Suimfx — Trading platform'
+  let titleText = 'Forexmt24'
+  let siteName = 'Forexmt24'
+  let description = 'Forexmt24 — Trading platform'
   let logoPath = '/suimfxLogo.png'
 
   const brandingAdmin = await resolveBrandingAdmin(req)
@@ -220,7 +221,7 @@ export async function renderBrandedHtml(req) {
     titleText = brand || domain
     description = `${siteName} — Trading platform`
     // Prefer the admin's uploaded logo for the preview image so WhatsApp /
-    // Facebook stop pulling the default Suimfx favicon on custom domains.
+    // Facebook stop pulling the default Forexmt24 favicon on custom domains.
     if (brandingAdmin.logo) {
       const raw = String(brandingAdmin.logo).trim()
       if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) {
@@ -231,9 +232,9 @@ export async function renderBrandedHtml(req) {
         logoPath = '/' + raw
       }
     }
-  } else if (hostHeader && !hostHeader.endsWith('suimfx.com') && hostHeader !== 'localhost') {
+  } else if (hostHeader && !isPlatformHost(hostHeader) && hostHeader !== 'localhost') {
     // Custom domain hit but admin record not found — at least use the hostname
-    // instead of the hardcoded "Suimfx" so link previews never leak the wrong brand.
+    // instead of the hardcoded "Forexmt24" so link previews never leak the wrong brand.
     siteName = hostHeader
     titleText = hostHeader
     description = `${hostHeader} — Trading platform`
@@ -269,9 +270,9 @@ export async function renderBrandedHtml(req) {
 
   // Strip ALL hardcoded branding meta tags from the template first.
   // The static frontend/index.html ships with og:title / og:site_name /
-  // og:description / twitter:* / description already set to "Suimfx".
+  // og:description / twitter:* / description already set to "Forexmt24".
   // If we only replaced <title>, those duplicate tags survived and WhatsApp
-  // / Facebook crawlers picked the static "Suimfx" values over our dynamic
+  // / Facebook crawlers picked the static "Forexmt24" values over our dynamic
   // ones, so custom-domain previews still leaked the super-admin brand.
   let html = template
     .replace(/<title>[\s\S]*?<\/title>/i, '')

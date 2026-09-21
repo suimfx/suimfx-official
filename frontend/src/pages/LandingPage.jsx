@@ -15,8 +15,8 @@ const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const slug = branding?.adminSlug
-  const loginUrl = slug ? `/${slug}/login` : 'https://trade.suimfx.com/user/login'
-  const signupUrl = slug ? `/${slug}/signup` : 'https://trade.suimfx.com/user/signup'
+  const loginUrl = slug ? `/${slug}/login` : 'https://forexmt24.com/user/login'
+  const signupUrl = slug ? `/${slug}/signup` : 'https://forexmt24.com/user/signup'
 
   const menuItems = [
     { name: 'Markets', href: '#markets' },
@@ -44,7 +44,7 @@ const Navbar = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 md:h-20">
             <a href="/" className="flex items-center gap-2">
-              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Suimfx'} className="h-20 md:h-24 w-auto" />
+              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Forexmt24'} className="h-20 md:h-24 w-auto" />
             </a>
 
             <div className="hidden md:flex items-center gap-8">
@@ -98,9 +98,9 @@ const Navbar = () => {
 // ============ HERO COMPONENT ============
 const Hero = () => {
   const { branding } = useBranding()
-  const brandName = branding?.brandName || 'Suimfx'
+  const brandName = branding?.brandName || 'Forexmt24'
   const slug = branding?.adminSlug
-  const signupUrl = slug ? `/${slug}/signup` : 'https://trade.suimfx.com/user/signup'
+  const signupUrl = slug ? `/${slug}/signup` : 'https://forexmt24.com/user/signup'
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-950">
       {/* Animated Background */}
@@ -298,7 +298,7 @@ const HowToStart = () => {
 const AccountTypes = () => {
   const { branding } = useBranding()
   const slug = branding?.adminSlug
-  const signupUrl = slug ? `/${slug}/signup` : 'https://trade.suimfx.com/user/signup'
+  const signupUrl = slug ? `/${slug}/signup` : 'https://forexmt24.com/user/signup'
   return (
     <section id="accounts" className="py-20 md:py-32 bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -380,7 +380,7 @@ const AccountTypes = () => {
 // ============ FAQ SECTION COMPONENT ============
 const FAQSection = () => {
   const { branding } = useBranding()
-  const brandName = branding?.brandName || 'Suimfx'
+  const brandName = branding?.brandName || 'Forexmt24'
   const [openIndex, setOpenIndex] = useState(0)
 
   const faqData = [
@@ -461,7 +461,7 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <a href="/" className="inline-block mb-4">
-              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Suimfx'} className="h-24 w-auto" />
+              <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Forexmt24'} className="h-24 w-auto" />
             </a>
             <p className="text-slate-400 text-sm mb-4">
               Your trusted partner for forex, stocks, and crypto trading.
@@ -505,7 +505,7 @@ const Footer = () => {
         </div>
 
         <div className="pt-8 border-t border-slate-800 text-center">
-          <p className="text-slate-500 text-sm">© {new Date().getFullYear()} {branding?.brandName || 'Suimfx'}. All rights reserved.</p>
+          <p className="text-slate-500 text-sm">© {new Date().getFullYear()} {branding?.brandName || 'Forexmt24'}. All rights reserved.</p>
         </div>
       </div>
     </footer>

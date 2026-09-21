@@ -40,6 +40,7 @@ import employeeManagementRoutes from './routes/employeeManagement.js'
 import lpIntegrationRoutes from './routes/lpIntegration.js'
 import bookManagementRoutes from './routes/bookManagement.js'
 import publicApiRoutes from './routes/publicApi.js'
+import { isPlatformHost, platformOrigins, originHost } from './utils/platformHost.js'
 import mt5Routes from './routes/mt5.js'
 import path from 'path'
 import fs from 'fs'
@@ -72,7 +73,7 @@ const defaultOrigins = [
   'http://localhost:3000',
   'http://localhost:5001'
 ]
-const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])]
+const allowedOrigins = [...new Set([...envOrigins, ...platformOrigins(), ...defaultOrigins])]
 console.log('Allowed CORS origins:', allowedOrigins)
 
 // CORS options with dynamic origin checking
@@ -81,8 +82,8 @@ const corsOptions = {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true)
     
-    // Allow if in list or any suimfx.com subdomain
-    if (allowedOrigins.includes(origin) || origin.endsWith('.suimfx.com') || origin.includes('suimfx.com')) {
+    // Allow if in the list, or any host under a platform domain
+    if (allowedOrigins.includes(origin) || isPlatformHost(originHost(origin))) {
       callback(null, true)
     } else {
       console.log('CORS blocked origin:', origin)
@@ -315,7 +316,7 @@ app.use(async (req, res, next) => {
 
     // Skip localhost, IP addresses, and main platform domains
     const isLocalhost = hostname === 'localhost' || hostname.startsWith('127.') || hostname.startsWith('192.168.')
-    const isPlatformDomain = hostname.endsWith('suimfx.com') || hostname === 'api.suimfx.com'
+    const isPlatformDomain = isPlatformHost(hostname)
     if (isLocalhost || isPlatformDomain) return next()
 
     // Single Admin model import

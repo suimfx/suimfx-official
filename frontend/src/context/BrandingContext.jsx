@@ -3,10 +3,11 @@ import { useLocation } from 'react-router-dom'
 import { API_URL, API_BASE_URL } from '../config/api'
 import defaultLogo from '../assets/suimfxLogo.png'
 import { buildWlSessionHash, originForCustomDomain } from '../utils/wlSessionHandoff'
+import { isPlatformHost, normalizeHost } from '../utils/whiteLabelHost'
 
 const BrandingContext = createContext()
 
-const DEFAULT_TITLE = 'Suimfx'
+const DEFAULT_TITLE = 'Forexmt24'
 const DEFAULT_FAVICON = '/suimfxLogo.png'
 
 export const useBranding = () => {
@@ -17,18 +18,7 @@ export const useBranding = () => {
   return context
 }
 
-function normalizeHost (h) {
-  if (!h) return ''
-  return h.replace(/^www\./i, '').toLowerCase()
-}
-
-/** Main platform hosts — white-label users with a custom domain are redirected off these. */
-function isPlatformHost (hostname) {
-  const h = hostname.toLowerCase()
-  return h === 'suimfx.com' || h.endsWith('.suimfx.com')
-}
-
-/** Super Admin / Admin / Subadmin portal — always Suimfx tab title & favicon, never white-label. */
+/** Super Admin / Admin / Subadmin portal — always Forexmt24 tab title & favicon, never white-label. */
 function isAdminAppPath (pathname) {
   return pathname.startsWith('/admin') || pathname.startsWith('/subadmin')
 }
@@ -159,7 +149,7 @@ export const BrandingProvider = ({ children }) => {
     window.location.replace(url)
   }, [brandingLoaded, branding])
 
-  // Title & favicon: on platform host (suimfx.com) admin paths always show Suimfx.
+  // Title & favicon: on platform host (suimfx.com) admin paths always show Forexmt24.
   // On custom domains, admin/employee dashboards use the admin's branding.
   useEffect(() => {
     if (!brandingLoaded) return

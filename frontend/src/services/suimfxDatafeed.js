@@ -258,7 +258,7 @@ function waitForPrice(symbol, timeoutMs = 4000) {
 
 class SuimfxDatafeed {
   constructor(brandName) {
-    this._brandName = brandName || 'Suimfx'
+    this._brandName = brandName || 'Forexmt24'
     // subscribers[guid] = { symbol, resolution, onTick }
     this._subscribers = {}
     // _liveBar[symbol][resolution] = { time, open, high, low, close, volume }

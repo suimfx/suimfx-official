@@ -124,8 +124,8 @@ router.post('/submit-files', kycUpload.fields([
           email: user.email,
           documentType: documentType,
           submittedAt: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'Suimfx',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
       }
@@ -206,8 +206,8 @@ router.post('/submit', async (req, res) => {
           email: user.email,
           documentType: documentType,
           submittedAt: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'Suimfx',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
       }
@@ -410,9 +410,9 @@ router.put('/approve/:kycId', verifyAdminToken, requireEmployeePermission(PERMIS
           email: user.email,
           documentType: kyc.documentType,
           approvedAt: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'Suimfx',
-          loginUrl: settings?.loginUrl || 'https://suimfx.com/login',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          loginUrl: settings?.loginUrl || 'https://forexmt24.com/login',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
         console.log('KYC approved email result:', emailResult)
@@ -474,9 +474,9 @@ router.put('/reject/:kycId', verifyAdminToken, requireEmployeePermission(PERMISS
           documentType: kyc.documentType,
           rejectionReason: kyc.rejectionReason,
           rejectedAt: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'Suimfx',
-          loginUrl: settings?.loginUrl || 'https://suimfx.com/login',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          loginUrl: settings?.loginUrl || 'https://forexmt24.com/login',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
       }

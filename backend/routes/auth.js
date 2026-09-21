@@ -549,8 +549,8 @@ router.post('/forgot-password', async (req, res) => {
           email: user.email,
           otp,
           expiryMinutes,
-          platformName: emailSettings?.fromName || 'Suimfx',
-          supportEmail: emailSettings?.fromEmail || 'support@suimfx.com',
+          platformName: emailSettings?.fromName || 'Forexmt24',
+          supportEmail: emailSettings?.fromEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         }, user.assignedAdmin || null)
 

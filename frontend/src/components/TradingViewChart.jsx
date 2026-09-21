@@ -44,10 +44,10 @@ const TradingViewChart = ({ symbol, interval = '5', isDarkMode = true, container
       // falling back to Suimfx for platform users. BrandingContext is the app's
       // resolved per-tenant brand (from custom domain / slug / the logged-in user's
       // /my-branding) — most reliable across login flows; localStorage is a fallback.
-      let brandName = 'Suimfx'
+      let brandName = 'Forexmt24'
       try {
         const u = JSON.parse(localStorage.getItem('user') || '{}')
-        brandName = branding?.brandName || u?.adminBranding?.brandName || localStorage.getItem('adminBrandName') || 'Suimfx'
+        brandName = branding?.brandName || u?.adminBranding?.brandName || localStorage.getItem('adminBrandName') || 'Forexmt24'
       } catch { /* keep default */ }
 
       try {

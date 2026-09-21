@@ -61,7 +61,7 @@ const AdminLogin = () => {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <Link to="/">
-              <img src={suimfxLogo} alt="Suimfx" className="h-20 sm:h-24 w-auto" />
+              <img src={suimfxLogo} alt="Forexmt24" className="h-20 sm:h-24 w-auto" />
             </Link>
           </div>
 
@@ -148,7 +148,7 @@ const AdminLogin = () => {
           </div>
 
           <a
-            href="https://suimfx.com/admin/login"
+            href="https://forexmt24.com/admin/login"
             className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-blue-500/30 text-blue-400 font-medium hover:bg-blue-500/10 transition-all text-sm sm:text-base mb-4"
           >
             <UserCog size={18} />
@@ -157,7 +157,7 @@ const AdminLogin = () => {
 
           {/* User Login Link */}
           <a
-            href="https://suimfx.com/user/login"
+            href="https://forexmt24.com/user/login"
             className="block w-full text-center py-3 sm:py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all text-sm sm:text-base"
           >
             Go to User Login

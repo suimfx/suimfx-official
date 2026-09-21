@@ -101,8 +101,8 @@ router.post('/deposit', async (req, res) => {
           transactionId: transaction._id.toString(),
           paymentMethod: paymentMethod || 'Bank Transfer',
           date: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'Suimfx',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
       }
@@ -215,8 +215,8 @@ router.post('/withdraw', async (req, res) => {
           transactionId: transaction._id.toString(),
           paymentMethod: paymentMethod || 'Bank Transfer',
           date: new Date().toLocaleString(),
-          platformName: settings?.platformName || 'Suimfx',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
       }
@@ -442,8 +442,8 @@ router.put('/admin/approve/:id', verifyAdminToken, requireEmployeePermission(PER
           paymentMethod: transaction.paymentMethod || 'Wallet',
           date: new Date().toLocaleString(),
           newBalance: wallet.balance.toFixed(2),
-          platformName: settings?.platformName || 'Suimfx',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
       }
@@ -590,8 +590,8 @@ router.put('/transaction/:id/approve', verifyAdminToken, requireEmployeePermissi
           paymentMethod: transaction.paymentMethod || 'Wallet',
           date: new Date().toLocaleString(),
           newBalance: wallet.balance.toFixed(2),
-          platformName: settings?.platformName || 'Suimfx',
-          supportEmail: settings?.supportEmail || 'support@suimfx.com',
+          platformName: settings?.platformName || 'Forexmt24',
+          supportEmail: settings?.supportEmail || 'support@forexmt24.com',
           year: new Date().getFullYear().toString()
         })
       }

@@ -13,7 +13,7 @@ const InstructionsPage = () => {
   const navigate = useNavigate()
   const { isDarkMode, toggleDarkMode } = useTheme()
   const [logoImage, setLogoImage] = useState(suimfxLogo)
-  const [brandName, setBrandName] = useState('Suimfx')
+  const [brandName, setBrandName] = useState('Forexmt24')
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [expandedSection, setExpandedSection] = useState('getting-started')
   const [challengeModeEnabled, setChallengeModeEnabled] = useState(false)
@@ -168,7 +168,7 @@ const InstructionsPage = () => {
           onMouseLeave={() => setSidebarExpanded(false)}
         >
           <div className="p-4 flex items-center justify-center">
-            <img src={logoImage} alt="Suimfx" className="h-20 w-auto object-contain" />
+            <img src={logoImage} alt="Forexmt24" className="h-20 w-auto object-contain" />
           </div>
           <nav className="flex-1 px-2">
             {menuItems.map((item) => (
