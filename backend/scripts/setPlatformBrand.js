@@ -19,7 +19,7 @@ dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '.
 const { default: Admin } = await import('../models/Admin.js')
 const { default: AdminDomainConnection } = await import('../models/AdminDomainConnection.js')
 
-const PLATFORM_SLUG = 'suimfx'
+const PLATFORM_SLUG = 'forexmt24'
 const NEW_BRAND = 'Forexmt24'
 const CLAIM_DOMAIN = 'forexmt24.com'
 
