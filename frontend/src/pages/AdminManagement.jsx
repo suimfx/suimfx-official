@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import AdminLayout from '../components/AdminLayout'
+import { PLATFORM_DOMAINS, isLocalDevHost } from '../utils/whiteLabelHost'
 import {
   Users,
   Plus,
@@ -250,9 +251,18 @@ const AdminManagement = () => {
   }
 
   const cleanDomain = customDomain ? customDomain.replace(/^https?:\/\//, '').replace(/\/$/, '') : ''
+
+  // Build the fallback from the platform's own domain, not the host the admin
+  // happens to be browsing. Opening the panel on an old or tenant domain used
+  // to bake that host into the link handed out to employees — which then died
+  // with that domain.
+  const platformOrigin = isLocalDevHost(window.location.hostname)
+    ? window.location.origin
+    : `https://${PLATFORM_DOMAINS[0]}`
+
   const employeeLoginLink = cleanDomain
     ? `https://${cleanDomain}/employee-login`
-    : urlSlug ? `${window.location.origin}/${urlSlug}/employee-login` : ''
+    : urlSlug ? `${platformOrigin}/${urlSlug}/employee-login` : ''
 
   const handleCopyLoginLink = () => {
     if (!employeeLoginLink) return
