@@ -448,7 +448,7 @@ const AdminBookManagement = () => {
         <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center gap-3">
           <Info size={18} className="text-orange-500 flex-shrink-0" />
           <p className="text-orange-400 text-sm">
-            <strong>Warning:</strong> No A-Book venue is available, so users cannot be moved to A-Book. Connect Corecen LP, or enable MT5 with at least one active account.
+            <strong>Heads up:</strong> No hedging venue is reachable right now. You can still assign A-Book and B-Book, but A-Book trades will stay unhedged until Corecen LP is reachable or MT5 is enabled with an active account.
           </p>
         </div>
       )}
@@ -710,13 +710,10 @@ const AdminBookManagement = () => {
           <span className="text-gray-400">{selectedUsers.length} users selected</span>
           <button
             onClick={() => bulkUpdateBookType('A')}
-            disabled={!aBookAvailable}
-            title={!aBookAvailable ? 'No A-Book venue available: connect Corecen LP, or enable MT5 with an active account' : `Hedging through ${venueNote}`}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              !aBookAvailable
-                ? 'bg-gray-500/20 text-gray-500 border border-gray-500/30 cursor-not-allowed' 
-                : 'bg-green-500/20 hover:bg-green-500/30 text-green-500 border border-green-500/30'
-            }`}
+            title={aBookAvailable
+              ? `A-Book trades hedge through ${venueNote}`
+              : 'Assignment works. A-Book trades will not hedge until a venue is available.'}
+            className="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-green-500/20 hover:bg-green-500/30 text-green-500 border border-green-500/30"
           >
             Move to A-Book
           </button>
@@ -807,16 +804,11 @@ const AdminBookManagement = () => {
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => toggleUserBookType(user._id, user.bookType || 'B')}
-                        disabled={user.bookType !== 'A' && !aBookAvailable}
-                        title={user.bookType !== 'A' && !aBookAvailable
-                          ? 'No A-Book venue available: connect Corecen LP, or enable MT5 with an active account'
-                          : `Switch to ${user.bookType === 'A' ? 'B' : 'A'}-Book`}
+                        title={`Switch to ${user.bookType === 'A' ? 'B' : 'A'}-Book`}
                         className={`p-2 rounded-lg transition-colors ${
                           user.bookType === 'A'
                             ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            : !aBookAvailable
-                              ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
-                              : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                            : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
                         }`}
                       >
                         {user.bookType === 'A' ? (
