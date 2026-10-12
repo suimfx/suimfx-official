@@ -74,6 +74,11 @@ const AdminBookManagement = () => {
   const [connectionMessage, setConnectionMessage] = useState('')
   const [lpConnected, setLpConnected] = useState(false)
   const [checkingLpStatus, setCheckingLpStatus] = useState(true)
+  // A-Book hedges through Corecen OR MT5, so the A-Book controls gate on this
+  // rather than on Corecen alone — Corecen being down used to disable every
+  // switch while MT5 was live and taking the trades.
+  const [aBookAvailable, setABookAvailable] = useState(false)
+  const [venueNote, setVenueNote] = useState('')
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('adminToken')
@@ -107,9 +112,19 @@ const AdminBookManagement = () => {
       })
       const data = await res.json()
       setLpConnected(data.connected === true)
+      setABookAvailable(data.aBookAvailable === true)
+      setVenueNote(
+        data.connected === true
+          ? 'Corecen LP'
+          : data.mt5?.available
+            ? `MT5 (${data.mt5.activeAccounts} active account${data.mt5.activeAccounts === 1 ? '' : 's'})`
+            : ''
+      )
     } catch (error) {
       console.error('Error checking LP status:', error)
       setLpConnected(false)
+      setABookAvailable(false)
+      setVenueNote('')
     }
     setCheckingLpStatus(false)
   }
@@ -419,12 +434,21 @@ const AdminBookManagement = () => {
         </button>
       </div>
 
-      {/* Warning if LP not connected */}
-      {!checkingLpStatus && !lpConnected && (
+      {/* A-Book venue notice. Corecen down is only blocking when MT5 is down too. */}
+      {!checkingLpStatus && !lpConnected && aBookAvailable && (
+        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center gap-3">
+          <Info size={18} className="text-blue-400 flex-shrink-0" />
+          <p className="text-blue-300 text-sm">
+            Corecen LP is unreachable, so A-Book trades are hedging through <strong>{venueNote}</strong>. Book assignment still works.
+          </p>
+        </div>
+      )}
+
+      {!checkingLpStatus && !aBookAvailable && (
         <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center gap-3">
           <Info size={18} className="text-orange-500 flex-shrink-0" />
           <p className="text-orange-400 text-sm">
-            <strong>Warning:</strong> Users cannot be moved to A-Book while LP is disconnected. Please configure and test the LP connection first.
+            <strong>Warning:</strong> No A-Book venue is available, so users cannot be moved to A-Book. Connect Corecen LP, or enable MT5 with at least one active account.
           </p>
         </div>
       )}
@@ -686,10 +710,10 @@ const AdminBookManagement = () => {
           <span className="text-gray-400">{selectedUsers.length} users selected</span>
           <button
             onClick={() => bulkUpdateBookType('A')}
-            disabled={!lpConnected}
-            title={!lpConnected ? 'LP must be connected to move users to A-Book' : ''}
+            disabled={!aBookAvailable}
+            title={!aBookAvailable ? 'No A-Book venue available: connect Corecen LP, or enable MT5 with an active account' : `Hedging through ${venueNote}`}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              !lpConnected 
+              !aBookAvailable
                 ? 'bg-gray-500/20 text-gray-500 border border-gray-500/30 cursor-not-allowed' 
                 : 'bg-green-500/20 hover:bg-green-500/30 text-green-500 border border-green-500/30'
             }`}
@@ -783,12 +807,14 @@ const AdminBookManagement = () => {
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => toggleUserBookType(user._id, user.bookType || 'B')}
-                        disabled={user.bookType !== 'A' && !lpConnected}
-                        title={user.bookType !== 'A' && !lpConnected ? 'LP must be connected to move users to A-Book' : `Switch to ${user.bookType === 'A' ? 'B' : 'A'}-Book`}
+                        disabled={user.bookType !== 'A' && !aBookAvailable}
+                        title={user.bookType !== 'A' && !aBookAvailable
+                          ? 'No A-Book venue available: connect Corecen LP, or enable MT5 with an active account'
+                          : `Switch to ${user.bookType === 'A' ? 'B' : 'A'}-Book`}
                         className={`p-2 rounded-lg transition-colors ${
                           user.bookType === 'A'
                             ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            : !lpConnected
+                            : !aBookAvailable
                               ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                               : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
                         }`}

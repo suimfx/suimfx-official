@@ -5,6 +5,8 @@ import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
 import lpService from '../services/lpService.js'
 import LpSettings from '../models/LpSettings.js'
+import MtSettings from '../models/MtSettings.js'
+import Mt5Account from '../models/Mt5Account.js'
 import dotenv from 'dotenv'
 import { verifyAdminToken, requireSidebarPermission, PERMISSIONS } from '../middleware/rbac.js'
 import { getAdminUserIds } from '../utils/adminFilter.js'
@@ -523,13 +525,38 @@ router.get('/b-book/trades', async (req, res) => {
 // LP CONNECTION SETTINGS
 // ============================================
 
-// GET /api/book-management/lp-status - Check LP connection status
+// Can A-Book actually take a hedge through MT5? aBookRouter sends a trade to
+// MT5 when the user is tagged to an account and to Corecen otherwise, so either
+// venue being up makes A-Book usable.
+async function mt5Availability () {
+  try {
+    const s = await MtSettings.findOne({ key: 'metaapi_config' }).select('enabled metaApiToken').lean()
+    if (!s?.enabled || !s?.metaApiToken) return { available: false, activeAccounts: 0 }
+    const activeAccounts = await Mt5Account.countDocuments({ isActive: true })
+    return { available: activeAccounts > 0, activeAccounts }
+  } catch {
+    return { available: false, activeAccounts: 0 }
+  }
+}
+
+// GET /api/book-management/lp-status - A-Book venue status
 router.get('/lp-status', async (req, res) => {
+  const mt5 = await mt5Availability()
+
+  // `connected` stays Corecen-only, so the LP panel keeps reporting on Corecen.
+  // `aBookAvailable` is what the A-Book controls gate on: Corecen being
+  // unreachable must not disable book assignment while MT5 is live.
+  const reply = (body) => res.json({
+    ...body,
+    mt5,
+    aBookAvailable: body.connected === true || mt5.available
+  })
+
   try {
     const settings = getLpSettings()
 
     if (!settings.lpApiUrl) {
-      return res.json({
+      return reply({
         success: true,
         connected: false,
         message: 'LP API URL not configured'
@@ -548,23 +575,22 @@ router.get('/lp-status', async (req, res) => {
 
       const tickCount = getAllLpPrices().size
       if (response.ok) {
-        res.json({
+        return reply({
           success: true,
           connected: true,
           message: 'Corecen LP is reachable. Market ticks on this server: POST /api/lp/prices/batch.',
           lpUrl: settings.lpApiUrl,
           suimfxCachedSymbols: tickCount
         })
-      } else {
-        res.json({
-          success: true,
-          connected: false,
-          message: `LP returned status ${response.status}`,
-          suimfxCachedSymbols: tickCount
-        })
       }
+      return reply({
+        success: true,
+        connected: false,
+        message: `LP returned status ${response.status}`,
+        suimfxCachedSymbols: tickCount
+      })
     } catch (fetchError) {
-      res.json({
+      return reply({
         success: true,
         connected: false,
         message: fetchError.code === 'ECONNREFUSED'
@@ -577,7 +603,7 @@ router.get('/lp-status', async (req, res) => {
     }
   } catch (error) {
     console.error('Error checking LP status:', error)
-    res.json({
+    return reply({
       success: false,
       connected: false,
       message: 'Error checking LP status'
