@@ -30,6 +30,18 @@ import { getAdminUserIds } from '../utils/adminFilter.js'
 
 const router = express.Router()
 
+// A live feed must never be revalidated. Express puts an ETag on every JSON
+// response, so two polls whose P&L rounds to the same figure come back as a
+// 304 with an empty body — which polling clients read as "no data", and the
+// board they drive then freezes. Dropping the conditional headers keeps every
+// poll a full 200, and no-store stops clients revalidating in the first place.
+router.use((req, res, next) => {
+  delete req.headers['if-none-match']
+  delete req.headers['if-modified-since']
+  res.set('Cache-Control', 'no-store')
+  next()
+})
+
 const MAX_DAYS = 90
 const DEFAULT_DAYS = 30
 const MAX_LIMIT = 500
