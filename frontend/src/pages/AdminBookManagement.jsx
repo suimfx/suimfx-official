@@ -79,6 +79,9 @@ const AdminBookManagement = () => {
   // switch while MT5 was live and taking the trades.
   const [aBookAvailable, setABookAvailable] = useState(false)
   const [venueNote, setVenueNote] = useState('')
+  // A failed switch used to revert the toggle with nothing but a console line,
+  // so a dead API host looked exactly like "the button does nothing".
+  const [actionError, setActionError] = useState('')
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('adminToken')
@@ -300,12 +303,21 @@ const AdminBookManagement = () => {
 
   const toggleUserBookType = async (userId, currentBookType) => {
     const newBookType = currentBookType === 'A' ? 'B' : 'A'
-    
+
+    setActionError('')
+
     // Optimistic UI update - instantly update the UI
-    setUsers(prev => prev.map(user => 
+    setUsers(prev => prev.map(user =>
       user._id === userId ? { ...user, bookType: newBookType } : user
     ))
-    
+
+    const revert = (message) => {
+      setUsers(prev => prev.map(user =>
+        user._id === userId ? { ...user, bookType: currentBookType } : user
+      ))
+      setActionError(message)
+    }
+
     try {
       const res = await fetch(`${API_URL}/book-management/users/${userId}/book-type`, {
         method: 'PUT',
@@ -317,17 +329,11 @@ const AdminBookManagement = () => {
         // Refresh stats in background
         fetchStats()
       } else {
-        // Revert on failure
-        setUsers(prev => prev.map(user => 
-          user._id === userId ? { ...user, bookType: currentBookType } : user
-        ))
+        revert(data.message || `Could not move the user to ${newBookType}-Book.`)
       }
     } catch (error) {
       console.error('Error toggling book type:', error)
-      // Revert on error
-      setUsers(prev => prev.map(user => 
-        user._id === userId ? { ...user, bookType: currentBookType } : user
-      ))
+      revert(`Could not reach the server, so the user is still on ${currentBookType}-Book. Check that this page is open on ${window.location.hostname} and that you are online.`)
     }
   }
 
@@ -433,6 +439,19 @@ const AdminBookManagement = () => {
           Check Status
         </button>
       </div>
+
+      {actionError && (
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+          <Info size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-red-300 text-sm flex-1">{actionError}</p>
+          <button
+            onClick={() => setActionError('')}
+            className="text-red-300 hover:text-red-200 text-sm font-medium flex-shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* A-Book venue notice. Corecen down is only blocking when MT5 is down too. */}
       {!checkingLpStatus && !lpConnected && aBookAvailable && (
