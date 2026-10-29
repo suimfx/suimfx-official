@@ -12,11 +12,17 @@
  * trades, which is what lets three brokers each get their own feed. The scope
  * `all` sees every tenant. A bare key with no `scope:` prefix means `all`.
  *
- * The feed is A-Book only: real money that was hedged out to a liquidity
- * provider. B-Book (internal) and demo trades never appear. Demo accounts are
- * forced to B-Book at creation and are never hedged, so filtering on bookType
- * excludes them by construction. Prop/challenge accounts are simulated capital
- * and are excluded too.
+ * The feed is A-Book only, and "A-Book" means the account holder's CURRENT
+ * book type — the one an admin sets in Book Management — not the tag stamped
+ * on a trade when it opened. Stamping is what a hedge router needs; a broker
+ * reading this feed expects the clients they have on A-Book today, with their
+ * history. Moving a client onto A-Book therefore brings their earlier trades
+ * into the feed, and moving them off takes those trades back out.
+ *
+ * B-Book (internal) clients never appear. Demo money never appears either, but
+ * that no longer follows from the book tag, so demo accounts are excluded by
+ * name below. Prop/challenge accounts are simulated capital and are excluded
+ * too.
  */
 
 import express from 'express'
@@ -24,6 +30,7 @@ import crypto from 'crypto'
 import Trade from '../models/Trade.js'
 import TradingAccount from '../models/TradingAccount.js'
 import Admin from '../models/Admin.js'
+import User from '../models/User.js'
 import tradeEngine from '../services/tradeEngine.js'
 import lpPriceService from '../services/lpPriceService.js'
 import { getAdminUserIds } from '../utils/adminFilter.js'
@@ -85,20 +92,39 @@ function requireApiKey (req, res, next) {
 }
 
 /**
- * Trades visible to this key. `all` means every tenant; any other scope is an
- * Admin.urlSlug and narrows to that broker's own users.
- * Returns null for `all`, or an array of user ids to match on.
+ * The account holders this key may see who are on A-Book right now. `all`
+ * spans every tenant; any other scope is an Admin.urlSlug and narrows to that
+ * broker's own users.
  *
  * ponytail: loads the whole user-id list per request. Fine at a few thousand
  * users per broker; if a tenant outgrows that, denormalise assignedAdmin onto
  * Trade and filter on it directly.
  */
-async function scopeUserIds (scope) {
-  if (scope === 'all') return null
+async function aBookUserIds (scope) {
+  if (scope === 'all') {
+    const users = await User.find({ bookType: 'A' }).select('_id').lean()
+    return users.map(u => u._id)
+  }
 
   const admin = await Admin.findOne({ urlSlug: scope }).select('_id role')
   if (!admin) return []
-  return getAdminUserIds(admin)
+
+  const scoped = await getAdminUserIds(admin)
+  if (!scoped?.length) return []
+
+  const users = await User.find({ _id: { $in: scoped }, bookType: 'A' }).select('_id').lean()
+  return users.map(u => u._id)
+}
+
+/**
+ * Demo accounts belonging to these users. Selecting trades by the owner's book
+ * type means the old `bookType: 'A'` condition no longer keeps demo money out
+ * (demo is forced to B-Book at creation), so it has to be excluded explicitly.
+ */
+async function demoAccountIds (userIds) {
+  if (!userIds.length) return []
+  const accounts = await TradingAccount.find({ userId: { $in: userIds }, isDemo: true }).select('_id').lean()
+  return accounts.map(a => a._id)
 }
 
 /**
@@ -137,12 +163,13 @@ router.get('/trades', requireApiKey, async (req, res) => {
   try {
     const { status = 'all', days, from, to, limit, offset } = req.query
 
-    // A-Book only. Demo accounts are forced to B-Book at creation and never
-    // hedged, so this one condition also keeps demo trades out of the feed.
-    const query = { accountType: 'TradingAccount', bookType: 'A' }
+    // Trades of the clients who are on A-Book right now, including the ones
+    // they opened before an admin moved them there.
+    const userIds = await aBookUserIds(req.apiScope)
+    const query = { accountType: 'TradingAccount', userId: { $in: userIds } }
 
-    const userIds = await scopeUserIds(req.apiScope)
-    if (userIds) query.userId = { $in: userIds }
+    const demoIds = await demoAccountIds(userIds)
+    if (demoIds.length) query.tradingAccountId = { $nin: demoIds }
 
     const wanted = String(status).toLowerCase()
     if (wanted === 'open') query.status = 'OPEN'
