@@ -4385,7 +4385,22 @@ const TradingPage = () => {
 
                             : 100000
 
-                          const margin = (parseFloat(volume || 0) * contractSize * (selectedInstrument.ask || 0)) / leverageNum
+                          // Margin is charged on the base currency, matching
+                          // tradeEngine.calculateMargin on the server. The quote
+                          // price only equals that when the pair is quoted in USD,
+                          // so a preview using it read ~150x high on USDJPY.
+                          const sym = (selectedInstrument.symbol || '').toUpperCase()
+                          const price = selectedInstrument.ask || 0
+                          let basePrice = price
+                          if (sym.startsWith('USD')) {
+                            basePrice = 1
+                          } else if (sym.length >= 6 && !sym.endsWith('USD')) {
+                            const leg = priceStreamService.getPrice(`${sym.slice(0, 3)}USD`)
+                            const mid = leg ? (Number(leg.bid) + Number(leg.ask)) / 2 : 0
+                            const nonFiatBase = ['XAU', 'XAG', 'XPT', 'XPD', 'BTC', 'ETH', 'LTC', 'XRP'].includes(sym.slice(0, 3))
+                            basePrice = mid > 0 ? mid : (nonFiatBase ? price : 1)
+                          }
+                          const margin = (parseFloat(volume || 0) * contractSize * basePrice) / leverageNum
 
                           return margin.toFixed(2)
 
