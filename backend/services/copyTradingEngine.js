@@ -213,7 +213,8 @@ class CopyTradingEngine {
           followerLotSize,
           masterTrade.openPrice,
           followerAccount.leverage,
-          contractSize
+          contractSize,
+          masterTrade.symbol
         )
 
         // Calculate used margin from existing open trades

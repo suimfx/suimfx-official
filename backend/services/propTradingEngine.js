@@ -5,6 +5,7 @@ import Trade from '../models/Trade.js'
 import User from '../models/User.js'
 import Charges from '../models/Charges.js'
 import { sendTemplateEmail } from '../services/emailService.js'
+import tradeEngine from './tradeEngine.js'
 
 class PropTradingEngine {
   /** Expiry for new/reset challenge accounts. 0-step with no duration = effectively unlimited. */
@@ -1024,9 +1025,12 @@ class PropTradingEngine {
     return Math.abs(priceDiff * quantity * contractSize)
   }
 
+  // One margin rule for the whole platform. This used to carry its own copy of
+  // the formula, which drifted from live trading the moment that one was fixed
+  // to charge on the base currency rather than the quote price.
   calculateMargin(tradeParams, account) {
-    const { quantity, openPrice, leverage = 100, contractSize = 100000 } = tradeParams
-    return (quantity * openPrice * contractSize) / leverage
+    const { quantity, openPrice, leverage = 100, contractSize = 100000, symbol = '' } = tradeParams
+    return tradeEngine.calculateMargin(quantity, openPrice, leverage, contractSize, symbol)
   }
 
   // Get challenge account dashboard data

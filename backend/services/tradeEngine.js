@@ -6,6 +6,7 @@ import TradeSettings from '../models/TradeSettings.js'
 import AdminLog from '../models/AdminLog.js'
 import ibEngine from './ibEngineNew.js'
 import lpService from './lpService.js'
+import lpPriceService from './lpPriceService.js'
 import aBookRouter from './aBookRouter.js'
 
 class TradeEngine {
@@ -79,9 +80,47 @@ class TradeEngine {
   // Formula: (Lots * Contract Size * Price) / Leverage
   // Example: 0.01 lot XAUUSD at $2650 with 1:100 leverage
   // = (0.01 * 100 * 2650) / 100 = $26.50 margin required
-  calculateMargin(quantity, openPrice, leverage, contractSize = this.CONTRACT_SIZE) {
+  /**
+   * Price of one unit of a position's BASE currency in USD.
+   *
+   *   XXXUSD  -> the symbol's own price (EURUSD, XAUUSD, BTCUSD)
+   *   USDXXX  -> 1, because the base already IS USD
+   *   crosses -> the base leg priced against USD, from the live feed
+   *
+   * Falls back to the trade price when the cross rate is unknown, so a missing
+   * quote can never block a trade.
+   */
+  baseCurrencyPrice(symbol, openPrice) {
+    const s = String(symbol || '').toUpperCase()
+    if (s.length < 6) return openPrice
+    if (s.endsWith('USD')) return openPrice
+    if (s.startsWith('USD')) return 1
+
+    const baseSymbol = `${s.slice(0, 3)}USD`
+    const leg = lpPriceService.getPrice(baseSymbol)
+    const mid = leg ? (Number(leg.bid) + Number(leg.ask)) / 2 : 0
+    if (mid > 0) return mid
+
+    // Cross rate unknown. A fiat base trades within a small band of the dollar,
+    // so 1 is far closer than the quote price — which on EURJPY would overstate
+    // margin about 150x and block the trade outright. Metals and crypto are
+    // nowhere near 1, so there the quote price stays the safer guess.
+    return (this._isMetal(baseSymbol) || this._isCrypto(baseSymbol)) ? openPrice : 1
+  }
+
+  /**
+   * Margin for a position, in account currency.
+   *
+   * MT5 and retail brokers charge margin on the position's BASE currency, not
+   * on its quote price: one lot of USDCAD locks $100,000 whatever the CAD rate
+   * is. Multiplying by the trade price is only right when the quote currency is
+   * the account currency, which is why this matched Exness exactly on EURUSD
+   * and XAUUSD while overstating USDJPY-style pairs by the whole quote rate.
+   */
+  calculateMargin(quantity, openPrice, leverage, contractSize = this.CONTRACT_SIZE, symbol = '') {
     const leverageNum = parseInt(leverage.toString().replace('1:', '')) || 100
-    const margin = (quantity * contractSize * openPrice) / leverageNum
+    const basePrice = this.baseCurrencyPrice(symbol, openPrice)
+    const margin = (quantity * contractSize * basePrice) / leverageNum
     return Math.round(margin * 100) / 100 // Round to 2 decimal places
   }
 
@@ -184,7 +223,7 @@ class TradeEngine {
     }
 
     // Calculate margin required for new trade
-    const marginRequired = this.calculateMargin(quantity, openPrice, leverage, contractSize)
+    const marginRequired = this.calculateMargin(quantity, openPrice, leverage, contractSize, symbol)
 
     // Calculate current used margin from existing trades
     const usedMargin = openTrades.reduce((sum, t) => sum + (t.marginUsed || 0), 0)
@@ -316,7 +355,7 @@ class TradeEngine {
     }
     
     const leverage = `1:${selectedLeverage}`
-    const marginRequired = this.calculateMargin(quantity, openPrice, leverage, contractSize)
+    const marginRequired = this.calculateMargin(quantity, openPrice, leverage, contractSize, symbol)
     
     // Log for debugging
     console.log(`Trade validation: ${quantity} lots ${symbol} @ ${openPrice}, Contract: ${contractSize}, Leverage: ${leverage}, Margin Required: $${marginRequired}`)
