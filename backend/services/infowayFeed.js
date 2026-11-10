@@ -319,12 +319,21 @@ export async function startInfowayFeed({ onTicks }) {
   if (_flushTimer) clearInterval(_flushTimer)
   _flushTimer = setInterval(flush, FLUSH_MS)
 
+  // Which business sockets to open. Crypto and non-crypto need separate
+  // connections, and a plan that allows only ONE at a time hands the slot to
+  // whichever connects first and answers the other with 429 forever — which is
+  // how forex and metals went dark for hours while crypto kept ticking. Set
+  // INFOWAY_BUSINESSES=common to give the single slot to forex/metals/indices.
+  const wanted = (process.env.INFOWAY_BUSINESSES || 'common,crypto')
+    .split(',').map((b) => b.trim().toLowerCase()).filter(Boolean)
+
   _feeds = []
-  if (commonSyms.length) _feeds.push(new BusinessFeed('common', commonSyms, apiKey, bufferTicks))
-  if (cryptoSyms.length) _feeds.push(new BusinessFeed('crypto', cryptoSyms, apiKey, bufferTicks))
+  if (wanted.includes('common') && commonSyms.length) _feeds.push(new BusinessFeed('common', commonSyms, apiKey, bufferTicks))
+  if (wanted.includes('crypto') && cryptoSyms.length) _feeds.push(new BusinessFeed('crypto', cryptoSyms, apiKey, bufferTicks))
   _feeds.forEach((f) => f.start())
 
-  console.log(`[Infoway] feed started → ${commonSyms.length} common + ${cryptoSyms.length} crypto symbols (batched ${FLUSH_MS}ms, ${WS_BASE})`)
+  const started = _feeds.map((f) => f.business).join(' + ') || 'nothing'
+  console.log(`[Infoway] feed started → ${started} (${commonSyms.length} common / ${cryptoSyms.length} crypto symbols available, batched ${FLUSH_MS}ms, ${WS_BASE})`)
   return { stop: stopInfowayFeed }
 }
 
