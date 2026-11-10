@@ -260,6 +260,103 @@ class BusinessFeed {
   }
 }
 
+const KLINE_URL = process.env.INFOWAY_KLINE_URL || 'https://data.infoway.io/common/v2/batch_kline'
+const REST_POLL_MS = Number(process.env.INFOWAY_REST_POLL_MS) || 2000
+
+/**
+ * Polls the REST kline endpoint for symbols we are not streaming over a socket.
+ *
+ * This account's WS `common` business answers the handshake with 429 every time
+ * while REST serves the very same instruments in ~110ms, so forex, metals and
+ * indices are priced from here instead of going dark. One call returns each
+ * symbol's in-progress 1-minute candle and its close is the current price.
+ * Like the socket feed this is MID — the broker spread is applied downstream.
+ */
+class RestPoller {
+  constructor(symbols, apiKey, onTicks) {
+    this.symbols = symbols
+    this.apiKey = apiKey
+    this.onTicks = onTicks
+    this._timer = null
+    this._inFlight = false
+    this._fails = 0
+    this._stopped = false
+  }
+
+  start() {
+    this._stopped = false
+    this._tick()
+    this._timer = setInterval(() => this._tick(), REST_POLL_MS)
+    console.log(`[Infoway/rest] polling ${this.symbols.length} symbols every ${REST_POLL_MS}ms`)
+  }
+
+  stop() {
+    this._stopped = true
+    if (this._timer) clearInterval(this._timer)
+    this._timer = null
+  }
+
+  async _tick() {
+    // Never let calls stack: a slow response must not queue a second request.
+    if (this._inFlight || this._stopped) return
+    this._inFlight = true
+    try {
+      const resp = await fetch(KLINE_URL, {
+        method: 'POST',
+        headers: { apiKey: this.apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          klineType: 1,
+          klineNum: 1,
+          codes: this.symbols.join(','),
+          timestamp: Math.floor(Date.now() / 1000),
+        }),
+      })
+
+      if (!resp.ok) {
+        this._note(`HTTP ${resp.status}`)
+        return
+      }
+
+      const json = await resp.json()
+      const ticks = []
+      for (const row of json?.data || []) {
+        const close = Number(row?.respList?.[0]?.c)
+        if (!row?.s || !(close > 0)) continue
+        ticks.push({
+          symbol: String(row.s).toUpperCase(),
+          bid: close,
+          ask: close,
+          timestamp: Date.now(),
+          source: 'INFOWAY_REST',
+        })
+      }
+
+      if (ticks.length) {
+        if (this._fails) {
+          console.log(`[Infoway/rest] recovered — ${ticks.length} symbols priced`)
+          this._fails = 0
+        }
+        this.onTicks(ticks)
+      } else {
+        this._note('response carried no usable candles')
+      }
+    } catch (e) {
+      this._note(e.message)
+    } finally {
+      this._inFlight = false
+    }
+  }
+
+  // One line on the first failure, then every 30th, so a long outage cannot
+  // bury the log the way the 429 reconnect loop did.
+  _note(reason) {
+    this._fails++
+    if (this._fails === 1 || this._fails % 30 === 0) {
+      console.warn(`[Infoway/rest] poll failed (${this._fails}x): ${reason}`)
+    }
+  }
+}
+
 async function loadSymbols() {
   try {
     const docs = await Instrument.find({}).select('symbol isActive').lean()
@@ -330,10 +427,16 @@ export async function startInfowayFeed({ onTicks }) {
   _feeds = []
   if (wanted.includes('common') && commonSyms.length) _feeds.push(new BusinessFeed('common', commonSyms, apiKey, bufferTicks))
   if (wanted.includes('crypto') && cryptoSyms.length) _feeds.push(new BusinessFeed('crypto', cryptoSyms, apiKey, bufferTicks))
+
+  // Anything left off the socket is priced over REST rather than left frozen.
+  const streamed = new Set(_feeds.flatMap((f) => f.symbols))
+  const polled = symbols.filter((s) => !streamed.has(s))
+  if (polled.length) _feeds.push(new RestPoller(polled, apiKey, bufferTicks))
+
   _feeds.forEach((f) => f.start())
 
-  const started = _feeds.map((f) => f.business).join(' + ') || 'nothing'
-  console.log(`[Infoway] feed started → ${started} (${commonSyms.length} common / ${cryptoSyms.length} crypto symbols available, batched ${FLUSH_MS}ms, ${WS_BASE})`)
+  const sockets = _feeds.filter((f) => f.business).map((f) => f.business).join(' + ') || 'none'
+  console.log(`[Infoway] feed started → sockets: ${sockets}, REST-polled: ${polled.length} (${commonSyms.length} common / ${cryptoSyms.length} crypto available, batched ${FLUSH_MS}ms)`)
   return { stop: stopInfowayFeed }
 }
 
