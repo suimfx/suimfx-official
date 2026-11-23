@@ -56,6 +56,9 @@ export async function recordOpenResult(trade, hedge) {
       trade.mt5AccountId = hedge.mt5AccountId
       trade.aBookOrderId = hedge.positionId || null
       trade.aBookExecuted = true
+      // Record it per trade: the user's setting can change while this position
+      // is still open, and then only the trade remembers which way it went out.
+      trade.reverseHedged = hedge.reversed === true
     }
   } else {
     trade.lpSyncStatus = 'FAILED'

@@ -320,7 +320,7 @@ router.post('/sync/:tradeId/retry', async (req, res) => {
       })
     }
 
-    const user = await User.findById(trade.userId).select('bookType firstName email mt5AccountId')
+    const user = await User.findById(trade.userId).select('bookType firstName email mt5AccountId reverseHedge')
     if (!user) return res.status(404).json({ success: false, message: 'Trade owner not found' })
 
     const hedge = await aBookRouter.routeOpen(trade, user)

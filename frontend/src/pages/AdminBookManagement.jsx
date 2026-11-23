@@ -337,6 +337,31 @@ const AdminBookManagement = () => {
     }
   }
 
+  const toggleReverseHedge = async (userId, currentlyOn) => {
+    const next = !currentlyOn
+    setActionError('')
+
+    setUsers(prev => prev.map(user =>
+      user._id === userId ? { ...user, reverseHedge: next } : user
+    ))
+
+    try {
+      const res = await fetch(`${API_URL}/book-management/users/${userId}/reverse`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reverseHedge: next })
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.message || 'Could not change reverse hedging.')
+    } catch (error) {
+      console.error('Error toggling reverse hedge:', error)
+      setUsers(prev => prev.map(user =>
+        user._id === userId ? { ...user, reverseHedge: currentlyOn } : user
+      ))
+      setActionError(error.message || 'Could not reach the server, so reverse hedging is unchanged.')
+    }
+  }
+
   const bulkUpdateBookType = async (bookType) => {
     if (selectedUsers.length === 0) return
     
@@ -812,13 +837,28 @@ const AdminBookManagement = () => {
                     <td className={`px-4 py-3 text-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{user.totalTrades || 0}</td>
                     <td className={`px-4 py-3 text-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{user.openTrades || 0}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        user.bookType === 'A' 
-                          ? 'bg-red-500/20 text-blue-400' 
-                          : 'bg-green-500/20 text-green-400'
-                      }`}>
-                        {user.bookType || 'B'}-Book
-                      </span>
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          user.bookType === 'A'
+                            ? 'bg-red-500/20 text-blue-400'
+                            : 'bg-green-500/20 text-green-400'
+                        }`}>
+                          {user.bookType || 'B'}-Book
+                        </span>
+                        <button
+                          onClick={() => toggleReverseHedge(user._id, user.reverseHedge === true)}
+                          title={user.bookType === 'A'
+                            ? 'Mirror this client on MT5: their BUY is hedged as a SELL, with stop and target swapped'
+                            : 'Applies once this client is on A-Book — B-Book trades are never hedged'}
+                          className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
+                            user.reverseHedge
+                              ? 'bg-orange-500/20 text-orange-300 border-orange-500/40 hover:bg-orange-500/30'
+                              : 'bg-dark-600 text-gray-500 border-gray-700 hover:text-gray-300'
+                          }`}
+                        >
+                          Reverse {user.reverseHedge ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button

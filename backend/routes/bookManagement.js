@@ -140,7 +140,7 @@ router.get('/users', async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit)
 
     const users = await User.find(query)
-      .select('firstName email phone bookType bookChangedAt createdAt isBlocked')
+      .select('firstName email phone bookType reverseHedge bookChangedAt createdAt isBlocked')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
@@ -222,6 +222,44 @@ router.put('/users/:userId/book-type', async (req, res) => {
 })
 
 // Bulk update book type for multiple users
+// PUT /api/book-management/users/:userId/reverse - mirror this user's hedge
+router.put('/users/:userId/reverse', async (req, res) => {
+  try {
+    const { userId } = req.params
+    const { reverseHedge } = req.body
+
+    if (typeof reverseHedge !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'reverseHedge must be true or false' })
+    }
+
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    // Same tenant rule as the book switch: an ADMIN only touches their own users.
+    if (req.admin.role === 'ADMIN' && user.assignedAdmin?.toString() !== req.admin._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
+    user.reverseHedge = reverseHedge
+    await user.save()
+
+    console.log(`[Book Management] ${user.email} reverse hedging ${reverseHedge ? 'ON' : 'OFF'}`)
+
+    res.json({
+      success: true,
+      message: reverseHedge
+        ? 'Reverse hedging on — new trades go to MT5 on the opposite side'
+        : 'Reverse hedging off — hedges follow the client again',
+      user: { _id: user._id, bookType: user.bookType, reverseHedge: user.reverseHedge }
+    })
+  } catch (error) {
+    console.error('Error setting reverse hedge:', error)
+    res.status(500).json({ success: false, message: 'Error setting reverse hedge' })
+  }
+})
+
 router.put('/users/bulk-book-type', async (req, res) => {
   try {
     const { userIds, bookType } = req.body

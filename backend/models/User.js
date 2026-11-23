@@ -136,6 +136,19 @@ const userSchema = new mongoose.Schema({
     enum: ['A', 'B'],
     default: 'B'
   },
+
+  // Mirror this user's A-Book flow instead of copying it: a client BUY is
+  // hedged as a SELL on MT5, and the stop and target swap with it.
+  //
+  // Deliberately a flag beside bookType rather than a third book value. The
+  // user stays A-Book, so every A-Book path — the hedge gate, the stats, the
+  // partner feed — keeps working untouched, and only the side flips at the
+  // moment the order reaches MT5. Inert while the user is on B-Book, since
+  // nothing is pushed then.
+  reverseHedge: {
+    type: Boolean,
+    default: false
+  },
   bookChangedAt: {
     type: Date,
     default: null

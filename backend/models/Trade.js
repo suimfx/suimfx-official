@@ -197,6 +197,14 @@ const tradeSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // This trade's hedge was mirrored, not copied: the MT5 position sits on the
+  // opposite side. Recorded per trade because the user's setting can change
+  // while the position is still open. Closing is unaffected — it addresses the
+  // position by id, not by side.
+  reverseHedged: {
+    type: Boolean,
+    default: false
+  },
   aBookOrderId: {
     type: String,
     default: null

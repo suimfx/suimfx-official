@@ -18,6 +18,30 @@ function describeMetaApiError(error) {
   return `${error.message} (${parts.join('; ')})`
 }
 
+/**
+ * What to send MT5 for one client trade: which side, and which stop and target.
+ *
+ * Normally the hedge copies the client. Reverse hedging mirrors them instead,
+ * so a client BUY goes out as a SELL — and the stop and target swap with it:
+ * on a BUY the stop sits below the entry, which is exactly where a SELL's
+ * target belongs. Left unswapped MT5 rejects the order outright, because a sell
+ * cannot carry a stop below its own entry price.
+ */
+export function hedgeOrder(trade, user) {
+  const clientSl = (trade.sl || trade.stopLoss) > 0 ? trade.sl || trade.stopLoss : undefined
+  const clientTp = (trade.tp || trade.takeProfit) > 0 ? trade.tp || trade.takeProfit : undefined
+  const clientSide = String(trade.side).toUpperCase() === 'BUY' ? 'BUY' : 'SELL'
+  const reverse = user?.reverseHedge === true
+
+  return {
+    reverse,
+    clientSide,
+    side: reverse ? (clientSide === 'BUY' ? 'SELL' : 'BUY') : clientSide,
+    sl: reverse ? clientTp : clientSl,
+    tp: reverse ? clientSl : clientTp,
+  }
+}
+
 class MT5Service {
   constructor() {
     // metaApiAccountId -> Promise<RPCConnection>. The promise (not the resolved
@@ -129,8 +153,7 @@ class MT5Service {
       const conn = await this.getConnection(account.metaApiAccountId)
       const symbol = this.mapSymbol(trade.symbol, account)
       const volume = this.normalizeVolume(trade.quantity)
-      const sl = (trade.sl || trade.stopLoss) > 0 ? trade.sl || trade.stopLoss : undefined
-      const tp = (trade.tp || trade.takeProfit) > 0 ? trade.tp || trade.takeProfit : undefined
+      const { side: hedgeSide, sl, tp, reverse, clientSide } = hedgeOrder(trade, user)
       // No clientId and no comment. MetaApi rejected our tradeId as a clientId
       // ("Value must match required pattern") and rejects comment + clientId
       // over its combined length cap — between them they failed every order.
@@ -138,14 +161,16 @@ class MT5Service {
       // the positionId MetaApi returns, which we store in Trade.aBookOrderId.
       // ponytail: if reconciliation later needs a tag on the MT5 side, look up
       // MetaApi's exact clientId pattern first instead of assuming ours fits.
-      const result =
-        String(trade.side).toUpperCase() === 'BUY'
-          ? await conn.createMarketBuyOrder(symbol, volume, sl, tp)
-          : await conn.createMarketSellOrder(symbol, volume, sl, tp)
+      const result = hedgeSide === 'BUY'
+        ? await conn.createMarketBuyOrder(symbol, volume, sl, tp)
+        : await conn.createMarketSellOrder(symbol, volume, sl, tp)
 
       const positionId = result?.positionId || result?.orderId || null
-      console.log(`[MT5] Pushed ${trade.tradeId} -> ${symbol} ${volume} lots, position ${positionId}`)
-      return { success: true, positionId, data: result }
+      console.log(
+        `[MT5] Pushed ${trade.tradeId} -> ${symbol} ${hedgeSide} ${volume} lots` +
+        `${reverse ? ` (REVERSED from client ${clientSide})` : ''}, position ${positionId}`
+      )
+      return { success: true, positionId, reversed: reverse, data: result }
     } catch (error) {
       // MetaApi's "Validation failed" message alone says nothing — the offending
       // parameter is only in error.details. Surface it or every rejection turns

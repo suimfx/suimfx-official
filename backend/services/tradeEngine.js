@@ -381,7 +381,7 @@ class TradeEngine {
     // Generate trade ID
     const tradeId = await Trade.generateTradeId()
 
-    const userForBook = await User.findById(userId).select('bookType firstName email mt5AccountId')
+    const userForBook = await User.findById(userId).select('bookType firstName email mt5AccountId reverseHedge')
     // Demo accounts can NEVER be A-book — LP must not see demo volume regardless
     // of what User.bookType says. Force B-book at creation so the stored trade
     // can't be routed to LP by any later path.
@@ -1002,7 +1002,7 @@ class TradeEngine {
             // Demo-account trades must never reach a hedge venue
             const pendingAccount = await TradingAccount.findById(trade.tradingAccountId).select('isDemo')
             if (pendingAccount && !pendingAccount.isDemo) {
-              const u = await User.findById(trade.userId).select('bookType firstName email mt5AccountId')
+              const u = await User.findById(trade.userId).select('bookType firstName email mt5AccountId reverseHedge')
               if (u) {
                 try {
                   const hedge = await aBookRouter.routeOpen(trade, u)
