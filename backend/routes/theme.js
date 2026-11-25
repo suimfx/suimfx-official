@@ -1,5 +1,6 @@
 import express from 'express'
 import Theme from '../models/Theme.js'
+import { verifyAdminToken } from '../middleware/rbac.js'
 
 const router = express.Router()
 
@@ -130,7 +131,10 @@ const PRESET_THEMES = [
 // GET /api/theme/active - Get active theme for user dashboard
 router.get('/active', async (req, res) => {
   try {
-    const theme = await Theme.getActiveTheme()
+    // Which brand's colours to paint is decided by the host the visitor is on.
+    // The tenant middleware in server.js has already resolved it; on the
+    // platform's own domains there is no tenant and the default is used.
+    const theme = await Theme.getActiveTheme(req.tenantAdmin?._id || null)
     res.json({ success: true, theme })
   } catch (error) {
     console.error('Error fetching active theme:', error)
@@ -138,10 +142,38 @@ router.get('/active', async (req, res) => {
   }
 })
 
+// Everything past this point manages themes, so it needs an admin. These routes
+// used to be open: anyone who knew the URL could repaint the whole platform.
+router.use(verifyAdminToken)
+
+// A broker owns its own themes; the Super Admin owns the platform default that
+// every broker falls back to.
+const scopeId = (req) => (req.userType === 'SUPER_ADMIN' ? null : req.admin?._id || null)
+
+// Guard every :id route in one place, so no handler can forget to check that
+// the theme it was handed belongs to the caller.
+router.param('id', async (req, res, next, id) => {
+  try {
+    const theme = await Theme.findById(id)
+    if (!theme) {
+      return res.status(404).json({ success: false, message: 'Theme not found' })
+    }
+    const owner = theme.adminId ? String(theme.adminId) : null
+    const caller = scopeId(req) ? String(scopeId(req)) : null
+    if (owner !== caller) {
+      return res.status(403).json({ success: false, message: 'This theme belongs to another account' })
+    }
+    req.theme = theme
+    next()
+  } catch (error) {
+    next(error)
+  }
+})
+
 // GET /api/theme/all - Get all themes (admin)
 router.get('/all', async (req, res) => {
   try {
-    const themes = await Theme.find().sort({ createdAt: -1 })
+    const themes = await Theme.find({ adminId: scopeId(req) }).sort({ createdAt: -1 })
     res.json({ success: true, themes })
   } catch (error) {
     console.error('Error fetching themes:', error)
@@ -167,13 +199,14 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Theme name is required' })
     }
 
-    const existingTheme = await Theme.findOne({ name })
+    const existingTheme = await Theme.findOne({ name, adminId: scopeId(req) })
     if (existingTheme) {
       return res.status(400).json({ success: false, message: 'Theme with this name already exists' })
     }
 
     const theme = await Theme.create({
       name,
+      adminId: scopeId(req),
       colors: colors || {},
       isActive: isActive || false
     })
@@ -196,7 +229,7 @@ router.post('/apply-preset', async (req, res) => {
     }
 
     // Check if theme exists, update it; otherwise create
-    let theme = await Theme.findOne({ name: preset.name })
+    let theme = await Theme.findOne({ name: preset.name, adminId: scopeId(req) })
     if (theme) {
       theme.colors = preset.colors
       theme.isActive = true
@@ -204,6 +237,7 @@ router.post('/apply-preset', async (req, res) => {
     } else {
       theme = await Theme.create({
         name: preset.name,
+        adminId: scopeId(req),
         colors: preset.colors,
         isActive: true
       })

@@ -29,10 +29,17 @@ const AdminThemeSettings = () => {
     fetchPresets()
   }, [])
 
+  // The theme routes are admin-only now — they used to be open, so anyone who
+  // knew the URL could repaint the platform. Every call carries the token.
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+  })
+
   const fetchThemes = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/theme/all`)
+      const res = await fetch(`${API_URL}/theme/all`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.success) {
         setThemes(data.themes || [])
@@ -47,7 +54,7 @@ const AdminThemeSettings = () => {
 
   const fetchPresets = async () => {
     try {
-      const res = await fetch(`${API_URL}/theme/presets`)
+      const res = await fetch(`${API_URL}/theme/presets`, { headers: getAuthHeaders() })
       const data = await res.json()
       if (data.success) {
         setPresets(data.presets || [])
@@ -61,7 +68,7 @@ const AdminThemeSettings = () => {
     try {
       const res = await fetch(`${API_URL}/theme/apply-preset`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ presetName })
       })
       const data = await res.json()
@@ -79,7 +86,8 @@ const AdminThemeSettings = () => {
   const activateTheme = async (themeId) => {
     try {
       const res = await fetch(`${API_URL}/theme/${themeId}/activate`, {
-        method: 'PUT'
+        method: 'PUT',
+        headers: getAuthHeaders()
       })
       const data = await res.json()
       if (data.success) {
@@ -97,7 +105,8 @@ const AdminThemeSettings = () => {
     if (!confirm('Are you sure you want to delete this theme?')) return
     try {
       const res = await fetch(`${API_URL}/theme/${themeId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       })
       const data = await res.json()
       if (data.success) {
@@ -119,7 +128,7 @@ const AdminThemeSettings = () => {
     try {
       const res = await fetch(`${API_URL}/theme/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ name: newThemeName, isActive: false })
       })
       const data = await res.json()
@@ -146,7 +155,7 @@ const AdminThemeSettings = () => {
     try {
       const res = await fetch(`${API_URL}/theme/${selectedTheme._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ colors: editColors })
       })
       const data = await res.json()

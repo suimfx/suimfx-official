@@ -3,8 +3,16 @@ import mongoose from 'mongoose'
 const themeSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true,
-    unique: true
+    required: true
+  },
+  // Whose theme this is. null = the platform default, which every tenant falls
+  // back to until it sets one of its own. Without this the whole platform shared
+  // a single active theme, so giving one broker its colours repainted them all.
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+    index: true
   },
   isActive: {
     type: Boolean,
@@ -70,29 +78,38 @@ const themeSchema = new mongoose.Schema({
   timestamps: true
 })
 
-// Ensure only one theme is active at a time
+// Theme names are per-tenant: two brokers may both want one called "Light".
+// A global unique index on name would let whoever created it first block
+// everyone else, the same trap AccountType and IBPlan already had to undo.
+themeSchema.index({ name: 1, adminId: 1 }, { unique: true })
+
+// One active theme per tenant. Scoped to adminId on purpose — activating a
+// broker's theme must not switch off the platform's or another broker's.
 themeSchema.pre('save', async function(next) {
   if (this.isActive) {
     await this.constructor.updateMany(
-      { _id: { $ne: this._id } },
+      { _id: { $ne: this._id }, adminId: this.adminId ?? null },
       { isActive: false }
     )
   }
   next()
 })
 
-// Static method to get active theme
-themeSchema.statics.getActiveTheme = async function() {
-  let theme = await this.findOne({ isActive: true })
+/**
+ * The theme to paint for one tenant: its own active theme, or the platform
+ * default when it has none. Called with no argument for the platform itself.
+ */
+themeSchema.statics.getActiveTheme = async function(adminId = null) {
+  if (adminId) {
+    const own = await this.findOne({ adminId, isActive: true })
+    if (own) return own
+  }
+
+  let theme = await this.findOne({ adminId: null, isActive: true })
   if (!theme) {
-    // Return default theme if none active
-    theme = await this.findOne({ name: 'Default Blue' })
+    theme = await this.findOne({ adminId: null, name: 'Default Blue' })
     if (!theme) {
-      // Create default theme
-      theme = await this.create({
-        name: 'Default Blue',
-        isActive: true
-      })
+      theme = await this.create({ name: 'Default Blue', isActive: true, adminId: null })
     }
   }
   return theme

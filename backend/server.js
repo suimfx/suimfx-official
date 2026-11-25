@@ -399,6 +399,15 @@ mongoose.connect(process.env.MONGODB_URI)
     } catch (e) {
       console.warn('[MongoDB] AccountType.syncIndexes:', e.message)
     }
+    // Sync Theme indexes. Themes used to be platform-wide with a GLOBAL unique
+    // index on `name`; they are per-tenant now, so that index would let whichever
+    // broker created "Light" first block every other broker from having one.
+    try {
+      const ThemeModel = (await import('./models/Theme.js')).default
+      await ThemeModel.syncIndexes()
+    } catch (e) {
+      console.warn('[MongoDB] Theme.syncIndexes:', e.message)
+    }
     // One-time migration: backfill accountTypeName for existing trading accounts
     try {
       const TradingAccount = (await import('./models/TradingAccount.js')).default
