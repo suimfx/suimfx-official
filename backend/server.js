@@ -304,15 +304,28 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }))
 // Detects custom domains and attaches the matching admin to req.tenantAdmin.
 // This allows routes to serve branded experiences per admin's custom domain.
 // ─────────────────────────────────────────────────────────────────────────────
+const isLocalHost = (h) =>
+  h === 'localhost' || h.startsWith('127.') || h.startsWith('192.168.')
+
 app.use(async (req, res, next) => {
   try {
-    const hostname = req.hostname?.toLowerCase()
-    if (!hostname) return next()
+    // Which host to resolve the tenant from. Normally the request's own, but
+    // the frontend bundle has VITE_API_URL baked in at build time and that
+    // points at the platform, so a visitor on broker.com calls the API at
+    // forexmt24.com and req.hostname is the PLATFORM for every tenant. The
+    // visitor's real host survives only in the Origin header, which browsers
+    // send on exactly these cross-origin fetches and never on a top-level
+    // navigation — so page requests keep resolving from req.hostname and only
+    // the API calls that would otherwise lose their tenant fall back to Origin.
+    // Without this, /api/theme/active handed every broker the platform theme.
+    const direct = req.hostname?.toLowerCase() || ''
+    const resolvable = (h) => h && !isLocalHost(h) && !isPlatformHost(h)
 
-    // Skip localhost, IP addresses, and main platform domains
-    const isLocalhost = hostname === 'localhost' || hostname.startsWith('127.') || hostname.startsWith('192.168.')
-    const isPlatformDomain = isPlatformHost(hostname)
-    if (isLocalhost || isPlatformDomain) return next()
+    const hostname = resolvable(direct)
+      ? direct
+      : [originHost(req.get('origin') || '')].find(resolvable)
+
+    if (!hostname) return next()
 
     // Single Admin model import
     const AdminModel = (await import('./models/Admin.js')).default
