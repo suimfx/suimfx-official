@@ -332,18 +332,18 @@ const Signup = () => {
   }, [otpVerified, refreshBranding, isMobile, navigate])
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-surface flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#1e3a5f_0%,_transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#312e81_0%,_transparent_50%)]" />
-        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/10 rounded-full blur-[100px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--ui-glow-1)_0%,_transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--ui-glow-2)_0%,_transparent_50%)]" />
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-brand-soft/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-brand-2/10 rounded-full blur-[120px]" />
       </div>
 
       {/* Signup Card */}
       <div className="relative w-full max-w-md">
-        <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-8 shadow-2xl">
+        <div className="bg-surface-2/80 backdrop-blur-xl rounded-2xl border border-hair-soft p-8 shadow-2xl">
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <Link to="/">
@@ -353,10 +353,10 @@ const Signup = () => {
 
           {/* Header */}
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">
+            <h1 className="text-2xl font-bold text-ink mb-2">
               {otpStep ? 'Verify Your Email' : 'Create Account'}
             </h1>
-            <p className="text-slate-400">
+            <p className="text-ink-2">
               {otpStep ? 'Enter the code sent to your email' : 'Start your trading journey today'}
             </p>
           </div>
@@ -366,13 +366,13 @@ const Signup = () => {
             <div className="space-y-5">
               <button
                 onClick={() => { setOtpStep(false); setOtp(''); setError('') }}
-                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                className="flex items-center gap-2 text-ink-2 hover:text-ink transition-colors"
               >
                 <ArrowLeft size={18} /> Back
               </button>
 
-              <p className="text-slate-400 text-sm">
-                We've sent a 6-digit OTP to <span className="text-white font-medium">{formData.email}</span>
+              <p className="text-ink-2 text-sm">
+                We've sent a 6-digit OTP to <span className="text-ink font-medium">{formData.email}</span>
               </p>
 
               <input
@@ -381,19 +381,19 @@ const Signup = () => {
                 value={otp}
                 onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError('') }}
                 maxLength={6}
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-4 text-white text-center text-2xl tracking-[0.5em] placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                className="w-full bg-surface-3/50 border border-hair rounded-xl px-4 py-4 text-ink text-center text-2xl tracking-[0.5em] placeholder-ink-3 focus:outline-none focus:border-brand-soft focus:ring-1 focus:ring-brand-soft transition-all"
               />
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                  <p className="text-red-400 text-sm">{error}</p>
+                <div className="bg-danger/10 border border-danger/20 rounded-lg p-3">
+                  <p className="text-danger text-sm">{error}</p>
                 </div>
               )}
 
               <button
                 onClick={handleVerifyOtp}
                 disabled={verifyingOtp || otp.length !== 6}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3.5 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-brand to-brand-2 text-white font-semibold py-3.5 rounded-xl hover:from-brand-2 hover:to-brand transition-all shadow-lg shadow-brand-soft/25 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {verifyingOtp ? <><RefreshCw size={16} className="animate-spin" /> Verifying...</> : 'Verify OTP'}
               </button>
@@ -401,7 +401,7 @@ const Signup = () => {
               <button
                 onClick={handleResendOtp}
                 disabled={sendingOtp}
-                className="w-full text-slate-400 hover:text-white text-sm transition-colors flex items-center justify-center gap-2"
+                className="w-full text-ink-2 hover:text-ink text-sm transition-colors flex items-center justify-center gap-2"
               >
                 {sendingOtp ? <><RefreshCw size={14} className="animate-spin" /> Sending...</> : "Didn't receive? Resend OTP"}
               </button>
@@ -411,62 +411,62 @@ const Signup = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name field */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Full Name</label>
+                <label className="block text-sm font-medium text-ink-1 mb-2">Full Name</label>
                 <div className="relative">
-                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3" />
                   <input
                     type="text"
                     name="firstName"
                     placeholder="John Doe"
                     value={formData.firstName}
                     onChange={handleChange}
-                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    className="w-full bg-surface-3/50 border border-hair rounded-xl pl-11 pr-4 py-3.5 text-ink placeholder-ink-3 focus:outline-none focus:border-brand-soft focus:ring-1 focus:ring-brand-soft transition-all"
                   />
                 </div>
               </div>
 
               {/* Email field */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Email Address</label>
+                <label className="block text-sm font-medium text-ink-1 mb-2">Email Address</label>
                 <div className="relative">
-                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-3" />
                   <input
                     type="email"
                     name="email"
                     placeholder="you@example.com"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    className="w-full bg-surface-3/50 border border-hair rounded-xl pl-11 pr-4 py-3.5 text-ink placeholder-ink-3 focus:outline-none focus:border-brand-soft focus:ring-1 focus:ring-brand-soft transition-all"
                   />
                 </div>
               </div>
 
               {/* Phone field with country selector */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Phone Number</label>
+                <label className="block text-sm font-medium text-ink-1 mb-2">Phone Number</label>
                 <div className="flex relative" ref={dropdownRef}>
                   <button
                     type="button"
                     onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                    className="flex items-center gap-1 sm:gap-2 bg-slate-800/50 border border-slate-700 rounded-l-xl px-3 py-3.5 border-r-0 hover:bg-slate-700/50 transition-colors min-w-[80px]"
+                    className="flex items-center gap-1 sm:gap-2 bg-surface-3/50 border border-hair rounded-l-xl px-3 py-3.5 border-r-0 hover:bg-surface-4/50 transition-colors min-w-[80px]"
                   >
                     <span className="text-lg">{selectedCountry.flag}</span>
-                    <span className="text-slate-400 text-sm">{selectedCountry.code}</span>
-                    <ChevronDown size={14} className="text-slate-500" />
+                    <span className="text-ink-2 text-sm">{selectedCountry.code}</span>
+                    <ChevronDown size={14} className="text-ink-3" />
                   </button>
 
                   {/* Country Dropdown */}
                   {showCountryDropdown && (
-                    <div className="absolute top-full left-0 mt-1 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 max-h-64 overflow-hidden">
-                      <div className="p-2 border-b border-slate-700">
+                    <div className="absolute top-full left-0 mt-1 w-72 bg-surface-3 border border-hair rounded-xl shadow-xl z-50 max-h-64 overflow-hidden">
+                      <div className="p-2 border-b border-hair">
                         <div className="relative">
-                          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
                           <input
                             type="text"
                             placeholder="Search country..."
                             value={countrySearch}
                             onChange={(e) => setCountrySearch(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                            className="w-full bg-surface-2 border border-hair rounded-lg pl-9 pr-3 py-2 text-ink text-sm placeholder-ink-3 focus:outline-none focus:border-brand-soft"
                           />
                         </div>
                       </div>
@@ -476,15 +476,15 @@ const Signup = () => {
                             key={`${country.code}-${index}`}
                             type="button"
                             onClick={() => handleCountrySelect(country)}
-                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-700 transition-colors text-left"
+                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-surface-4 transition-colors text-left"
                           >
                             <span className="text-lg">{country.flag}</span>
-                            <span className="text-white text-sm flex-1">{country.name}</span>
-                            <span className="text-slate-500 text-sm">{country.code}</span>
+                            <span className="text-ink text-sm flex-1">{country.name}</span>
+                            <span className="text-ink-3 text-sm">{country.code}</span>
                           </button>
                         ))}
                         {filteredCountries.length === 0 && (
-                          <p className="text-slate-500 text-sm text-center py-3">No countries found</p>
+                          <p className="text-ink-3 text-sm text-center py-3">No countries found</p>
                         )}
                       </div>
                     </div>
@@ -496,14 +496,14 @@ const Signup = () => {
                     placeholder="Phone number"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="flex-1 bg-slate-800/50 border border-slate-700 rounded-r-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all min-w-0"
+                    className="flex-1 bg-surface-3/50 border border-hair rounded-r-xl px-4 py-3.5 text-ink placeholder-ink-3 focus:outline-none focus:border-brand-soft focus:ring-1 focus:ring-brand-soft transition-all min-w-0"
                   />
                 </div>
               </div>
 
               {/* Password field */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+                <label className="block text-sm font-medium text-ink-1 mb-2">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -511,12 +511,12 @@ const Signup = () => {
                     placeholder="Create a strong password"
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3.5 pr-12 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    className="w-full bg-surface-3/50 border border-hair rounded-xl px-4 py-3.5 pr-12 text-ink placeholder-ink-3 focus:outline-none focus:border-brand-soft focus:ring-1 focus:ring-brand-soft transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-3 hover:text-ink-1 transition-colors"
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -525,8 +525,8 @@ const Signup = () => {
 
               {/* Error message */}
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                  <p className="text-red-400 text-sm">{error}</p>
+                <div className="bg-danger/10 border border-danger/20 rounded-lg p-3">
+                  <p className="text-danger text-sm">{error}</p>
                 </div>
               )}
 
@@ -534,7 +534,7 @@ const Signup = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3.5 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+                className="w-full bg-gradient-to-r from-brand to-brand-2 text-white font-semibold py-3.5 rounded-xl hover:from-brand-2 hover:to-brand transition-all shadow-lg shadow-brand-soft/25 disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
               >
                 {loading ? 'Creating account...' : <>Create Account <ArrowRight size={18} /></>}
               </button>
@@ -544,27 +544,27 @@ const Signup = () => {
           {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-700"></div>
+              <div className="w-full border-t border-hair"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900/80 text-slate-500">Already have an account?</span>
+              <span className="px-4 bg-surface-2/80 text-ink-3">Already have an account?</span>
             </div>
           </div>
 
           {/* Sign In Link */}
           <Link
             to="/user/login"
-            className="block w-full text-center py-3.5 rounded-xl border border-slate-700 text-white font-medium hover:bg-slate-800/50 transition-all"
+            className="block w-full text-center py-3.5 rounded-xl border border-hair text-ink font-medium hover:bg-surface-3/50 transition-all"
           >
             Sign In
           </Link>
 
           {/* Terms */}
-          <p className="text-center text-slate-500 text-xs mt-6">
+          <p className="text-center text-ink-3 text-xs mt-6">
             By creating an account, you agree to our{' '}
-            <a href="#" className="text-blue-400 hover:underline">Terms of Service</a>
+            <a href="#" className="text-brand-soft hover:underline">Terms of Service</a>
             {' '}and{' '}
-            <a href="#" className="text-blue-400 hover:underline">Privacy Policy</a>
+            <a href="#" className="text-brand-soft hover:underline">Privacy Policy</a>
           </p>
         </div>
       </div>

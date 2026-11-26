@@ -7,6 +7,31 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Semantic tokens for the public pages (landing, login, signup).
+        // Their defaults are the exact slate/blue palette those pages were
+        // written in, so a broker still on the platform theme renders
+        // unchanged; ThemeContext only overrides them for a tenant that set
+        // up a theme of its own. Channels, not hex, so bg-surface/50 works.
+        surface: 'rgb(var(--ui-surface) / <alpha-value>)',
+        'surface-2': 'rgb(var(--ui-surface-2) / <alpha-value>)',
+        'surface-3': 'rgb(var(--ui-surface-3) / <alpha-value>)',
+        'surface-4': 'rgb(var(--ui-surface-4) / <alpha-value>)',
+        ink: 'rgb(var(--ui-ink) / <alpha-value>)',
+        'ink-1': 'rgb(var(--ui-ink-1) / <alpha-value>)',
+        'ink-2': 'rgb(var(--ui-ink-2) / <alpha-value>)',
+        'ink-3': 'rgb(var(--ui-ink-3) / <alpha-value>)',
+        hair: 'rgb(var(--ui-hair) / <alpha-value>)',
+        'hair-soft': 'rgb(var(--ui-hair-soft) / <alpha-value>)',
+        'hair-strong': 'rgb(var(--ui-hair-strong) / <alpha-value>)',
+        brand: 'rgb(var(--ui-brand) / <alpha-value>)',
+        'brand-2': 'rgb(var(--ui-brand-2) / <alpha-value>)',
+        'brand-soft': 'rgb(var(--ui-brand-soft) / <alpha-value>)',
+        // The landing page tints each section with its own hue. Tokenised for
+        // the same reason: emerald-400 on a white page is unreadable.
+        'accent-a': 'rgb(var(--ui-accent-a) / <alpha-value>)',
+        'accent-b': 'rgb(var(--ui-accent-b) / <alpha-value>)',
+        'accent-c': 'rgb(var(--ui-accent-c) / <alpha-value>)',
+        danger: 'rgb(var(--ui-danger) / <alpha-value>)',
         dark: {
           900: 'var(--theme-bgPrimary, #0a0a0a)',
           800: 'var(--theme-bgSecondary, #111111)',

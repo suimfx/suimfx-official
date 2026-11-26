@@ -4,7 +4,7 @@ import { useBranding } from '../context/BrandingContext'
 import { isPlatformHost, isLocalDevHost } from '../utils/whiteLabelHost'
 import {
   CheckCircle2, Users, TrendingUp, Shield, Zap, Globe, BarChart3,
-  Menu, X, Download, ArrowRight, Star, Clock, Headphones, Award,
+  Menu, X, ArrowRight, Star, Clock, Headphones, Award,
   ChevronDown, ChevronUp, Smartphone, Monitor, Server
 } from 'lucide-react'
 
@@ -39,7 +39,7 @@ const Navbar = () => {
   return (
     <>
       <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 ${
-        isScrolled ? 'bg-slate-900/95 backdrop-blur-xl shadow-lg' : 'bg-transparent'
+        isScrolled ? 'bg-surface-2/95 backdrop-blur-xl shadow-lg' : 'bg-transparent'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 md:h-20">
@@ -49,23 +49,20 @@ const Navbar = () => {
 
             <div className="hidden md:flex items-center gap-8">
               {menuItems.map((item) => (
-                <a key={item.name} href={item.href} className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+                <a key={item.name} href={item.href} className="text-sm font-medium text-ink-1 hover:text-ink transition-colors">
                   {item.name}
                 </a>
               ))}
             </div>
 
             <div className="hidden md:flex items-center gap-3">
-              <a href="/suimfx.apk" download className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/10 transition-all">
-                <Download className="w-4 h-4" /> APK
-              </a>
-              <a href={loginUrl} className="px-4 py-2 text-sm font-medium text-white hover:text-slate-300 transition-colors">Sign In</a>
-              <a href={signupUrl} className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25">
+              <a href={loginUrl} className="px-4 py-2 text-sm font-medium text-ink hover:text-ink-1 transition-colors">Sign In</a>
+              <a href={signupUrl} className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-brand to-brand-2 text-white rounded-lg hover:from-brand-2 hover:to-brand transition-all shadow-lg shadow-brand-soft/25">
                 Get Started
               </a>
             </div>
 
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-white">
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-ink">
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
@@ -73,20 +70,17 @@ const Navbar = () => {
       </nav>
 
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[99] bg-slate-900/98 backdrop-blur-xl md:hidden pt-16">
+        <div className="fixed inset-0 z-[99] bg-surface-2/95 backdrop-blur-xl md:hidden pt-16">
           <div className="flex flex-col p-6 gap-2">
             {menuItems.map((item) => (
               <a key={item.name} href={item.href} onClick={() => setMobileMenuOpen(false)}
-                className="py-4 text-lg font-medium text-white border-b border-slate-800">
+                className="py-4 text-lg font-medium text-ink border-b border-hair-soft">
                 {item.name}
               </a>
             ))}
             <div className="mt-6 flex flex-col gap-3">
-              <a href="/suimfx.apk" download className="flex items-center justify-center gap-2 py-3 text-emerald-400 border border-emerald-500/30 rounded-xl">
-                <Download className="w-5 h-5" /> Download APK
-              </a>
-              <a href={loginUrl} className="py-3 text-center text-white border border-slate-700 rounded-xl">Sign In</a>
-              <a href={signupUrl} className="py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl">Get Started</a>
+              <a href={loginUrl} className="py-3 text-center text-ink border border-hair rounded-xl">Sign In</a>
+              <a href={signupUrl} className="py-3 text-center font-semibold bg-gradient-to-r from-brand to-brand-2 text-white rounded-xl">Get Started</a>
             </div>
           </div>
         </div>
@@ -102,48 +96,48 @@ const Hero = () => {
   const slug = branding?.adminSlug
   const signupUrl = slug ? `/${slug}/signup` : 'https://forexmt24.com/user/signup'
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-950">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-surface">
       {/* Animated Background */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#1e3a5f_0%,_transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#312e81_0%,_transparent_50%)]" />
-        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/20 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--ui-glow-1)_0%,_transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--ui-glow-2)_0%,_transparent_50%)]" />
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-brand-soft/20 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-brand-2/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
         {/* Grid Pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(var(--ui-grid)_1px,transparent_1px),linear-gradient(90deg,var(--ui-grid)_1px,transparent_1px)] bg-[size:60px_60px]" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 md:pt-32 md:pb-24">
         <div className="text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-soft/10 border border-brand-soft/20 mb-8">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-soft opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-soft"></span>
             </span>
-            <span className="text-sm font-medium text-blue-300">Trade Forex, Stocks, Crypto & More</span>
+            <span className="text-sm font-medium text-brand-soft">Trade Forex, Stocks, Crypto & More</span>
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight mb-6">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-ink leading-tight mb-6">
             Trade Smarter
-            <span className="block bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <span className="block bg-gradient-to-r from-brand to-brand-2 bg-clip-text text-transparent">
               With {brandName}
             </span>
             Your Gateway to Global Markets
           </h1>
 
           {/* Subtitle */}
-          <p className="max-w-2xl mx-auto text-lg sm:text-xl text-slate-400 mb-10 leading-relaxed">
+          <p className="max-w-2xl mx-auto text-lg sm:text-xl text-ink-2 mb-10 leading-relaxed">
             Access global forex, stocks, commodities, and crypto markets with tight spreads, fast execution, and powerful trading tools. Start trading today.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <a href={signupUrl} className="w-full sm:w-auto px-8 py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2">
+            <a href={signupUrl} className="w-full sm:w-auto px-8 py-4 text-lg font-semibold bg-gradient-to-r from-brand to-brand-2 text-white rounded-xl hover:from-brand-2 hover:to-brand transition-all shadow-xl shadow-brand-soft/30 flex items-center justify-center gap-2">
               Open Account <ArrowRight className="w-5 h-5" />
             </a>
-            <a href="#markets" className="w-full sm:w-auto px-8 py-4 text-lg font-semibold text-white border border-slate-700 rounded-xl hover:bg-slate-800/50 transition-all flex items-center justify-center gap-2">
+            <a href="#markets" className="w-full sm:w-auto px-8 py-4 text-lg font-semibold text-ink border border-hair rounded-xl hover:bg-surface-3/50 transition-all flex items-center justify-center gap-2">
               View Markets
             </a>
           </div>
@@ -156,9 +150,9 @@ const Hero = () => {
               { value: '1:500', label: 'Max Leverage' },
               { value: '24/5', label: 'Market Access' },
             ].map((stat, i) => (
-              <div key={i} className="text-center p-4 rounded-2xl bg-slate-800/30 border border-slate-700/50">
-                <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1">{stat.value}</div>
-                <div className="text-sm text-slate-400">{stat.label}</div>
+              <div key={i} className="text-center p-4 rounded-2xl bg-surface-3/30 border border-hair/50">
+                <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-ink mb-1">{stat.value}</div>
+                <div className="text-sm text-ink-2">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -166,7 +160,7 @@ const Hero = () => {
       </div>
 
       {/* Bottom Gradient */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-950 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-surface to-transparent" />
     </section>
   )
 }
@@ -183,26 +177,26 @@ const Markets = () => {
   ]
 
   return (
-    <section id="markets" className="py-20 md:py-32 bg-slate-900">
+    <section id="markets" className="py-20 md:py-32 bg-surface-2">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <span className="inline-block px-4 py-1.5 text-sm font-medium text-emerald-400 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-4">
+          <span className="inline-block px-4 py-1.5 text-sm font-medium text-accent-a bg-accent-a/10 rounded-full border border-accent-a/20 mb-4">
             Markets
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-ink mb-4">
             Trade Global Markets
           </h2>
-          <p className="text-lg text-slate-400 max-w-2xl mx-auto">
+          <p className="text-lg text-ink-2 max-w-2xl mx-auto">
             Access a wide range of financial instruments from one powerful platform.
           </p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
           {markets.map((market, i) => (
-            <div key={i} className="group p-5 md:p-6 rounded-2xl bg-slate-800/50 border border-slate-700 hover:border-emerald-500/50 transition-all duration-300 hover:-translate-y-1 text-center">
+            <div key={i} className="group p-5 md:p-6 rounded-2xl bg-surface-3/50 border border-hair hover:border-accent-a/50 transition-all duration-300 hover:-translate-y-1 text-center">
               <div className="text-3xl md:text-4xl mb-3">{market.icon}</div>
-              <h3 className="text-lg font-semibold text-white mb-1">{market.name}</h3>
-              <p className="text-sm text-emerald-400 font-medium">{market.pairs}</p>
+              <h3 className="text-lg font-semibold text-ink mb-1">{market.name}</h3>
+              <p className="text-sm text-accent-a font-medium">{market.pairs}</p>
             </div>
           ))}
         </div>
@@ -223,28 +217,28 @@ const Features = () => {
   ]
 
   return (
-    <section id="features" className="py-20 md:py-32 bg-slate-950">
+    <section id="features" className="py-20 md:py-32 bg-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <span className="inline-block px-4 py-1.5 text-sm font-medium text-blue-400 bg-blue-500/10 rounded-full border border-blue-500/20 mb-4">
+          <span className="inline-block px-4 py-1.5 text-sm font-medium text-brand-soft bg-brand-soft/10 rounded-full border border-brand-soft/20 mb-4">
             Why Trade With Us
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-ink mb-4">
             Trading Made Simple
           </h2>
-          <p className="text-lg text-slate-400 max-w-2xl mx-auto">
+          <p className="text-lg text-ink-2 max-w-2xl mx-auto">
             Experience professional-grade trading with tools designed for both beginners and experts.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {features.map((feature, i) => (
-            <div key={i} className="group p-6 md:p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-blue-500/50 transition-all duration-300 hover:-translate-y-1">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+            <div key={i} className="group p-6 md:p-8 rounded-2xl bg-surface-2/50 border border-hair-soft hover:border-brand-soft/50 transition-all duration-300 hover:-translate-y-1">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand to-brand-2 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                 <feature.icon className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
-              <p className="text-slate-400 leading-relaxed">{feature.description}</p>
+              <h3 className="text-xl font-semibold text-ink mb-2">{feature.title}</h3>
+              <p className="text-ink-2 leading-relaxed">{feature.description}</p>
             </div>
           ))}
         </div>
@@ -263,16 +257,16 @@ const HowToStart = () => {
   ]
 
   return (
-    <section id="process" className="py-20 md:py-32 bg-slate-900">
+    <section id="process" className="py-20 md:py-32 bg-surface-2">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <span className="inline-block px-4 py-1.5 text-sm font-medium text-purple-400 bg-purple-500/10 rounded-full border border-purple-500/20 mb-4">
+          <span className="inline-block px-4 py-1.5 text-sm font-medium text-accent-b bg-accent-b/10 rounded-full border border-accent-b/20 mb-4">
             Get Started
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-ink mb-4">
             Start Trading in Minutes
           </h2>
-          <p className="text-lg text-slate-400 max-w-2xl mx-auto">
+          <p className="text-lg text-ink-2 max-w-2xl mx-auto">
             Opening an account is quick and easy. Follow these simple steps to begin your trading journey.
           </p>
         </div>
@@ -280,11 +274,11 @@ const HowToStart = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {steps.map((item, i) => (
             <div key={i} className="relative">
-              <div className="text-6xl md:text-7xl font-bold text-slate-800 mb-4">{item.step}</div>
-              <h3 className="text-xl font-semibold text-white mb-2">{item.title}</h3>
-              <p className="text-slate-400">{item.description}</p>
+              <div className="text-6xl md:text-7xl font-bold text-ink mb-4">{item.step}</div>
+              <h3 className="text-xl font-semibold text-ink mb-2">{item.title}</h3>
+              <p className="text-ink-2">{item.description}</p>
               {i < steps.length - 1 && (
-                <div className="hidden lg:block absolute top-8 left-full w-full h-0.5 bg-gradient-to-r from-slate-700 to-transparent" style={{ width: '80%', marginLeft: '10%' }} />
+                <div className="hidden lg:block absolute top-8 left-full w-full h-0.5 bg-gradient-to-r from-surface-4 to-transparent" style={{ width: '80%', marginLeft: '10%' }} />
               )}
             </div>
           ))}
@@ -300,74 +294,74 @@ const AccountTypes = () => {
   const slug = branding?.adminSlug
   const signupUrl = slug ? `/${slug}/signup` : 'https://forexmt24.com/user/signup'
   return (
-    <section id="accounts" className="py-20 md:py-32 bg-slate-950">
+    <section id="accounts" className="py-20 md:py-32 bg-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <span className="inline-block px-4 py-1.5 text-sm font-medium text-amber-400 bg-amber-500/10 rounded-full border border-amber-500/20 mb-4">
+          <span className="inline-block px-4 py-1.5 text-sm font-medium text-accent-c bg-accent-c/10 rounded-full border border-accent-c/20 mb-4">
             Account Types
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-ink mb-4">
             Choose Your Trading Account
           </h2>
-          <p className="text-lg text-slate-400 max-w-2xl mx-auto">
+          <p className="text-lg text-ink-2 max-w-2xl mx-auto">
             Select the account type that best fits your trading style and experience level.
           </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 md:gap-8">
           {/* Standard Account */}
-          <div className="p-6 md:p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-blue-500/50 transition-all">
-            <h3 className="text-xl font-bold text-white mb-2">Standard</h3>
-            <p className="text-slate-400 text-sm mb-4">Perfect for beginners</p>
-            <div className="text-3xl font-bold text-white mb-6">$100 <span className="text-sm font-normal text-slate-400">min deposit</span></div>
+          <div className="p-6 md:p-8 rounded-2xl bg-surface-2/50 border border-hair-soft hover:border-brand-soft/50 transition-all">
+            <h3 className="text-xl font-bold text-ink mb-2">Standard</h3>
+            <p className="text-ink-2 text-sm mb-4">Perfect for beginners</p>
+            <div className="text-3xl font-bold text-ink mb-6">$100 <span className="text-sm font-normal text-ink-2">min deposit</span></div>
             <ul className="space-y-3 mb-8">
               {['Spreads from 1.0 pips', 'Leverage up to 1:200', 'All instruments', 'Basic support', 'No commission'].map((item, i) => (
-                <li key={i} className="flex items-center gap-2 text-slate-300 text-sm">
-                  <CheckCircle2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <li key={i} className="flex items-center gap-2 text-ink-1 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-brand-soft flex-shrink-0" />
                   {item}
                 </li>
               ))}
             </ul>
-            <a href={signupUrl} className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
+            <a href={signupUrl} className="block w-full py-3 text-center font-semibold text-ink border border-hair-strong rounded-xl hover:bg-surface-3 transition-all">
               Open Account
             </a>
           </div>
 
           {/* Pro Account */}
-          <div className="relative p-6 md:p-8 rounded-2xl bg-gradient-to-b from-blue-600/20 to-indigo-600/20 border border-blue-500/30">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold rounded-full">
+          <div className="relative p-6 md:p-8 rounded-2xl bg-gradient-to-b from-brand/20 to-brand-2/20 border border-brand-soft/30">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-brand to-brand-2 text-white text-xs font-semibold rounded-full">
               Most Popular
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Pro</h3>
-            <p className="text-slate-400 text-sm mb-4">For active traders</p>
-            <div className="text-3xl font-bold text-white mb-6">$1,000 <span className="text-sm font-normal text-slate-400">min deposit</span></div>
+            <h3 className="text-xl font-bold text-ink mb-2">Pro</h3>
+            <p className="text-ink-2 text-sm mb-4">For active traders</p>
+            <div className="text-3xl font-bold text-ink mb-6">$1,000 <span className="text-sm font-normal text-ink-2">min deposit</span></div>
             <ul className="space-y-3 mb-8">
               {['Spreads from 0.4 pips', 'Leverage up to 1:400', 'All instruments', 'Priority support', 'Low commission'].map((item, i) => (
-                <li key={i} className="flex items-center gap-2 text-slate-300 text-sm">
-                  <CheckCircle2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <li key={i} className="flex items-center gap-2 text-ink-1 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-brand-soft flex-shrink-0" />
                   {item}
                 </li>
               ))}
             </ul>
-            <a href={signupUrl} className="block w-full py-3 text-center font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all">
+            <a href={signupUrl} className="block w-full py-3 text-center font-semibold bg-gradient-to-r from-brand to-brand-2 text-white rounded-xl hover:from-brand-2 hover:to-brand transition-all">
               Open Account
             </a>
           </div>
 
           {/* VIP Account */}
-          <div className="p-6 md:p-8 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-amber-500/50 transition-all">
-            <h3 className="text-xl font-bold text-white mb-2">VIP</h3>
-            <p className="text-slate-400 text-sm mb-4">For professional traders</p>
-            <div className="text-3xl font-bold text-white mb-6">$10,000 <span className="text-sm font-normal text-slate-400">min deposit</span></div>
+          <div className="p-6 md:p-8 rounded-2xl bg-surface-2/50 border border-hair-soft hover:border-accent-c/50 transition-all">
+            <h3 className="text-xl font-bold text-ink mb-2">VIP</h3>
+            <p className="text-ink-2 text-sm mb-4">For professional traders</p>
+            <div className="text-3xl font-bold text-ink mb-6">$10,000 <span className="text-sm font-normal text-ink-2">min deposit</span></div>
             <ul className="space-y-3 mb-8">
               {['Spreads from 0.0 pips', 'Leverage up to 1:500', 'All instruments', 'Dedicated manager', 'Zero commission'].map((item, i) => (
-                <li key={i} className="flex items-center gap-2 text-slate-300 text-sm">
-                  <CheckCircle2 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <li key={i} className="flex items-center gap-2 text-ink-1 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-accent-c flex-shrink-0" />
                   {item}
                 </li>
               ))}
             </ul>
-            <a href={signupUrl} className="block w-full py-3 text-center font-semibold text-white border border-slate-600 rounded-xl hover:bg-slate-800 transition-all">
+            <a href={signupUrl} className="block w-full py-3 text-center font-semibold text-ink border border-hair-strong rounded-xl hover:bg-surface-3 transition-all">
               Open Account
             </a>
           </div>
@@ -411,37 +405,37 @@ const FAQSection = () => {
   ]
 
   return (
-    <section id="faq" className="py-20 md:py-32 bg-slate-900">
+    <section id="faq" className="py-20 md:py-32 bg-surface-2">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <span className="inline-block px-4 py-1.5 text-sm font-medium text-blue-400 bg-blue-500/10 rounded-full border border-blue-500/20 mb-4">
+          <span className="inline-block px-4 py-1.5 text-sm font-medium text-brand-soft bg-brand-soft/10 rounded-full border border-brand-soft/20 mb-4">
             FAQ
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-ink mb-4">
             Frequently Asked Questions
           </h2>
-          <p className="text-lg text-slate-400">
+          <p className="text-lg text-ink-2">
             Everything you need to know about trading with {brandName}.
           </p>
         </div>
 
         <div className="space-y-4">
           {faqData.map((item, index) => (
-            <div key={index} className="rounded-xl border border-slate-800 overflow-hidden">
+            <div key={index} className="rounded-xl border border-hair-soft overflow-hidden">
               <button
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
                 className={`w-full p-5 md:p-6 text-left flex items-center justify-between gap-4 transition-colors ${
-                  openIndex === index ? 'bg-slate-800/50' : 'hover:bg-slate-800/30'
+                  openIndex === index ? 'bg-surface-3/50' : 'hover:bg-surface-3/30'
                 }`}
               >
-                <span className="font-medium text-white">{item.question}</span>
+                <span className="font-medium text-ink">{item.question}</span>
                 <div className={`flex-shrink-0 transition-transform ${openIndex === index ? 'rotate-180' : ''}`}>
-                  <ChevronDown className="w-5 h-5 text-slate-400" />
+                  <ChevronDown className="w-5 h-5 text-ink-2" />
                 </div>
               </button>
               {openIndex === index && (
                 <div className="px-5 md:px-6 pb-5 md:pb-6">
-                  <p className="text-slate-400 leading-relaxed">{item.answer}</p>
+                  <p className="text-ink-2 leading-relaxed">{item.answer}</p>
                 </div>
               )}
             </div>
@@ -456,56 +450,56 @@ const FAQSection = () => {
 const Footer = () => {
   const { branding } = useBranding()
   return (
-    <footer className="bg-slate-950 border-t border-slate-800">
+    <footer className="bg-surface border-t border-hair-soft">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <a href="/" className="inline-block mb-4">
               <img src={branding?.logo || suimfxLogo} alt={branding?.brandName || 'Forexmt24'} className="h-24 w-auto" />
             </a>
-            <p className="text-slate-400 text-sm mb-4">
+            <p className="text-ink-2 text-sm mb-4">
               Your trusted partner for forex, stocks, and crypto trading.
             </p>
-            <div className="flex gap-4">
-              <a href="https://api.whatsapp.com/send/?phone=919932566062" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors">
+            <div className={`gap-4 ${branding?.adminSlug ? 'hidden' : 'flex'}`}>
+              <a href="https://api.whatsapp.com/send/?phone=919932566062" target="_blank" rel="noopener noreferrer" className="text-ink-2 hover:text-ink transition-colors">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
               </a>
-              <a href="https://www.instagram.com/suimfx/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors">
+              <a href="https://www.instagram.com/suimfx/" target="_blank" rel="noopener noreferrer" className="text-ink-2 hover:text-ink transition-colors">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
               </a>
             </div>
           </div>
 
           <div>
-            <h4 className="text-white font-semibold mb-4">Trading</h4>
+            <h4 className="text-ink font-semibold mb-4">Trading</h4>
             <ul className="space-y-2">
               {['Forex', 'Stocks', 'Crypto', 'Commodities'].map((item) => (
-                <li key={item}><a href="#markets" className="text-slate-400 hover:text-white text-sm transition-colors">{item}</a></li>
+                <li key={item}><a href="#markets" className="text-ink-2 hover:text-ink text-sm transition-colors">{item}</a></li>
               ))}
             </ul>
           </div>
 
           <div>
-            <h4 className="text-white font-semibold mb-4">Account</h4>
+            <h4 className="text-ink font-semibold mb-4">Account</h4>
             <ul className="space-y-2">
               {['Open Account', 'Deposit', 'Withdraw', 'Support'].map((item) => (
-                <li key={item}><a href="#" className="text-slate-400 hover:text-white text-sm transition-colors">{item}</a></li>
+                <li key={item}><a href="#" className="text-ink-2 hover:text-ink text-sm transition-colors">{item}</a></li>
               ))}
             </ul>
           </div>
 
           <div>
-            <h4 className="text-white font-semibold mb-4">Legal</h4>
+            <h4 className="text-ink font-semibold mb-4">Legal</h4>
             <ul className="space-y-2">
               {['Privacy Policy', 'Terms of Service', 'Disclaimer'].map((item) => (
-                <li key={item}><a href="#" className="text-slate-400 hover:text-white text-sm transition-colors">{item}</a></li>
+                <li key={item}><a href="#" className="text-ink-2 hover:text-ink text-sm transition-colors">{item}</a></li>
               ))}
             </ul>
           </div>
         </div>
 
-        <div className="pt-8 border-t border-slate-800 text-center">
-          <p className="text-slate-500 text-sm">© {new Date().getFullYear()} {branding?.brandName || 'Forexmt24'}. All rights reserved.</p>
+        <div className="pt-8 border-t border-hair-soft text-center">
+          <p className="text-ink-3 text-sm">© {new Date().getFullYear()} {branding?.brandName || 'Forexmt24'}. All rights reserved.</p>
         </div>
       </div>
     </footer>
@@ -519,7 +513,7 @@ const LandingPage = () => {
 
   if (!brandingLoaded) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 text-sm">
+      <div className="min-h-screen bg-surface flex items-center justify-center text-ink-3 text-sm">
         Loading…
       </div>
     )
@@ -527,9 +521,9 @@ const LandingPage = () => {
 
   if (!isPlatformHost(hostname) && !isLocalDevHost(hostname) && !branding?.adminSlug) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-8 text-center">
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center text-ink p-8 text-center">
         <h1 className="text-xl font-semibold mb-2">This domain is not connected</h1>
-        <p className="text-slate-400 max-w-md text-sm">
+        <p className="text-ink-2 max-w-md text-sm">
           No active broker branding was found for this address. Ask your broker to connect this domain in the admin panel, or check DNS points to the correct server.
         </p>
       </div>
@@ -537,7 +531,7 @@ const LandingPage = () => {
   }
 
   return (
-    <main className="relative min-h-screen bg-slate-950 text-white">
+    <main className="relative min-h-screen bg-surface text-ink">
       <Navbar />
       <Hero />
       <Markets />

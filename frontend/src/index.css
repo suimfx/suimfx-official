@@ -41,6 +41,36 @@ html, body {
   --theme-buttonPrimary: #3B82F6;
   --theme-buttonSecondary: #374151;
   --theme-buttonDanger: #EF4444;
+
+  /* Semantic tokens the public pages paint from. These values ARE the old
+     hardcoded palette (slate-950/900/.../blue-600), so nothing moves until a
+     tenant supplies its own theme. RGB channels so Tailwind can add alpha. */
+  --ui-surface: 2 6 23;          /* slate-950 */
+  --ui-surface-2: 15 23 42;      /* slate-900 */
+  --ui-surface-3: 30 41 59;      /* slate-800 */
+  --ui-surface-4: 51 65 85;      /* slate-700 */
+  --ui-ink: 255 255 255;         /* white      */
+  --ui-ink-1: 203 213 225;       /* slate-300 */
+  --ui-ink-2: 148 163 184;       /* slate-400 */
+  --ui-ink-3: 100 116 139;       /* slate-500 */
+  --ui-hair: 51 65 85;           /* slate-700 */
+  --ui-hair-soft: 30 41 59;      /* slate-800 */
+  --ui-hair-strong: 71 85 105;   /* slate-600 */
+  --ui-brand: 37 99 235;         /* blue-600   */
+  --ui-brand-2: 79 70 229;       /* indigo-600 */
+  --ui-brand-soft: 59 130 246;   /* blue-500   */
+  --ui-accent-a: 52 211 153;     /* emerald-400 */
+  --ui-accent-b: 192 132 252;    /* purple-400  */
+  --ui-accent-c: 251 191 36;     /* amber-400   */
+  --ui-danger: 248 113 113;      /* red-400     */
+
+  /* The hero and the auth cards wash two big radial glows over the page and
+     rule a faint grid on top. They were baked in as hex, which is why a light
+     theme still rendered a dark page. Full colour strings, not channels: they
+     go straight into an arbitrary-value gradient. */
+  --ui-glow-1: #1e3a5f;
+  --ui-glow-2: #312e81;
+  --ui-grid: rgba(255, 255, 255, 0.02);
 }
 
 * {

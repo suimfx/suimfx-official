@@ -42,3 +42,6 @@ coverage/
 
 # MetaApi SDK local history cache
 backend/.metaapi/
+
+# Playwright MCP scratch output (screenshots, page snapshots)
+.playwright-mcp/

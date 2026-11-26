@@ -37,6 +37,41 @@ const lightColors = {
   borderLight: '#D1D5DB',
 }
 
+// The public pages (landing, login, signup) paint from semantic tokens whose
+// defaults in index.css ARE the slate palette those pages were written in. A
+// broker still on the platform's theme therefore renders exactly as before;
+// only a tenant that set up a theme of its own repaints them. Three surfaces,
+// four ink levels and three hairlines is all those pages use.
+const UI_TOKENS = {
+  '--ui-surface': 'bgPrimary',
+  '--ui-surface-2': 'bgSecondary',
+  '--ui-surface-3': 'bgHover',
+  '--ui-surface-4': 'bgCard',
+  '--ui-ink': 'textPrimary',
+  '--ui-ink-1': 'textPrimary',
+  '--ui-ink-2': 'textSecondary',
+  '--ui-ink-3': 'textMuted',
+  '--ui-hair': 'border',
+  '--ui-hair-soft': 'border',
+  '--ui-hair-strong': 'borderLight',
+  '--ui-brand': 'primary',
+  '--ui-brand-2': 'primaryHover',
+  '--ui-brand-soft': 'accent',
+  '--ui-accent-a': 'success',
+  '--ui-accent-b': 'secondary',
+  '--ui-accent-c': 'warning',
+  '--ui-danger': 'error',
+}
+
+// Tailwind composes these with <alpha-value>, so they have to be channels
+// ("37 99 235") rather than hex, or bg-surface/50 emits invalid CSS.
+const rgbChannels = (hex) => {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || '').trim())
+  if (!m) return null
+  const n = parseInt(m[1], 16)
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`
+}
+
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -51,7 +86,8 @@ export const ThemeProvider = ({ children }) => {
       const data = await res.json()
       if (data.success && data.theme) {
         setTheme(data.theme)
-        applyTheme(data.theme.colors)
+        // adminId is null on the platform default that brokers fall back to.
+        applyTheme(data.theme.colors, Boolean(data.theme.adminId))
       }
     } catch (error) {
       console.error('Error fetching theme:', error)
@@ -59,11 +95,36 @@ export const ThemeProvider = ({ children }) => {
     setLoading(false)
   }
 
-  const applyTheme = (colors) => {
+  const applyTheme = (colors, tenantOwned = false) => {
     if (!colors) return
     
     const root = document.documentElement
     
+    // Only a tenant's own theme drives the public pages. Falling back to the
+    // platform default must leave them on index.css's defaults, otherwise
+    // every broker's landing page would follow the operator's colours.
+    if (tenantOwned) {
+      Object.entries(UI_TOKENS).forEach(([cssVar, key]) => {
+        const channels = rgbChannels(colors[key])
+        if (channels) root.style.setProperty(cssVar, channels)
+      })
+
+      // The hero glows are a wash, not a fill, so they follow the brand at a
+      // tenth of its strength and the grid is ruled in the ink colour.
+      const wash = (hex, alpha) => {
+        const channels = rgbChannels(hex)
+        return channels ? `rgb(${channels} / ${alpha})` : null
+      }
+      const glows = {
+        '--ui-glow-1': wash(colors.primary, 0.1),
+        '--ui-glow-2': wash(colors.accent, 0.1),
+        '--ui-grid': wash(colors.textPrimary, 0.05),
+      }
+      Object.entries(glows).forEach(([cssVar, value]) => {
+        if (value) root.style.setProperty(cssVar, value)
+      })
+    }
+
     // Apply CSS custom properties
     Object.entries(colors).forEach(([key, value]) => {
       if (value) {

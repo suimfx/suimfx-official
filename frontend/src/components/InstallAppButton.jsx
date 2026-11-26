@@ -126,7 +126,7 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
         onClick={handleClick}
         className={
           className ||
-          'w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-emerald-500/30 text-emerald-400 font-medium hover:bg-emerald-500/10 transition-all text-sm sm:text-base mb-4'
+          'w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl border border-accent-a/30 text-accent-a font-medium hover:bg-accent-a/10 transition-all text-sm sm:text-base mb-4'
         }
       >
         <Download size={18} />
@@ -139,25 +139,25 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
           onClick={() => setShowHelpModal(false)}
         >
           <div
-            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl"
+            className="bg-surface-2 border border-hair rounded-2xl w-full max-w-md p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-semibold text-lg">
+              <h3 className="text-ink font-semibold text-lg">
                 Install {brandName || 'App'}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowHelpModal(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-ink-2 hover:text-ink"
               >
                 <X size={20} />
               </button>
             </div>
 
             {isInAppBrowser ? (
-              <div className="text-slate-300 text-sm space-y-3">
-                <p className="text-amber-400 font-medium">
+              <div className="text-ink-1 text-sm space-y-3">
+                <p className="text-accent-c font-medium">
                   You're in a chat/social app browser.
                 </p>
                 <p>
@@ -167,11 +167,11 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
                 </p>
               </div>
             ) : isSafariOnIOS ? (
-              <div className="text-slate-300 text-sm space-y-4">
+              <div className="text-ink-1 text-sm space-y-4">
                 <p>Install this app on your iPhone in 3 quick steps:</p>
                 <ol className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <span className="bg-emerald-500/20 text-emerald-400 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <span className="bg-accent-a/20 text-accent-a rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
                       1
                     </span>
                     <span>
@@ -180,7 +180,7 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
                     </span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <span className="bg-emerald-500/20 text-emerald-400 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <span className="bg-accent-a/20 text-accent-a rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
                       2
                     </span>
                     <span>
@@ -189,7 +189,7 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
                     </span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <span className="bg-emerald-500/20 text-emerald-400 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <span className="bg-accent-a/20 text-accent-a rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
                       3
                     </span>
                     <span>
@@ -199,8 +199,8 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
                 </ol>
               </div>
             ) : isIOS ? (
-              <div className="text-slate-300 text-sm space-y-3">
-                <p className="text-amber-400 font-medium">
+              <div className="text-ink-1 text-sm space-y-3">
+                <p className="text-accent-c font-medium">
                   Please open this page in <strong>Safari</strong> first.
                 </p>
                 <p>
@@ -209,11 +209,11 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
                 </p>
               </div>
             ) : isAndroid ? (
-              <div className="text-slate-300 text-sm space-y-3">
+              <div className="text-ink-1 text-sm space-y-3">
                 <p>To install the app:</p>
                 <ol className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <span className="bg-emerald-500/20 text-emerald-400 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <span className="bg-accent-a/20 text-accent-a rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
                       1
                     </span>
                     <span>
@@ -222,7 +222,7 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
                     </span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <span className="bg-emerald-500/20 text-emerald-400 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <span className="bg-accent-a/20 text-accent-a rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs flex-shrink-0">
                       2
                     </span>
                     <span>
@@ -230,13 +230,13 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
                     </span>
                   </li>
                 </ol>
-                <p className="text-slate-500 text-xs mt-3">
+                <p className="text-ink-3 text-xs mt-3">
                   Don't see the option? Make sure you're using Chrome — Firefox and other browsers
                   on Android don't support app install.
                 </p>
               </div>
             ) : (
-              <div className="text-slate-300 text-sm space-y-3">
+              <div className="text-ink-1 text-sm space-y-3">
                 <p>To install the app on your computer:</p>
                 <ol className="space-y-2">
                   <li>
@@ -254,7 +254,7 @@ const InstallAppButton = ({ brandName, logoUrl, className = '' }) => {
             <button
               type="button"
               onClick={() => setShowHelpModal(false)}
-              className="mt-6 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-xl transition-colors"
+              className="mt-6 w-full bg-accent-a hover:opacity-90 text-white font-medium py-3 rounded-xl transition-colors"
             >
               Got it
             </button>
