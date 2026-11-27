@@ -73,6 +73,34 @@ html, body {
   --ui-grid: rgba(255, 255, 255, 0.02);
 }
 
+/* ── Light-theme text shim ───────────────────────────────────────────────────
+   47 screens still hardcode text-white (1,533 of them) and text-gray-300/400
+   over backgrounds that already follow the theme, because bg-dark-* is bound to
+   --theme-bg*. Give a broker a white page and those screens turned white on
+   white — the labels were still there, just invisible.
+
+   Repaint only the text that sits on a themed surface (bg-dark-*) or on no
+   background at all. A label on a coloured button or a gradient carries its own
+   bg- class, so it is excluded and keeps its white, which is what it needs.
+
+   This is a bridge, not the destination: the fix is for those screens to use
+   the ink tokens above, the same way the landing, login and signup pages now
+   do. Dark themes never match the attribute, so they are untouched. */
+html[data-brand-light] .text-white:not([class*="bg-"]),
+html[data-brand-light] .text-white[class*="bg-dark-"] {
+  color: var(--theme-textPrimary, #0F172A) !important;
+}
+
+html[data-brand-light] :is(.text-gray-300, .text-gray-400):not([class*="bg-"]),
+html[data-brand-light] :is(.text-gray-300, .text-gray-400)[class*="bg-dark-"] {
+  color: var(--theme-textSecondary, #475569) !important;
+}
+
+/* Hairlines drawn for a dark page read as harsh black rules on a white one. */
+html[data-brand-light] :is([class*="border-gray-7"], [class*="border-gray-8"]) {
+  border-color: var(--theme-border, #E2E8F0);
+}
+
 * {
   margin: 0;
   padding: 0;

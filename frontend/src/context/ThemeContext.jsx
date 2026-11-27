@@ -72,6 +72,16 @@ const rgbChannels = (hex) => {
   return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`
 }
 
+/** Perceived brightness, so a white-ish page background can be told from a
+ *  dark one. Weighted the usual way — green reads far brighter than blue. */
+const isLightHex = (hex) => {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || '').trim())
+  if (!m) return false
+  const n = parseInt(m[1], 16)
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6
+}
+
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -123,6 +133,18 @@ export const ThemeProvider = ({ children }) => {
       Object.entries(glows).forEach(([cssVar, value]) => {
         if (value) root.style.setProperty(cssVar, value)
       })
+    }
+
+    // Most screens still hardcode text-white and text-gray-300/400 over
+    // backgrounds that DO follow the theme (bg-dark-* is bound to --theme-bg*).
+    // Give a tenant a white page and the text stayed white on it, so whole
+    // screens went blank. index.css carries a shim keyed on this flag; it is a
+    // bridge until those pages use the ink tokens, and it costs dark themes
+    // nothing because the attribute is simply absent for them.
+    if (isLightHex(colors.bgPrimary)) {
+      root.setAttribute('data-brand-light', '')
+    } else {
+      root.removeAttribute('data-brand-light')
     }
 
     // Apply CSS custom properties
