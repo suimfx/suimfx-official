@@ -265,6 +265,91 @@ router.post('/users/:id/add-fund', requireSidebarPermission(PERMISSIONS.SIDEBAR.
   }
 })
 
+// POST /api/admin/users/:id/deposit-lock - Hold part of a user's wallet balance
+// back from withdrawal for a number of days. Nothing moves: the money stays in
+// the balance and stays tradable, it just cannot be withdrawn until the lock
+// lapses or an admin releases it.
+router.post('/users/:id/deposit-lock', requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
+  try {
+    if (!await checkAdminUserAccess(req, req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
+    const amount = parseFloat(req.body.amount)
+    const days = parseFloat(req.body.days)
+    const reason = (req.body.reason || '').toString().trim()
+
+    if (!(amount > 0)) {
+      return res.status(400).json({ success: false, message: 'Enter a lock amount greater than 0' })
+    }
+    if (!(days > 0)) {
+      return res.status(400).json({ success: false, message: 'Enter a lock period greater than 0 days' })
+    }
+
+    const user = await User.findById(req.params.id)
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    const Wallet = (await import('../models/Wallet.js')).default
+    let wallet = await Wallet.findOne({ userId: req.params.id })
+    if (!wallet) wallet = new Wallet({ userId: req.params.id, balance: 0 })
+
+    wallet.locks.push({
+      amount,
+      unlockAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      reason,
+      // The tenant, not the individual: an Employee acting here has no Admin
+      // document of its own to point at.
+      lockedBy: req.admin?._id || null
+    })
+    await wallet.save()
+
+    console.log(`[Admin] Locked $${amount} of ${user.email}'s balance for ${days} day(s). Locked total: $${wallet.lockedAmount}, available: $${wallet.availableBalance}`)
+
+    res.json({
+      success: true,
+      message: `$${amount.toFixed(2)} locked for ${days} day(s)`,
+      wallet
+    })
+  } catch (error) {
+    console.error('Error locking deposit:', error)
+    res.status(500).json({ success: false, message: 'Error locking deposit', error: error.message })
+  }
+})
+
+// POST /api/admin/users/:id/deposit-lock/:lockId/release - End a lock early
+router.post('/users/:id/deposit-lock/:lockId/release', requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
+  try {
+    if (!await checkAdminUserAccess(req, req.params.id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
+    const Wallet = (await import('../models/Wallet.js')).default
+    const wallet = await Wallet.findOne({ userId: req.params.id })
+    if (!wallet) {
+      return res.status(404).json({ success: false, message: 'Wallet not found' })
+    }
+
+    const lock = wallet.locks.id(req.params.lockId)
+    if (!lock) {
+      return res.status(404).json({ success: false, message: 'Lock not found' })
+    }
+
+    if (!lock.releasedAt) {
+      lock.releasedAt = new Date()
+      lock.releasedBy = req.admin?._id || null
+      await wallet.save()
+      console.log(`[Admin] Released a $${lock.amount} lock for user ${req.params.id}. Locked total: $${wallet.lockedAmount}`)
+    }
+
+    res.json({ success: true, message: 'Lock released', wallet })
+  } catch (error) {
+    console.error('Error releasing deposit lock:', error)
+    res.status(500).json({ success: false, message: 'Error releasing lock', error: error.message })
+  }
+})
+
 // POST /api/admin/trading-account/:id/add-fund - Add funds to trading account (Admin only)
 router.post('/trading-account/:id/add-fund', requireSidebarPermission(PERMISSIONS.SIDEBAR.FUND_MANAGEMENT), async (req, res) => {
   try {

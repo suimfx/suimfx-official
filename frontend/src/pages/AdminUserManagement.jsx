@@ -27,7 +27,8 @@ import {
   CreditCard,
   Plus,
   Minus,
-  Key
+  Key,
+  Timer
 } from 'lucide-react'
 
 const AdminUserManagement = () => {
@@ -52,6 +53,12 @@ const AdminUserManagement = () => {
   const [deductReason, setDeductReason] = useState('')
   const [addFundAmount, setAddFundAmount] = useState('')
   const [addFundReason, setAddFundReason] = useState('')
+  // The whole wallet, not just its balance: the deposit locks and the derived
+  // locked/available amounts come down on the same document.
+  const [userWallet, setUserWallet] = useState(null)
+  const [lockAmount, setLockAmount] = useState('')
+  const [lockDays, setLockDays] = useState('7')
+  const [lockReason, setLockReason] = useState('')
   const [blockReason, setBlockReason] = useState('')
   const [creditAmount, setCreditAmount] = useState('')
   const [creditReason, setCreditReason] = useState('')
@@ -162,6 +169,7 @@ const AdminUserManagement = () => {
       if (response.ok) {
         const data = await response.json()
         setUserWalletBalance(data.wallet?.balance || 0)
+        setUserWallet(data.wallet || null)
       }
     } catch (error) {
       console.error('Error fetching user wallet:', error)
@@ -297,6 +305,69 @@ const AdminUserManagement = () => {
     }
     setActionLoading(false)
   }
+
+  // Hold part of the user's balance back from withdrawal. Nothing moves: the
+  // money stays in the wallet and stays tradable until the lock lapses.
+  const handleLockDeposit = async () => {
+    if (!(parseFloat(lockAmount) > 0)) {
+      setMessage({ type: 'error', text: 'Enter a lock amount greater than 0' })
+      return
+    }
+    if (!(parseFloat(lockDays) > 0)) {
+      setMessage({ type: 'error', text: 'Enter a lock period greater than 0 days' })
+      return
+    }
+    setActionLoading(true)
+    try {
+      const response = await fetch(`${API_URL}/admin/users/${selectedUser._id}/deposit-lock`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({
+          amount: parseFloat(lockAmount),
+          days: parseFloat(lockDays),
+          reason: lockReason
+        })
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        setMessage({ type: 'success', text: data.message })
+        setLockAmount('')
+        setLockReason('')
+        await fetchUserWallet(selectedUser._id)
+      } else {
+        setMessage({ type: 'error', text: data.message || 'Failed to lock deposit' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error locking deposit' })
+    }
+    setActionLoading(false)
+  }
+
+  const handleReleaseLock = async (lockId) => {
+    setActionLoading(true)
+    try {
+      const response = await fetch(`${API_URL}/admin/users/${selectedUser._id}/deposit-lock/${lockId}/release`, {
+        method: 'POST',
+        headers: getAdminHeaders()
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        setMessage({ type: 'success', text: 'Lock released' })
+        await fetchUserWallet(selectedUser._id)
+      } else {
+        setMessage({ type: 'error', text: data.message || 'Failed to release lock' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error releasing lock' })
+    }
+    setActionLoading(false)
+  }
+
+  /** Locks still holding, newest first. Expiry is decided here the same way
+   *  the server decides it, so the list never shows a lapsed lock as live. */
+  const activeLocks = (userWallet?.locks || [])
+    .filter(l => !l.releasedAt && new Date(l.unlockAt) > new Date())
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
   const handleBlockUser = async () => {
     setActionLoading(true)
@@ -614,7 +685,7 @@ const AdminUserManagement = () => {
                       >
                         <Plus size={16} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => setModalType('deductWallet')}
                         className="p-2 bg-orange-500/20 text-orange-500 rounded-lg hover:bg-orange-500/30 transition-colors"
                         title="Deduct from Wallet"
@@ -623,6 +694,18 @@ const AdminUserManagement = () => {
                       </button>
                     </div>
                   </div>
+                  {userWallet?.lockedAmount > 0 && (
+                    <div className="mt-3 pt-3 border-t border-green-500/20 grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-gray-400 text-xs mb-1">🔒 Locked</p>
+                        <p className="text-purple-400 font-semibold">${userWallet.lockedAmount.toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 text-xs mb-1">Available to withdraw</p>
+                        <p className="text-white font-semibold">${userWallet.availableBalance.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Quick Actions */}
@@ -648,10 +731,17 @@ const AdminUserManagement = () => {
                     <DollarSign size={16} />
                     <span className="text-sm">Deduct Fund</span>
                   </button>
-                  <button 
+                  <button
+                    onClick={() => setModalType('lockDeposit')}
+                    className="flex items-center justify-center gap-2 p-3 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
+                  >
+                    <Timer size={16} />
+                    <span className="text-sm">Lock Deposit</span>
+                  </button>
+                  <button
                     onClick={() => setModalType('block')}
                     className={`flex items-center justify-center gap-2 p-3 rounded-lg transition-colors ${
-                      selectedUser.isBlocked 
+                      selectedUser.isBlocked
                         ? 'bg-green-500/20 text-green-500 hover:bg-green-500/30' 
                         : 'bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30'
                     }`}
@@ -1089,6 +1179,127 @@ const AdminUserManagement = () => {
             )}
 
             {/* Add Fund to Wallet */}
+            {/* Lock Deposit — holds part of the balance back from withdrawal */}
+            {modalType === 'lockDeposit' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-purple-400 mb-2">
+                  <Timer size={20} />
+                  <h4 className="font-semibold">Lock Deposit</h4>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-dark-700 p-3 rounded-lg">
+                    <p className="text-gray-500 text-xs mb-1">Balance</p>
+                    <p className="text-white font-bold">${(userWallet?.balance || 0).toFixed(2)}</p>
+                  </div>
+                  <div className="bg-dark-700 p-3 rounded-lg">
+                    <p className="text-gray-500 text-xs mb-1">Locked</p>
+                    <p className="text-purple-400 font-bold">${(userWallet?.lockedAmount || 0).toFixed(2)}</p>
+                  </div>
+                  <div className="bg-dark-700 p-3 rounded-lg">
+                    <p className="text-gray-500 text-xs mb-1">Withdrawable</p>
+                    <p className="text-white font-bold">${(userWallet?.availableBalance ?? userWallet?.balance ?? 0).toFixed(2)}</p>
+                  </div>
+                </div>
+
+                <p className="text-gray-500 text-xs">
+                  The user can still trade this money and move it to a trading account — it just can&apos;t be withdrawn until the lock ends.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-gray-400 text-sm mb-1 block">Amount to Lock ($)</label>
+                    <input
+                      type="number"
+                      value={lockAmount}
+                      onChange={(e) => setLockAmount(e.target.value)}
+                      placeholder="5000"
+                      min="0"
+                      step="0.01"
+                      className="w-full bg-dark-700 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-sm mb-1 block">Lock For (days)</label>
+                    <input
+                      type="number"
+                      value={lockDays}
+                      onChange={(e) => setLockDays(e.target.value)}
+                      placeholder="7"
+                      min="0"
+                      step="1"
+                      className="w-full bg-dark-700 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-gray-400 text-sm mb-1 block">Reason (Optional)</label>
+                  <input
+                    type="text"
+                    value={lockReason}
+                    onChange={(e) => setLockReason(e.target.value)}
+                    placeholder="Enter reason"
+                    className="w-full bg-dark-700 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                {parseFloat(lockAmount) > 0 && (
+                  <p className="text-gray-400 text-xs">
+                    Unlocks on {new Date(Date.now() + (parseFloat(lockDays) || 0) * 86400000).toLocaleString()}
+                    {parseFloat(lockAmount) + (userWallet?.lockedAmount || 0) > (userWallet?.balance || 0) && (
+                      <span className="text-yellow-500"> — this locks more than the current balance, so nothing can be withdrawn until it ends.</span>
+                    )}
+                  </p>
+                )}
+
+                <button
+                  onClick={handleLockDeposit}
+                  disabled={actionLoading}
+                  className="w-full py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? 'Processing...' : 'Lock Deposit'}
+                </button>
+
+                <div>
+                  <p className="text-gray-400 text-sm mb-2">Active Locks</p>
+                  {activeLocks.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500 text-sm bg-dark-700 rounded-lg">
+                      No active locks
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {activeLocks.map((lock) => (
+                        <div key={lock._id} className="flex items-center justify-between bg-dark-700 p-3 rounded-lg">
+                          <div>
+                            <p className="text-white font-semibold">${(lock.amount || 0).toFixed(2)}</p>
+                            <p className="text-gray-500 text-xs">
+                              Until {new Date(lock.unlockAt).toLocaleString()}
+                              {lock.reason ? ` · ${lock.reason}` : ''}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleReleaseLock(lock._id)}
+                            disabled={actionLoading}
+                            className="px-3 py-2 bg-green-500/20 text-green-500 rounded-lg hover:bg-green-500/30 transition-colors text-sm disabled:opacity-50"
+                          >
+                            Unlock now
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setModalType('view')}
+                  className="w-full py-3 bg-dark-700 text-gray-400 rounded-lg hover:bg-dark-600 transition-colors"
+                >
+                  Back
+                </button>
+              </div>
+            )}
+
             {modalType === 'addFundWallet' && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-green-500 mb-2">

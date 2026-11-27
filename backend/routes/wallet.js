@@ -139,8 +139,22 @@ router.post('/withdraw', async (req, res) => {
       return res.status(404).json({ message: 'Wallet not found' })
     }
 
-    // Check balance
-    if (wallet.balance < amount) {
+    // Check balance. A deposit lock keeps part of the balance on the platform
+    // for a period, so what can leave is the available balance, not the whole
+    // of it. This is the only place a withdrawal is created, so it is the only
+    // place the lock has to be enforced — transfers to a trading account stay
+    // open on purpose, since the money is still on the platform.
+    if (wallet.availableBalance < amount) {
+      const locked = wallet.lockedAmount
+      if (locked > 0) {
+        const until = wallet.nextUnlockAt
+        return res.status(400).json({
+          message: `$${locked.toFixed(2)} of your balance is locked${until ? ` until ${until.toDateString()}` : ''}. Available to withdraw: $${wallet.availableBalance.toFixed(2)}.`,
+          lockedAmount: locked,
+          availableBalance: wallet.availableBalance,
+          nextUnlockAt: until
+        })
+      }
       return res.status(400).json({ message: 'Insufficient balance' })
     }
 

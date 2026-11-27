@@ -528,8 +528,16 @@ const WalletPage = () => {
       setError('Please select a withdrawal account')
       return
     }
-    if (wallet && parseFloat(amount) > wallet.balance) {
-      setError('Insufficient balance')
+    // A locked deposit stays in the balance but can't leave, so check against
+    // what is actually withdrawable. The server enforces this too; catching it
+    // here just saves the round trip and says why.
+    const withdrawable = wallet?.availableBalance ?? wallet?.balance
+    if (wallet && parseFloat(amount) > withdrawable) {
+      setError(
+        wallet.lockedAmount > 0
+          ? `$${wallet.lockedAmount.toFixed(2)} of your balance is locked${wallet.nextUnlockAt ? ` until ${new Date(wallet.nextUnlockAt).toLocaleDateString()}` : ''}. You can withdraw up to $${withdrawable.toFixed(2)}.`
+          : 'Insufficient balance'
+      )
       return
     }
 
@@ -729,7 +737,20 @@ const WalletPage = () => {
                     <p className="text-gray-500 text-xs">Pending Withdrawals</p>
                     <p className="text-orange-500 font-medium text-sm">${wallet?.pendingWithdrawals?.toLocaleString() || '0.00'}</p>
                   </div>
+                  {wallet?.lockedAmount > 0 && (
+                    <div>
+                      <p className="text-gray-500 text-xs">🔒 Locked</p>
+                      <p className="text-purple-400 font-medium text-sm">${wallet.lockedAmount.toFixed(2)}</p>
+                    </div>
+                  )}
                 </div>
+                {wallet?.lockedAmount > 0 && (
+                  <p className={`text-xs mt-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    You can withdraw <span className="font-semibold">${wallet.availableBalance.toFixed(2)}</span> right now.
+                    {wallet.nextUnlockAt && ` The next $${wallet.lockedAmount.toFixed(2)} unlocks on ${new Date(wallet.nextUnlockAt).toLocaleDateString()}.`}
+                    {' '}Locked funds can still be traded.
+                  </p>
+                )}
               </div>
               <div className={`flex flex-wrap gap-2 ${isMobile ? 'mt-4' : ''}`}>
                 <button
