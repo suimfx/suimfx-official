@@ -368,7 +368,10 @@ router.get('/a-book/positions', async (req, res) => {
     // Use lean() and select only needed fields for faster queries
     const [positions, total, summary] = await Promise.all([
       Trade.find(query)
-        .select('tradeId userId tradingAccountId symbol side quantity openPrice leverage contractSize marginUsed commission swap openedAt stopLoss takeProfit')
+        // reverseHedged/aBookDestination so the admin table can show which way
+        // the hedge actually went out. The client's own side is `side`; a
+        // mirrored hedge sits the opposite way on MT5 and only the admin sees that.
+        .select('tradeId userId tradingAccountId symbol side quantity openPrice leverage contractSize marginUsed commission swap openedAt stopLoss takeProfit reverseHedged aBookDestination aBookExecuted')
         .populate('userId', 'firstName email')
         .populate('tradingAccountId', 'accountNumber')
         .sort({ openedAt: -1 })
@@ -425,7 +428,7 @@ router.get('/a-book/history', async (req, res) => {
 
     const [history, total, summary] = await Promise.all([
       Trade.find(query)
-        .select('tradeId userId tradingAccountId symbol side quantity openPrice closePrice leverage contractSize realizedPnl openedAt closedAt closedBy')
+        .select('tradeId userId tradingAccountId symbol side quantity openPrice closePrice leverage contractSize realizedPnl openedAt closedAt closedBy reverseHedged aBookDestination aBookExecuted')
         .populate('userId', 'firstName email')
         .populate('tradingAccountId', 'accountNumber')
         .sort({ closedAt: -1 })

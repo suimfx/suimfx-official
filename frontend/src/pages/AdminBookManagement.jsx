@@ -34,6 +34,43 @@ import { useTheme } from '../context/ThemeContext'
 
 import { API_URL } from '../config/api'
 
+const opposite = (side) => (side === 'BUY' ? 'SELL' : 'BUY')
+const sideColour = (side) => (side === 'BUY' ? 'text-green-400' : 'text-red-400')
+
+/**
+ * What the client did and, for a mirrored hedge, what actually went out to MT5.
+ * The client's own screens deliberately keep showing their own side — the
+ * reversal is a broker-side arrangement — so this is the only place the two
+ * directions appear together, and the admin needs to see both to reconcile a
+ * position against the MT5 account.
+ */
+const SideCell = ({ trade }) => {
+  if (!trade.reverseHedged) {
+    return (
+      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+        trade.side === 'BUY' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+      }`}>
+        {trade.side}
+      </span>
+    )
+  }
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-xs font-medium whitespace-nowrap">
+        <span className={sideColour(trade.side)}>{trade.side}</span>
+        <span className="text-gray-500 mx-1">→</span>
+        <span className={sideColour(opposite(trade.side))}>{opposite(trade.side)}</span>
+      </span>
+      <span
+        className="px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-300 text-[10px] font-semibold tracking-wide"
+        title={`Client opened ${trade.side}; the hedge went to MT5 as ${opposite(trade.side)}`}
+      >
+        REVERSED
+      </span>
+    </div>
+  )
+}
+
 const AdminBookManagement = () => {
   const { isDarkMode } = useTheme()
   const [activeTab, setActiveTab] = useState('book-management')
@@ -913,6 +950,9 @@ const AdminBookManagement = () => {
     </div>
   )
 
+  const reversedOnPage = (aBookSubTab === 'positions' ? positions : history)
+    .filter(t => t.reverseHedged).length
+
   const renderABook = () => (
     <div className="space-y-6">
       {/* Sub-tabs for Positions and History */}
@@ -935,6 +975,15 @@ const AdminBookManagement = () => {
           History ({historySummary.count || 0})
           {aBookSubTab === 'history' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />}
         </button>
+
+        {/* Counts only what is on screen, which is what the highlighting marks. */}
+        {reversedOnPage > 0 && (
+          <span className="ml-auto mb-2 self-end flex items-center gap-2 text-xs">
+            <span className="w-3 h-3 rounded-sm bg-purple-500/25 border-l-2 border-purple-500" />
+            <span className="text-purple-300 font-medium">{reversedOnPage} reversed</span>
+            <span className="text-gray-500">on this page — hedged the opposite way on MT5</span>
+          </span>
+        )}
       </div>
 
       {aBookSubTab === 'positions' ? renderPositions() : renderHistory()}
@@ -1042,7 +1091,14 @@ const AdminBookManagement = () => {
                     : pos.openPrice
                   
                   return (
-                    <tr key={pos._id} className="hover:bg-dark-700/50 transition-colors">
+                    <tr
+                      key={pos._id}
+                      className={`transition-colors ${
+                        pos.reverseHedged
+                          ? 'bg-purple-500/10 hover:bg-purple-500/20 border-l-2 border-purple-500'
+                          : 'hover:bg-dark-700/50'
+                      }`}
+                    >
                       <td className="px-3 py-2 text-white font-mono text-xs">{pos.tradeId}</td>
                       <td className="px-3 py-2">
                         <p className="text-white text-sm">{pos.userId?.firstName || 'Unknown'}</p>
@@ -1050,11 +1106,7 @@ const AdminBookManagement = () => {
                       </td>
                       <td className="px-3 py-2 text-white font-medium">{pos.symbol}</td>
                       <td className="px-3 py-2 text-center">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          pos.side === 'BUY' ? 'bg-red-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {pos.side}
-                        </span>
+                        <SideCell trade={pos} />
                       </td>
                       <td className="px-3 py-2 text-right text-white">{pos.quantity}</td>
                       <td className="px-3 py-2 text-right text-white">{pos.openPrice?.toFixed(5)}</td>
@@ -1214,7 +1266,14 @@ const AdminBookManagement = () => {
                 </tr>
               ) : (
                 history.map((trade) => (
-                  <tr key={trade._id} className="hover:bg-dark-700/50 transition-colors">
+                  <tr
+                    key={trade._id}
+                    className={`transition-colors ${
+                      trade.reverseHedged
+                        ? 'bg-purple-500/10 hover:bg-purple-500/20 border-l-2 border-purple-500'
+                        : 'hover:bg-dark-700/50'
+                    }`}
+                  >
                     <td className="px-3 py-2 text-white font-mono text-xs">{trade.tradeId}</td>
                     <td className="px-3 py-2">
                       <p className="text-white text-sm">{trade.userId?.firstName || 'Unknown'}</p>
@@ -1222,11 +1281,7 @@ const AdminBookManagement = () => {
                     </td>
                     <td className="px-3 py-2 text-white font-medium">{trade.symbol}</td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        trade.side === 'BUY' ? 'bg-red-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
-                      }`}>
-                        {trade.side}
-                      </span>
+                      <SideCell trade={trade} />
                     </td>
                     <td className="px-3 py-2 text-right text-white">{trade.quantity}</td>
                     <td className="px-3 py-2 text-right text-white">{trade.openPrice?.toFixed(5)}</td>
